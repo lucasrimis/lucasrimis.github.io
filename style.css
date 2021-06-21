@@ -10,11 +10,12 @@
 }
 body{
     background-image: url(montanha.jpg);
-    background-size: cover;
-    
+    background-size: 100%;
+    background-attachment: fixed;
     background-position: center;
     margin: 0;
     background-size: auto;
+    background-repeat: no-repeat;
     
 }
 #insta{
@@ -51,7 +52,7 @@ body{
 }
 #body{
     background-color: rgba(83, 229, 255, 0.733);
-    margin-inline: 30%;
+    margin-inline: 20%;
     border-radius: 10px;
     border:5px solid rgb(255, 255, 255);
     padding-bottom: 120px;
@@ -61,4 +62,6 @@ body{
 #habilidades li:hover{
     font-style: italic;
 }
+
+
 
