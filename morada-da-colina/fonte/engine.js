@@ -1473,8 +1473,8 @@ function buildPlayer(B, p, look) {
   // legs
   for (const [v, ph] of [[-0.17, sw], [0.17, -sw]]) {
     const L = swing(Tb, 0, 0.85, v, ph);
-    box(B, L, -0.12, 0.12, -0.75, 0, -0.11, 0.11, SHORTS, SHORTS);
-    box(B, L, -0.12, 0.12, -0.85, -0.45, -0.1, 0.1, SKIN, SKIN);
+    box(B, L, -0.12, 0.12, -0.78, 0.02, -0.11, 0.11, SHORTS, SHORTS);      // calça até o tornozelo
+    box(B, L, -0.125, 0.125, -0.78, -0.7, -0.115, 0.115, hex('#1f3a6e'), hex('#1f3a6e')); // barra da calça
     box(B, L, -0.13, 0.22, -0.88, -0.76, -0.12, 0.12, SHOE, SHOE);
   }
   box(B, Tb, -0.18, 0.18, 0.8, 1.45, -0.3, 0.3, SHIRT_, SHIRT_);
