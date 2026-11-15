@@ -264,7 +264,7 @@ function demRaw(x, z) {
 let DEM_MEAN = 0; if (DEM) { let s = 0; for (const v of DEM.data) s += v / 10; DEM_MEAN = s / DEM.data.length; }
 function demFar(x, z) { // outside the playable extent: fade towards the mean
   const cx = clampN(x, EX0, EX1), cz = clampN(z, EZ0, EZ1), d = Math.hypot(x - cx, z - cz);
-  return demRaw(cx, cz) * (1 - sstep(0, 450, d)) + DEM_MEAN * sstep(0, 450, d);
+  return demRaw(x, z) * (1 - sstep(500, 900, d)) + DEM_MEAN * sstep(500, 900, d);
 }
 function segDistT(x, z, ax, az, bx, bz) {
   const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz;
@@ -326,6 +326,7 @@ for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
     let d = 1e9; for (let k = 0; k < CREEK.length - 1; k++) d = Math.min(d, segDistT(x, z, CREEK[k][0], CREEK[k][1], CREEK[k + 1][0], CREEK[k + 1][1])[0]);
     if (d < 6) h -= 1.5 * sstep(6, 1.5, d);
   }
+  if (rs && rs.e < TS + 0.8) h = Math.min(h, rs.h - (rs.foot ? 0.12 : 0.22));
   LAT[j * LW + i] = h;
 }
 function groundAt(x, z) {
@@ -1365,7 +1366,21 @@ function upload(B, dyn) {
 }
 const meshes = [];
 let totalV = 0;
-for (const c of chunks.values()) { meshes.push({ m: upload(c.B), cx: c.cx, cz: c.cz }); totalV += c.B.n; c.B = null; }
+for (const c of chunks.values()) {
+  const f = c.B.f, bb = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9];
+  for (let i = 0; i < c.B.n; i++) { const o = i * 5; for (let k = 0; k < 3; k++) { const v = f[o + k]; if (v < bb[k]) bb[k] = v; if (v > bb[3 + k]) bb[3 + k] = v; } }
+  meshes.push({ m: upload(c.B), cx: c.cx, cz: c.cz, bb }); totalV += c.B.n; c.B = null;
+}
+// frustum test: a box is hidden only if all 8 corners are outside the same clip plane
+function boxVisible(M, bb) {
+  let out = [0, 0, 0, 0, 0];
+  for (let i = 0; i < 8; i++) {
+    const x = bb[i & 1 ? 3 : 0], y = bb[i & 2 ? 4 : 1], z = bb[i & 4 ? 5 : 2];
+    const cx = M[0] * x + M[4] * y + M[8] * z + M[12], cy = M[1] * x + M[5] * y + M[9] * z + M[13], cw = M[3] * x + M[7] * y + M[11] * z + M[15];
+    if (cx < -cw) out[0]++; if (cx > cw) out[1]++; if (cy < -cw) out[2]++; if (cy > cw) out[3]++; if (cw < 0.1) out[4]++;
+  }
+  return !out.some(n => n === 8);
+}
 const groundM = upload(ground), farM = upload(farB);
 totalV += ground.n + farB.n;
 const dynB = new Builder(1 << 14); const dynVBO = gl.createBuffer();
@@ -1948,9 +1963,9 @@ function frame_() {
   const vis = fogR[1] + 80;
   const fwx = -Math.sin(cam.yaw), fwz = -Math.cos(cam.yaw);
   for (const c of meshes) {
-    const dx = c.cx - eye[0], dz = c.cz - eye[2], d = Math.hypot(dx, dz);
-    if (d > vis) continue;
-    if (d > 120 && (dx * fwx + dz * fwz) / d < -0.35) continue; // behind the camera
+    const b = c.bb, nx = Math.max(b[0], Math.min(eye[0], b[3])), nz = Math.max(b[2], Math.min(eye[2], b[5]));
+    if (Math.hypot(nx - eye[0], nz - eye[2]) > vis) continue;
+    if (!boxVisible(VP, b)) continue;
     bindMain(c.m); gl.drawArrays(gl.TRIANGLES, 0, c.m.n);
   }
   bindMain(dynM); gl.drawArrays(gl.TRIANGLES, 0, dynM.n);
@@ -1979,7 +1994,7 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
 
 },30);
