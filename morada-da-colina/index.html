@@ -58,10 +58,16 @@
   .lbl.player{border-color:#ffd84a;color:#fff;font-size:12px}
   #touch{display:none}
   #joy{position:fixed;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.12);border:3px solid rgba(255,255,255,.35);display:none;pointer-events:none}
-  #knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,216,74,.7);border:3px solid #0d1018}
+  #knob{position:absolute;left:45px;top:45px;width:50px;height:50px;border-radius:50%;background:rgba(255,216,74,.7);border:3px solid #0d1018}
   .tbtn{font-family:'Silkscreen',monospace;font-size:12px;color:#fff;background:rgba(22,26,38,.85);border:3px solid #0d1018;box-shadow:inset 0 0 0 2px #39415a;padding:10px 12px;margin-left:6px}
-  #tbtns{position:fixed;right:12px;top:48px;display:flex}
-  @media (pointer:coarse){ #touch{display:block} #help .kb{display:none} #mini{width:130px} #hud{min-width:0} #street{font-size:20px} }
+  #tbtns{position:fixed;right:14px;bottom:calc(182px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:10px;z-index:5}
+  .tbtn.rb{width:58px;height:58px;border-radius:50%;margin:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:20px;line-height:1;background:rgba(22,26,38,.78);-webkit-tap-highlight-color:transparent}
+  .tbtn.rb span{font-size:8px;margin-top:3px;letter-spacing:.5px}
+  .tbtn.rb.big2{width:70px;height:70px;font-size:26px;background:rgba(181,83,47,.85)}
+  .tbtn.rb:active{transform:scale(.92)}
+  #joy{width:140px!important;height:140px!important}
+  #joy.run{border-color:#ffb347!important;background:rgba(255,160,60,.18)!important}
+  @media (pointer:coarse){ #touch{display:block} #help .kb{display:none} #mini{width:118px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom))} #mini.big{width:min(86vw,60vh)} #hud{min-width:0;transform:scale(.85);transform-origin:0 0} #street{font-size:20px} #fps{display:none} #online{top:112px} #chatLog{bottom:calc(14px + env(safe-area-inset-bottom));max-width:calc(100vw - 160px)} #chatBox{bottom:auto;top:12px} }
   @media (pointer:fine){ #help .tc{display:none} }
 </style>
 </head>
@@ -79,11 +85,11 @@
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
   <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)</div>
-  <div class="tc">Lado esquerdo: <b>joystick</b><br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)</div>
+  <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)</div>
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn" id="btnChat" style="display:none">CHAT</button><button class="tbtn" id="btnRun">CORRER</button><button class="tbtn" id="btnCar">CARRO</button><button class="tbtn" id="btnMap">MAPA</button></div>
+  <div id="tbtns"><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnMap">🗺<span>MAPA</span></button><button class="tbtn rb big2" id="btnCar">🚗<span>CARRO</span></button></div>
 </div>
 <div id="online" class="panel" style="display:none"></div>
 <div id="chatLog"></div>
@@ -1477,7 +1483,7 @@ const jEl = document.getElementById('joy'), jKnob = document.getElementById('kno
 cv.addEventListener('touchstart', e => {
   hideHelpSoon();
   for (const t of e.changedTouches) {
-    if (t.clientX < innerWidth * 0.45 && joy.id === null) { joy.id = t.identifier; joy.x = t.clientX; joy.y = t.clientY; joy.dx = joy.dy = 0; jEl.style.left = (t.clientX - 60) + 'px'; jEl.style.top = (t.clientY - 60) + 'px'; jEl.style.display = 'block'; jKnob.style.transform = 'translate(0px,0px)'; }
+    if (t.clientX < innerWidth * 0.45 && joy.id === null) { joy.id = t.identifier; joy.x = t.clientX; joy.y = t.clientY; joy.dx = joy.dy = 0; jEl.style.left = (t.clientX - 70) + 'px'; jEl.style.top = (t.clientY - 70) + 'px'; jEl.classList.remove('run'); jEl.style.display = 'block'; jKnob.style.transform = 'translate(0px,0px)'; }
     else if (look.id === null) { look.id = t.identifier; look.x = t.clientX; look.y = t.clientY; }
     else { pinch.d = null; pinch.id2 = t.identifier; }
   }
@@ -1485,7 +1491,7 @@ cv.addEventListener('touchstart', e => {
 }, { passive: false });
 cv.addEventListener('touchmove', e => {
   for (const t of e.touches) {
-    if (t.identifier === joy.id) { let dx = t.clientX - joy.x, dy = t.clientY - joy.y; const l = Math.hypot(dx, dy); if (l > 50) { dx *= 50 / l; dy *= 50 / l; } joy.dx = dx / 50; joy.dy = dy / 50; jKnob.style.transform = `translate(${dx}px,${dy}px)`; }
+    if (t.identifier === joy.id) { let dx = t.clientX - joy.x, dy = t.clientY - joy.y; const l = Math.hypot(dx, dy); const R = 60; if (l > R) { dx *= R / l; dy *= R / l; } joy.dx = dx / R; joy.dy = dy / R; jKnob.style.transform = `translate(${dx}px,${dy}px)`; jEl.classList.toggle('run', Math.hypot(joy.dx, joy.dy) > 0.82); }
     else if (t.identifier === look.id) {
       const t2 = [...e.touches].find(q => q.identifier === pinch.id2);
       if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) cam.dist = Math.max(7, Math.min(260, cam.dist * pinch.d / d)); pinch.d = d; }
@@ -1503,8 +1509,6 @@ cv.addEventListener('touchend', e => {
   }
 });
 document.getElementById('btnCar').addEventListener('click', toggleCar);
-document.getElementById('btnRun').addEventListener('touchstart', e => { keys.ShiftLeft = true; e.preventDefault(); });
-document.getElementById('btnRun').addEventListener('touchend', () => { keys.ShiftLeft = false; });
 document.getElementById('btnMap').addEventListener('click', () => document.getElementById('mini').classList.toggle('big'));
 let helpTimer = null;
 function hideHelpSoon() { if (helpTimer) return; helpTimer = setTimeout(() => document.getElementById('help').classList.add('hide'), 6000); }
@@ -1675,7 +1679,7 @@ function updateHUD() {
   const txt = best < 18 ? name : (inPoly(player.x, player.z, (W.areas.find(a => a.t === 'wood') || { pts: [[0, 0]] }).pts) ? 'Mata' : 'Morada da Colina');
   if (txt !== lastStreet) { hudStreet.textContent = txt; lastStreet = txt; }
   const v = player.car ? Math.abs(player.cv) : player.speed;
-  hudMode.textContent = (player.car ? 'CARRO ' : (keys.ShiftLeft || keys.ShiftRight ? 'CORRENDO ' : 'A PÉ ')) + Math.round(v * 3.6) + ' km/h · alt. ' + Math.round((DEM ? DEM.base : 0) + groundAt(player.x, player.z)) + ' m';
+  hudMode.textContent = (player.car ? 'CARRO ' : (player.running ? 'CORRENDO ' : 'A PÉ ')) + Math.round(v * 3.6) + ' km/h · alt. ' + Math.round((DEM ? DEM.base : 0) + groundAt(player.x, player.z)) + ' m';
 }
 
 // ---------------- modo online (Firebase Realtime Database) ----------------
@@ -1807,12 +1811,14 @@ function step(dt) {
   if (keys.KeyF) cam.pitch = Math.max(0.12, cam.pitch - dt);
   if (keys.Equal || keys.NumpadAdd) cam.dist = Math.max(7, cam.dist * (1 - dt));
   if (keys.Minus || keys.NumpadSubtract) cam.dist = Math.min(260, cam.dist * (1 + dt));
-  const run = keys.ShiftLeft || keys.ShiftRight;
+  const jl = joy.id !== null ? Math.min(1, Math.hypot(joy.dx, joy.dy)) : 0;
+  const run = keys.ShiftLeft || keys.ShiftRight || jl > 0.82;
+  player.running = run && (jl > 0.05 || ix || iy);
   if (!player.car) {
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     let mx_ = fx * iy + rx * ix, mz_ = fz * iy + rz * ix;
     const l = Math.hypot(mx_, mz_);
-    const target = l > 0.05 ? (run ? 9 : 4.2) * Math.min(1, l) : 0;
+    const target = l <= 0.05 ? 0 : joy.id !== null ? (jl <= 0.82 ? 4.2 * Math.min(1, jl / 0.6) : 4.2 + 4.8 * (jl - 0.82) / 0.18) : (run ? 9 : 4.2);
     player.speed += (target - player.speed) * Math.min(1, dt * 10);
     if (l > 0.05) {
       mx_ /= l; mz_ /= l;
@@ -1826,7 +1832,8 @@ function step(dt) {
       player.walk += dt * player.speed * 2.3;
     }
   } else {
-    const acc = iy > 0 ? 9 : iy < 0 ? (player.cv > 0.5 ? -16 : -6) : -Math.sign(player.cv) * 3;
+    const thr = joy.id !== null ? Math.max(-1, Math.min(1, iy)) : Math.sign(iy);
+    const acc = thr > 0.05 ? 9 * Math.min(1, thr / 0.6) : thr < -0.05 ? (player.cv > 0.5 ? -16 : -6) * Math.min(1, -thr / 0.6) : -Math.sign(player.cv) * 3;
     player.cv += acc * dt;
     const vmax = run ? 30 : 18;
     player.cv = Math.max(-6, Math.min(vmax, player.cv));
