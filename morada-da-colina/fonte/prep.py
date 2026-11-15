@@ -1,0 +1,585 @@
+"""Parse the OSM export of Morada da Colina and produce world data for the 3D game."""
+import json, math, random, sys
+import xml.etree.ElementTree as ET
+
+SRC = sys.argv[1]
+OUT = sys.argv[2]
+DEM = sys.argv[3] if len(sys.argv) > 3 else None
+random.seed(42)
+
+root = ET.parse(SRC).getroot()
+b = root.find('bounds')
+minlat, maxlat = float(b.get('minlat')), float(b.get('maxlat'))
+minlon, maxlon = float(b.get('minlon')), float(b.get('maxlon'))
+lat0, lon0 = (minlat + maxlat) / 2, (minlon + maxlon) / 2
+KX = 111320 * math.cos(math.radians(lat0))
+KZ = 110540
+
+
+def proj(lat, lon):
+    return ((lon - lon0) * KX, -(lat - lat0) * KZ)
+
+
+BX0, BZ0 = proj(maxlat, minlon)
+BX1, BZ1 = proj(minlat, maxlon)
+
+nodes = {}
+named_nodes = []
+for n in root.findall('node'):
+    p = proj(float(n.get('lat')), float(n.get('lon')))
+    nodes[n.get('id')] = p
+    tags = {t.get('k'): t.get('v') for t in n.findall('tag')}
+    if 'name' in tags:
+        named_nodes.append((tags['name'], p))
+
+ROAD = {  # type: (half width of carriageway, sidewalk width)
+    'secondary': (5.0, 2.5), 'secondary_link': (2.6, 0), 'residential': (3.6, 2.0),
+    'living_street': (2.8, 1.2), 'service': (2.0, 0), 'unclassified': (2.6, 0),
+    'footway': (0.9, 0),
+}
+roads, areas = [], []
+for w in root.findall('way'):
+    tags = {t.get('k'): t.get('v') for t in w.findall('tag')}
+    pts = [nodes[nd.get('ref')] for nd in w.findall('nd') if nd.get('ref') in nodes]
+    if len(pts) < 2:
+        continue
+    hw = tags.get('highway')
+    if hw in ROAD:
+        half, sw = ROAD[hw]
+        if hw == 'secondary' and tags.get('oneway') == 'yes':
+            half = 3.6
+        if hw == 'residential' and tags.get('oneway') == 'yes':
+            half = 3.2
+        pave = False
+        if tags.get('name') == 'Rua Albert Sabin':   # Street View (out/2024): bloquete, ~6 m, calçadas estreitas
+            half, sw, pave = 3.0, 1.5, True
+        roads.append({'id': w.get('id'), 't': hw, 'h': half, 'sw': sw, 'n': tags.get('name', ''),
+                      'ring': tags.get('junction') == 'roundabout',
+                      'dirt': tags.get('surface') == 'unpaved', 'pave': pave,
+                      'pts': pts})
+        continue
+    kind = None
+    if tags.get('natural') == 'water': kind = 'water'
+    elif tags.get('natural') == 'wood': kind = 'wood'
+    elif tags.get('leisure') == 'pitch': kind = 'pitch'
+    elif tags.get('leisure') == 'park': kind = 'park'
+    elif tags.get('amenity') == 'university': kind = 'uni'
+    elif tags.get('building'): kind = 'building'
+    elif tags.get('landuse') == 'grass': kind = 'grass'
+    if kind and pts[0] == pts[-1]:
+        areas.append({'t': kind, 'n': tags.get('name', ''), 'pts': pts[:-1]})
+
+# ---------- elevation (GeoTIFF, WGS84, 1 arc-second) ----------
+dem = None
+if DEM:
+    from PIL import Image
+    import numpy as np
+    im = Image.open(DEM)
+    arr = np.array(im).astype(float)
+    tie = im.tag_v2[33922]; scl = im.tag_v2[33550]
+    dem = {'lon0': tie[3], 'lat0': tie[4], 'step': scl[0], 'rows': arr.shape[0], 'cols': arr.shape[1], 'a': arr}
+    print('DEM', arr.shape, arr.min(), arr.max())
+
+def H(x, z):
+    if dem is None: return 0.0
+    lon = x / KX + lon0; lat = -z / KZ + lat0
+    c = (lon - dem['lon0']) / dem['step'] - 0.5; r = (dem['lat0'] - lat) / dem['step'] - 0.5
+    c = min(max(c, 0), dem['cols'] - 1.001); r = min(max(r, 0), dem['rows'] - 1.001)
+    i, j = int(r), int(c); fr, fc = r - i, c - j; a = dem['a']
+    return a[i, j]*(1-fr)*(1-fc) + a[i, j+1]*(1-fr)*fc + a[i+1, j]*fr*(1-fc) + a[i+1, j+1]*fr*fc
+
+# green strip with a creek between Rua Darci de Carvalho (515090114) and Rua Vandir de Carvalho (347965439)
+byid = {r['id']: r for r in roads}
+darci, vandir = byid['515090114']['pts'], byid['347965439']['pts']
+strip_poly = vandir + darci
+creek = []
+def _resample(pts, n):
+    L = [0]
+    for a, bb in zip(pts, pts[1:]): L.append(L[-1] + math.hypot(bb[0]-a[0], bb[1]-a[1]))
+    out = []
+    for k in range(n + 1):
+        s = L[-1] * k / n
+        i = 1
+        while i < len(L) - 1 and L[i] < s: i += 1
+        t = (s - L[i-1]) / ((L[i] - L[i-1]) or 1)
+        out.append((pts[i-1][0] + (pts[i][0]-pts[i-1][0]) * t, pts[i-1][1] + (pts[i][1]-pts[i-1][1]) * t))
+    return out
+dv = _resample(darci, 60); vv = _resample(vandir[::-1], 60)
+for (ax, az), (bx, bz) in zip(dv, vv):
+    # follow the valley floor: lowest point across the strip (keeping clear of the roads)
+    best = None
+    for k in range(12, 29):
+        t = k / 40
+        x, z = ax + (bx-ax)*t, az + (bz-az)*t
+        hh = H(x, z) + abs(t - 0.5) * 1.5  # slight preference for the middle
+        if best is None or hh < best[0]: best = (hh, t)
+    t = best[1] if dem else 0.5
+    creek.append((ax + (bx-ax)*t, az + (bz-az)*t))
+# smooth the path
+for _ in range(4):
+    creek = [creek[0]] + [((creek[i-1][0]+2*creek[i][0]+creek[i+1][0])/4, (creek[i-1][1]+2*creek[i][1]+creek[i+1][1])/4) for i in range(1, len(creek)-1)] + [creek[-1]]
+widths = [math.hypot(bx-ax, bz-az) for (ax, az), (bx, bz) in zip(dv, vv)]
+print('strip width min/max', round(min(widths),1), round(max(widths),1))
+areas.append({'t': 'strip', 'n': '', 'pts': strip_poly})
+
+# roundabout centre island
+for r in roads:
+    if r['ring']:
+        areas.append({'t': 'island', 'n': '', 'pts': r['pts'][:-1]})
+
+
+# ---------- geometry helpers ----------
+def seg_dist(px, pz, ax, az, bx, bz):
+    dx, dz = bx - ax, bz - az
+    L = dx * dx + dz * dz
+    t = 0 if L == 0 else max(0, min(1, ((px - ax) * dx + (pz - az) * dz) / L))
+    return math.hypot(px - (ax + t * dx), pz - (az + t * dz))
+
+
+def in_poly(x, z, poly):
+    c = False
+    j = len(poly) - 1
+    for i in range(len(poly)):
+        xi, zi = poly[i]; xj, zj = poly[j]
+        if (zi > z) != (zj > z) and x < (xj - xi) * (z - zi) / (zj - zi) + xi:
+            c = not c
+        j = i
+    return c
+
+
+# spatial grid for road segments
+CELL = 25
+seg_grid = {}
+for ri, r in enumerate(roads):
+    reach = r['h'] + r['sw']
+    for a, bb in zip(r['pts'], r['pts'][1:]):
+        x0, x1 = sorted([a[0], bb[0]]); z0, z1 = sorted([a[1], bb[1]])
+        for gx in range(int(math.floor((x0 - reach - 20) / CELL)), int(math.floor((x1 + reach + 20) / CELL)) + 1):
+            for gz in range(int(math.floor((z0 - reach - 20) / CELL)), int(math.floor((z1 + reach + 20) / CELL)) + 1):
+                seg_grid.setdefault((gx, gz), []).append((a, bb, reach))
+
+
+def road_clear(x, z, margin):
+    for a, bb, reach in seg_grid.get((int(math.floor(x / CELL)), int(math.floor(z / CELL))), []):
+        if seg_dist(x, z, a[0], a[1], bb[0], bb[1]) < reach + margin:
+            return False
+    return True
+
+
+def road_dist(x, z):
+    best = 1e9
+    for a, bb, reach in seg_grid.get((int(math.floor(x / CELL)), int(math.floor(z / CELL))), []):
+        best = min(best, seg_dist(x, z, a[0], a[1], bb[0], bb[1]) - reach)
+    return best
+
+
+blockers = [a['pts'] for a in areas if a['t'] in ('water', 'wood', 'pitch', 'park', 'uni', 'building', 'island', 'strip')]
+
+
+def area_clear(x, z):
+    return not any(in_poly(x, z, p) for p in blockers)
+
+
+def in_bounds(x, z, m=4):
+    return BX0 + m < x < BX1 - m and BZ0 + m < z < BZ1 - m
+
+
+def rect_corners(cx, cz, w, d, ang):
+    c, s = math.cos(ang), math.sin(ang)
+    out = []
+    for u, v in ((-w / 2, -d / 2), (w / 2, -d / 2), (w / 2, d / 2), (-w / 2, d / 2)):
+        out.append((cx + u * c - v * s, cz + u * s + v * c))
+    return out
+
+
+def sat_overlap(A, B):
+    for poly in (A, B):
+        for i in range(4):
+            ax, az = poly[i]; bx, bz = poly[(i + 1) % 4]
+            nx, nz = -(bz - az), bx - ax
+            pa = [nx * p[0] + nz * p[1] for p in A]
+            pb = [nx * p[0] + nz * p[1] for p in B]
+            if max(pa) < min(pb) or max(pb) < min(pa):
+                return False
+    return True
+
+
+occ_grid = {}  # placed rectangles
+
+
+def rect_free(corners, pad=0):
+    cx = sum(p[0] for p in corners) / 4; cz = sum(p[1] for p in corners) / 4
+    gx, gz = int(cx // 20), int(cz // 20)
+    for dx in (-1, 0, 1):
+        for dz in (-1, 0, 1):
+            for other in occ_grid.get((gx + dx, gz + dz), []):
+                if sat_overlap(corners, other):
+                    return False
+    return True
+
+
+def occupy(corners):
+    cx = sum(p[0] for p in corners) / 4; cz = sum(p[1] for p in corners) / 4
+    occ_grid.setdefault((int(cx // 20), int(cz // 20)), []).append(corners)
+
+
+def rect_ok(corners, road_margin):
+    for (x, z) in corners + [(sum(p[0] for p in corners) / 4, sum(p[1] for p in corners) / 4)]:
+        if not in_bounds(x, z) or not road_clear(x, z, road_margin) or not area_clear(x, z):
+            return False
+    # edge midpoints too
+    for i in range(4):
+        x = (corners[i][0] + corners[(i + 1) % 4][0]) / 2
+        z = (corners[i][1] + corners[(i + 1) % 4][1]) / 2
+        if not road_clear(x, z, road_margin):
+            return False
+    return True
+
+
+# ---------- houses ----------
+houses = []
+poles = []
+# ---------- Rua Albert Sabin, based on Street View (Oct 2024) ----------
+# dense lots, walls/gradis on the property line, many sobrados, some geminadas, solar panels,
+# a grassy empty lot on the north side at the start of the long SE straight
+WALL_IDX = {'amarelo': 1, 'creme': 0, 'pessego': 2, 'rosa': 3, 'verde': 5, 'branco': 6, 'amarelo2': 7, 'terracota': 8}
+weed_lot = proj(-22.48612, -44.47790)
+for r in roads:
+    if not r.get('pave'):
+        continue
+    pts = r['pts']
+    for a, bb in zip(pts, pts[1:]):
+        L = math.hypot(bb[0] - a[0], bb[1] - a[1])
+        if L < 6: continue
+        ux, uz = (bb[0] - a[0]) / L, (bb[1] - a[1]) / L
+        ang = math.atan2(uz, ux)
+        for side in (-1, 1):
+            nx, nz = -uz * side, ux * side
+            t = random.uniform(1, 3)
+            while t < L - 3:
+                pair = random.random() < 0.18
+                w = 6.5 if pair else random.choice([8, 9, 10, 10, 11, 12])
+                d = random.choice([9, 10, 11, 12])
+                setback = random.uniform(2.2, 4.5)
+                off = r['h'] + r['sw'] + setback + d / 2
+                cx = a[0] + ux * t + nx * off; cz = a[1] + uz * t + nz * off
+                if math.hypot(cx - weed_lot[0], cz - weed_lot[1]) < 16:
+                    t += 3; continue
+                corners = rect_corners(cx, cz, w, d, ang)
+                if rect_ok(corners, 0.6) and rect_free(rect_corners(cx, cz, w + 0.8, d + 1, ang)):
+                    occupy(corners)
+                    floors = 2 if (pair or random.random() < 0.5) else 1
+                    col = random.randrange(10)
+                    face = math.atan2(-nz, -nx)
+                    flags = (1 if random.random() < 0.3 else 0) | (2 if random.random() < 0.6 else 0) | 4 | \
+                            (8 if floors == 2 and random.random() < 0.6 else 0) | (16 if random.random() < 0.35 else 0)
+                    houses.append([round(cx, 1), round(cz, 1), w, d, round(ang, 3), floors, col, random.choice([0, 0, 0, 1, 2]), 0,
+                                   0, 0, 4, 7, round(face, 3), random.randrange(1000), flags, round(setback - 0.15, 2)])
+                    if pair:  # geminada: twin attached on the side, same colour
+                        cx2 = cx + ux * w; cz2 = cz + uz * w
+                        c2 = rect_corners(cx2, cz2, w, d, ang)
+                        if rect_ok(c2, 0.6) and rect_free(rect_corners(cx2, cz2, w - 0.2, d, ang)):
+                            occupy(c2)
+                            houses.append([round(cx2, 1), round(cz2, 1), w, d, round(ang, 3), 2, col, houses[-1][7], 0,
+                                           0, 0, 4, 7, round(face, 3), houses[-1][14], flags, round(setback - 0.15, 2)])
+                            t += w
+                    t += w + random.uniform(0.4, 1.4)
+                else:
+                    t += 2
+    # utility poles with wires, every ~32 m on the left-hand side
+    acc = 0; first = True
+    for a, bb in zip(pts, pts[1:]):
+        L = math.hypot(bb[0] - a[0], bb[1] - a[1])
+        if L < 0.5: continue
+        ux, uz = (bb[0] - a[0]) / L, (bb[1] - a[1]) / L
+        t = 0 if first else (32 - acc) % 32
+        first = False
+        while t < L:
+            off = r['h'] + 0.5
+            poles.append([round(a[0] + ux * t - uz * off, 1), round(a[1] + uz * t + ux * off, 1)])
+            t += 32
+        acc = (acc + L) % 32
+landmarks_pre = [{'type': 'weedlot', 'x': round(weed_lot[0], 1), 'z': round(weed_lot[1], 1)}]
+
+for r in roads:
+    if r['t'] not in ('residential', 'living_street') or r.get('pave'):
+        continue
+    pts = r['pts']
+    for a, bb in zip(pts, pts[1:]):
+        L = math.hypot(bb[0] - a[0], bb[1] - a[1])
+        if L < 6:
+            continue
+        ux, uz = (bb[0] - a[0]) / L, (bb[1] - a[1]) / L
+        ang = math.atan2(uz, ux)
+        for side in (-1, 1):
+            nx, nz = -uz * side, ux * side
+            t = random.uniform(2, 7)
+            while t < L - 3:
+                w = random.choice([8, 9, 10, 11, 12, 13])
+                d = random.choice([8, 9, 10, 11, 12])
+                setback = random.uniform(3, 6)
+                off = r['h'] + r['sw'] + setback + d / 2
+                cx = a[0] + ux * t + nx * off
+                cz = a[1] + uz * t + nz * off
+                corners = rect_corners(cx, cz, w, d, ang)
+                if rect_ok(corners, 1.5) and rect_free(rect_corners(cx, cz, w + 3, d + 2, ang)):
+                    occupy(corners)
+                    floors = 2 if random.random() < 0.35 else 1
+                    pool = 0
+                    # pool behind the house (away from the street)
+                    pw, pd = random.choice([(4, 7), (4, 8), (5, 8), (3.5, 6)])
+                    poff = off + d / 2 + 2.5 + pw / 2
+                    px, pz = a[0] + ux * t + nx * poff, a[1] + uz * t + nz * poff
+                    pc = rect_corners(px, pz, pd, pw, ang)
+                    if random.random() < 0.4 and rect_ok(pc, 1) and rect_free(pc):
+                        occupy(pc)
+                        pool = 1
+                    # facing: front of house points toward road (-n)
+                    face = math.atan2(-nz, -nx)
+                    houses.append([round(cx, 1), round(cz, 1), w, d, round(ang, 3), floors,
+                                   random.randrange(8), random.randrange(4), pool,
+                                   round(px, 1), round(pz, 1), pw, pd, round(face, 3), random.randrange(1000)])
+                    t += w + random.uniform(3, 6)
+                else:
+                    t += 2.5
+
+# campus buildings in the university area (generic blocks)
+for a in areas:
+    if a['t'] == 'uni':
+        xs = [p[0] for p in a['pts']]; zs = [p[1] for p in a['pts']]
+        cx, cz = sum(xs) / len(xs), sum(zs) / len(zs)
+
+# ---------- trees ----------
+trees = []
+tree_occ = {}
+
+
+def tree_free(x, z, rad):
+    gx, gz = int(x // 10), int(z // 10)
+    for dx in (-1, 0, 1):
+        for dz in (-1, 0, 1):
+            for (tx, tz, tr) in tree_occ.get((gx + dx, gz + dz), []):
+                if math.hypot(tx - x, tz - z) < (rad + tr) * 0.8:
+                    return False
+    return True
+
+
+def house_hit(x, z, rad):
+    probe = rect_corners(x, z, rad * 2, rad * 2, 0)
+    return not rect_free(probe)
+
+
+def add_tree(x, z, kind, size):
+    rad = size * 1.3
+    if not tree_free(x, z, rad) or house_hit(x, z, rad * 0.6):
+        return False
+    tree_occ.setdefault((int(x // 10), int(z // 10)), []).append((x, z, rad))
+    trees.append([round(x, 1), round(z, 1), kind, round(size, 2)])
+    return True
+
+
+def fill_poly(poly, spacing, kind_fn, road_margin=1.0, prob=1.0, wbounds=True):
+    xs = [p[0] for p in poly]; zs = [p[1] for p in poly]
+    x = min(xs)
+    while x < max(xs):
+        z = min(zs)
+        while z < max(zs):
+            jx = x + random.uniform(-spacing * .45, spacing * .45)
+            jz = z + random.uniform(-spacing * .45, spacing * .45)
+            if random.random() < prob and in_poly(jx, jz, poly) and road_clear(jx, jz, road_margin) \
+                    and (not wbounds or in_bounds(jx, jz, -60)):
+                k, s = kind_fn()
+                add_tree(jx, jz, k, s)
+            z += spacing
+        x += spacing
+
+
+water = [a['pts'] for a in areas if a['t'] == 'water']
+for a in areas:
+    if a['t'] == 'wood':
+        fill_poly(a['pts'], 5.0, lambda: (random.choice([0, 0, 1, 2]), random.uniform(0.9, 1.6)))
+    elif a['t'] == 'park' and 'Bosque' in a['n']:
+        fill_poly(a['pts'], 5.5, lambda: (random.choice([0, 1, 2]), random.uniform(0.9, 1.5)))
+    elif a['t'] == 'park':
+        fill_poly(a['pts'], 16, lambda: (random.choice([0, 1, 3]), random.uniform(0.8, 1.3)), prob=0.6)
+
+# riparian trees on both sides of the creek
+for i in range(len(creek) - 1):
+    ax, az = creek[i]; bx, bz = creek[i+1]
+    L = math.hypot(bx-ax, bz-az)
+    if L < 0.1: continue
+    ux, uz = (bx-ax)/L, (bz-az)/L
+    t = 0
+    while t < L:
+        for side in (-1, 1):
+            for rowoff in (3.5, 7.5, 11.5):
+                off = side * (rowoff + random.uniform(-1.2, 1.2))
+                x = ax + ux*t - uz*off; z = az + uz*t + ux*off
+                if road_clear(x, z, 1.5) and in_poly(x, z, strip_poly) and random.random() < 0.85:
+                    add_tree(x, z, random.choice([0, 0, 0, 1, 2, 2, 2, 4]), random.uniform(0.9, 1.4))
+        t += random.uniform(3.5, 5.5)
+
+# palms around the lake
+for poly in water:
+    for i in range(len(poly)):
+        ax, az = poly[i]; bx, bz = poly[(i + 1) % len(poly)]
+        cx = sum(p[0] for p in poly) / len(poly); cz = sum(p[1] for p in poly) / len(poly)
+        L = math.hypot(bx - ax, bz - az)
+        t = 0
+        while t < L:
+            px, pz = ax + (bx - ax) * t / L, az + (bz - az) * t / L
+            dx, dz = px - cx, pz - cz; dl = math.hypot(dx, dz)
+            px += dx / dl * 5; pz += dz / dl * 5
+            if road_clear(px, pz, 1) and random.random() < 0.7:
+                add_tree(px, pz, 3, random.uniform(0.9, 1.2))
+            t += 9
+
+# street trees
+for r in roads:
+    if r['t'] not in ('residential', 'secondary', 'living_street'):
+        continue
+    pts = r['pts']
+    for a, bb in zip(pts, pts[1:]):
+        L = math.hypot(bb[0] - a[0], bb[1] - a[1])
+        if L < 4: continue
+        ux, uz = (bb[0] - a[0]) / L, (bb[1] - a[1]) / L
+        for side in (-1, 1):
+            nx, nz = -uz * side, ux * side
+            t = random.uniform(3, 15)
+            while t < L - 2:
+                off = r['h'] + max(r['sw'], 1.0) + 1.8
+                x, z = a[0] + ux * t + nx * off, a[1] + uz * t + nz * off
+                if in_bounds(x, z, -20) and road_clear(x, z, 0.8) and area_clear(x, z) and random.random() < 0.45:
+                    add_tree(x, z, random.choice([1, 2, 4]), random.uniform(0.7, 1.0))
+                t += random.uniform(14, 26)
+
+# backyard trees
+for h in houses:
+    cx, cz, w, d, ang = h[0], h[1], h[2], h[3], h[4]
+    face = h[13]
+    for _ in range(2):
+        if random.random() < 0.55:
+            back = d / 2 + random.uniform(3, 8)
+            lat = random.uniform(-w / 2, w / 2)
+            x = cx - math.cos(face) * back + math.cos(face + math.pi / 2) * lat
+            z = cz - math.sin(face) * back + math.sin(face + math.pi / 2) * lat
+            if in_bounds(x, z) and road_clear(x, z, 1.5) and area_clear(x, z):
+                add_tree(x, z, random.choice([0, 1, 2, 3, 4]), random.uniform(0.7, 1.1))
+
+# scattered vegetation on empty land (hillside)
+x = BX0 - 40
+while x < BX1 + 40:
+    z = BZ0 - 40
+    while z < BZ1 + 40:
+        jx, jz = x + random.uniform(-5, 5), z + random.uniform(-5, 5)
+        rd = road_dist(jx, jz)
+        if rd > 14 and area_clear(jx, jz) and random.random() < 0.55:
+            add_tree(jx, jz, random.choice([0, 0, 1, 2, 2]), random.uniform(0.8, 1.4))
+        z += 11
+    x += 11
+
+# ---------- lamps along the avenue ----------
+lamps = []
+for r in roads:
+    if r['t'] != 'secondary': continue
+    pts = r['pts']; acc = 0
+    for a, bb in zip(pts, pts[1:]):
+        L = math.hypot(bb[0] - a[0], bb[1] - a[1])
+        if L < 1: continue
+        ux, uz = (bb[0] - a[0]) / L, (bb[1] - a[1]) / L
+        t = (30 - acc) % 30
+        while t < L:
+            nx, nz = -uz, ux
+            off = r['h'] + 1.2
+            lamps.append([round(a[0] + ux * t + nx * off, 1), round(a[1] + uz * t + nz * off, 1), round(math.atan2(-nz, -nx), 2)])
+            t += 30
+        acc = (acc + L) % 30
+
+# ---------- spawn: closest road point to the neighbourhood node ----------
+target = next((p for n, p in named_nodes if n == 'Morada da Colina'), (0, 0))
+best = None
+for r in roads:
+    if r['t'] not in ('residential',): continue
+    for a, bb in zip(r['pts'], r['pts'][1:]):
+        for k in range(11):
+            x = a[0] + (bb[0] - a[0]) * k / 10; z = a[1] + (bb[1] - a[1]) * k / 10
+            dd = math.hypot(x - target[0], z - target[1])
+            if best is None or dd < best[0]:
+                best = (dd, x, z)
+
+# ---------- remove houses generated inside small grass islands (e.g. roundabout centre) ----------
+grass_polys = [a['pts'] for a in areas if a['t'] == 'grass']
+houses = [h for h in houses if not any(in_poly(h[0], h[1], g) for g in grass_polys)]
+
+# ---------- landmark: guarita "SEGURANÇA" on the median between Av. Antenor O'Reilly and RJ-161 ----------
+def _nearest(pts, x, z):
+    best = None
+    for a, bb in zip(pts, pts[1:]):
+        dx, dz = bb[0]-a[0], bb[1]-a[1]; L = dx*dx + dz*dz
+        t = max(0, min(1, ((x-a[0])*dx + (z-a[1])*dz) / L))
+        px, pz = a[0]+t*dx, a[1]+t*dz; dd = math.hypot(x-px, z-pz)
+        if best is None or dd < best[0]: best = (dd, px, pz, math.atan2(dz, dx))
+    return best
+landmarks = []
+ant = min((_nearest(r['pts'], 222, -418) for r in roads if r['n'].startswith('Avenida Antenor')), key=lambda b: b[0])
+dar = min((_nearest(r['pts'], 222, -418) for r in roads if r['n'].startswith('Avenida Professor Darcy')), key=lambda b: b[0])
+nx, nz = dar[1]-ant[1], dar[2]-ant[2]; nl = math.hypot(nx, nz); nx /= nl; nz /= nl   # from Antenor towards the RJ-161
+gx, gz = ant[1] + nx*8.6, ant[2] + nz*8.6
+front = math.atan2(-nz, -nx)            # the booth faces Av. Antenor O'Reilly
+landmarks.append({'type': 'guarita', 'x': round(gx, 2), 'z': round(gz, 2), 'front': round(front, 4)})
+trees = [t for t in trees if math.hypot(t[0]-gx, t[1]-gz) > 8]
+print('guarita at', round(gx, 1), round(gz, 1), 'median width', round(nl, 1))
+
+# ---------- landmark: Parque Colina (campo, vôlei de areia, parquinho) + igreja ----------
+ana = [r for r in roads if r['n'].startswith('Rua Professora An')][0]['pts']
+SW, NW = ana[1], ana[0]
+conn = [r for r in roads if r['n'] == '' and r['t'] == 'residential' and r['pts'][0] == SW]
+SE = conn[0]['pts'][-1]
+ux, uz = NW[0]-SW[0], NW[1]-SW[1]; L = math.hypot(ux, uz); ux /= L; uz /= L
+pang = math.atan2(uz, ux)
+vx, vz = -math.sin(pang), math.cos(pang)          # frame az
+Wd = (SE[0]-SW[0])*vx + (SE[1]-SW[1])*vz
+def park_local(x, z):
+    dx, dz = x - SW[0], z - SW[1]
+    return dx*ux + dz*uz, dx*vx + dz*vz
+def in_park(x, z, m=0):
+    u, v = park_local(x, z)
+    return 2 - m < u < L - 2 + m and 2 - m < v < 44.5 + m
+before = len(houses)
+def house_in_park(h):
+    c, s_ = math.cos(h[4]), math.sin(h[4])
+    pts = [(h[0], h[1])] + [(h[0]+uu*c-vv*s_, h[1]+uu*s_+vv*c) for uu, vv in ((-h[2]/2, -h[3]/2), (h[2]/2, -h[3]/2), (h[2]/2, h[3]/2), (-h[2]/2, h[3]/2))]
+    return any(in_park(x, z) for x, z in pts)
+houses = [h for h in houses if not house_in_park(h)]
+trees = [t for t in trees if not in_park(t[0], t[1], 1)]
+# the whole block is park + pitch + church: no houses, no generated trees
+def in_block(x, z):
+    u, v = park_local(x, z); return 1 < u < L - 1 and 1 < v < Wd - 1
+def house_in_block(h):
+    c, s_ = math.cos(h[4]), math.sin(h[4])
+    pts = [(h[0], h[1])] + [(h[0]+uu*c-vv*s_, h[1]+uu*s_+vv*c) for uu, vv in ((-h[2]/2, -h[3]/2), (h[2]/2, -h[3]/2), (h[2]/2, h[3]/2), (-h[2]/2, h[3]/2))]
+    return any(in_block(x, z) for x, z in pts)
+houses = [h for h in houses if not house_in_block(h)]
+trees = [t for t in trees if not in_block(t[0], t[1])]
+landmarks.append({'type': 'parque', 'x': SW[0], 'z': SW[1], 'ang': round(pang, 5), 'L': round(L, 2), 'W': round(Wd, 2)})
+print('parque: removed houses', before - len(houses), 'L', round(L, 1), 'W', round(Wd, 1))
+
+R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
+data = {
+    'bounds': [round(BX0, 1), round(BZ0, 1), round(BX1, 1), round(BZ1, 1)],
+    'roads': [{'t': r['t'], 'h': r['h'], 'sw': r['sw'], 'n': r['n'], 'ring': r['ring'], 'dirt': r['dirt'], 'pave': r.get('pave', False), 'pts': R(r['pts'])} for r in roads],
+    'poles': poles,
+    'areas': [{'t': a['t'], 'n': a['n'], 'pts': R(a['pts'])} for a in areas],
+    'dem': None if dem is None else {'lon0': dem['lon0'], 'lat0': dem['lat0'], 'step': dem['step'], 'rows': dem['rows'], 'cols': dem['cols'],
+            'base': 400, 'data': [int(round((v - 400) * 10)) for v in dem['a'].flatten()]},
+    'proj': {'lat0': lat0, 'lon0': lon0, 'KX': KX, 'KZ': KZ},
+    'landmarks': landmarks + landmarks_pre,
+    'creek': [[round(x, 1), round(z, 1)] for x, z in creek],
+    'houses': houses, 'trees': trees, 'lamps': lamps,
+    'spawn': [round(best[1], 1), round(best[2], 1)],
+    'label': [round(target[0], 1), round(target[1], 1)],
+}
+with open(OUT, 'w') as f:
+    json.dump(data, f, separators=(',', ':'), ensure_ascii=False)
+print('roads', len(roads), 'areas', len(areas), 'houses', len(houses), 'pools', sum(h[8] for h in houses),
+      'trees', len(trees), 'lamps', len(lamps), 'bounds', data['bounds'], 'spawn', data['spawn'])

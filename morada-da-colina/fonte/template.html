@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Morada da Colina · Pixel 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#b8d1e6;touch-action:none;-webkit-user-select:none;user-select:none}
+  body{font-family:'VT323',monospace;color:#fff}
+  #c{position:fixed;inset:0;width:100vw;height:100vh;image-rendering:pixelated;image-rendering:crisp-edges;display:block;cursor:grab}
+  #c:active{cursor:grabbing}
+  .panel{background:rgba(22,26,38,.82);border:3px solid #0d1018;box-shadow:inset 0 0 0 2px #39415a,4px 4px 0 rgba(0,0,0,.35);padding:8px 12px}
+  #hud{position:fixed;left:12px;top:12px;min-width:220px;pointer-events:none}
+  #hud .t{font-family:'Silkscreen',monospace;font-size:15px;letter-spacing:1px;color:#ffd84a;text-shadow:2px 2px 0 #000}
+  #hud .s{font-family:'Silkscreen',monospace;font-size:10px;color:#9fb0cc;margin-top:2px}
+  #street{font-size:24px;margin-top:6px;line-height:1;text-shadow:2px 2px 0 #000}
+  #street:before{content:'▶ ';color:#ffd84a}
+  #mode{font-size:18px;color:#bfe3a0;margin-top:4px}
+  #fps{position:fixed;right:12px;top:12px;font-size:16px;color:#ffffffaa;text-shadow:1px 1px 0 #000;pointer-events:none}
+  #mini{position:fixed;right:12px;bottom:12px;width:200px;height:auto;image-rendering:pixelated;border:3px solid #0d1018;box-shadow:inset 0 0 0 2px #39415a,4px 4px 0 rgba(0,0,0,.35);background:#6fa64a;transition:width .2s}
+  #mini.big{width:min(70vw,70vh)}
+  #help{position:fixed;left:12px;bottom:12px;font-size:19px;line-height:1.15;max-width:330px;transition:opacity .4s}
+  #help.hide{opacity:0;pointer-events:none}
+  #help b{color:#ffd84a;font-weight:normal}
+  #help .h{font-family:'Silkscreen',monospace;font-size:12px;color:#ffd84a;margin-bottom:4px}
+  #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  .lbl{position:absolute;left:0;top:0;font-family:'Silkscreen',monospace;font-size:11px;padding:2px 6px;background:rgba(22,26,38,.75);border:2px solid #0d1018;white-space:nowrap;display:none}
+  .bubble{position:absolute;left:0;top:0;max-width:240px;font-size:19px;line-height:1.05;color:#1a1f2e;background:#fffbea;border:3px solid #0d1018;padding:6px 9px;box-shadow:3px 3px 0 rgba(0,0,0,.35);display:none}
+  .bubble b{color:#b5532f;font-weight:normal}
+  .bubble.mad{background:#ffe2dc;border-color:#5a0f0f}
+  .bubble.mad b{color:#c0221b}
+  .bubble.note{background:#fff4c8;font-style:italic}
+  .lbl.big{font-size:16px;color:#ffd84a;padding:4px 10px}
+  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Silkscreen',monospace;font-size:18px;background:#1a1f2e;color:#ffd84a;z-index:10}
+  #touch{display:none}
+  #joy{position:fixed;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.12);border:3px solid rgba(255,255,255,.35);display:none;pointer-events:none}
+  #knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,216,74,.7);border:3px solid #0d1018}
+  .tbtn{font-family:'Silkscreen',monospace;font-size:12px;color:#fff;background:rgba(22,26,38,.85);border:3px solid #0d1018;box-shadow:inset 0 0 0 2px #39415a;padding:10px 12px;margin-left:6px}
+  #tbtns{position:fixed;right:12px;top:48px;display:flex}
+  @media (pointer:coarse){ #touch{display:block} #help .kb{display:none} #mini{width:130px} #hud{min-width:0} #street{font-size:20px} }
+  @media (pointer:fine){ #help .tc{display:none} }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="hud" class="panel">
+  <div class="t">MORADA DA COLINA</div>
+  <div class="s">RESENDE · RJ · DADOS OPENSTREETMAP</div>
+  <div id="street">…</div>
+  <div id="mode"></div>
+</div>
+<div id="fps"></div>
+<canvas id="mini"></canvas>
+<div id="help" class="panel">
+  <div class="h">CONTROLES</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>L</b> sombras · <b>H</b> esconder ajuda</div>
+  <div class="tc">Lado esquerdo: <b>joystick</b><br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)</div>
+</div>
+<div id="touch">
+  <div id="joy"><div id="knob"></div></div>
+  <div id="tbtns"><button class="tbtn" id="btnRun">CORRER</button><button class="tbtn" id="btnCar">CARRO</button><button class="tbtn" id="btnMap">MAPA</button></div>
+</div>
+<div id="load">GERANDO O BAIRRO…</div>
+<script>window.WORLD=__WORLD__;</script>
+<script>
+setTimeout(function(){
+__ENGINE__
+},30);
+</script>
+</body>
+</html>
