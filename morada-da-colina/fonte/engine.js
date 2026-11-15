@@ -1365,7 +1365,7 @@ function toggleCar() {
     if (freeAt(sx, sz, 0.35)) { player.x = sx; player.z = sz; }
     player.car = false; player.cv = 0;
   } else { player.car = true; player.cv = 0; }
-  document.getElementById('btnCar').textContent = player.car ? 'A PÉ' : 'CARRO';
+  document.getElementById('btnCar').classList.toggle('on', player.car);
 }
 // touch controls
 const joy = { id: null, x: 0, y: 0, dx: 0, dy: 0 }, look = { id: null, x: 0, y: 0 };
@@ -1709,17 +1709,21 @@ function step(dt) {
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     let mx_ = fx * iy + rx * ix, mz_ = fz * iy + rz * ix;
     const l = Math.hypot(mx_, mz_);
-    const target = l <= 0.05 ? 0 : joy.id !== null ? (jl <= 0.82 ? 4.2 * Math.min(1, jl / 0.6) : 4.2 + 4.8 * (jl - 0.82) / 0.18) : (run ? 9 : 4.2);
+    const target = l <= 0.05 ? 0 : joy.id !== null ? (jl <= 0.82 ? 4.2 * Math.min(1, jl / 0.6) : 4.2 + 8.3 * (jl - 0.82) / 0.18) : (run ? 12.5 : 4.2);
     player.speed += (target - player.speed) * Math.min(1, dt * 10);
     if (l > 0.05) {
       mx_ /= l; mz_ /= l;
       const ta = Math.atan2(mz_, mx_);
       let da = ta - player.a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
       player.a += da * Math.min(1, dt * 12);
-      const nx = player.x + mx_ * player.speed * dt, nz = player.z + mz_ * player.speed * dt;
-      if (freeAt(nx, nz, 0.35)) { player.x = nx; player.z = nz; }
-      else if (freeAt(nx, player.z, 0.35)) player.x = nx;
-      else if (freeAt(player.x, nz, 0.35)) player.z = nz;
+      const dist = player.speed * dt, nsub = Math.max(1, Math.ceil(dist / 0.2));
+      for (let k = 0; k < nsub; k++) { // sub-steps so fast running can't pass through thin walls
+        const nx = player.x + mx_ * dist / nsub, nz = player.z + mz_ * dist / nsub;
+        if (freeAt(nx, nz, 0.35)) { player.x = nx; player.z = nz; }
+        else if (freeAt(nx, player.z, 0.35)) player.x = nx;
+        else if (freeAt(player.x, nz, 0.35)) player.z = nz;
+        else break;
+      }
       player.walk += dt * player.speed * 2.3;
     }
   } else {
