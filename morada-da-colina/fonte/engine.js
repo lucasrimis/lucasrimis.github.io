@@ -1341,6 +1341,9 @@ function placeCar(c) {
 
 // ---------------- input ----------------
 addEventListener('keydown', e => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  if (document.getElementById('lobby').style.display !== 'none') return;
+  if (e.code === 'Enter' && window.__net && window.__net.online) { e.preventDefault(); window.__net.openChat(); return; }
   keys[e.code] = true;
   if (e.code === 'KeyC') toggleCar();
   if (e.code === 'KeyP') { pixel = pixel === 2 ? 3 : pixel === 3 ? 4 : 2; resize(); }
@@ -1461,11 +1464,13 @@ for (const p of POIS) { p.el = document.createElement('div'); p.el.className = '
 
 // ---------------- player mesh ----------------
 const SKIN = hex('#c98d62'), HAIR = hex('#2a1d14'), SHIRT = hex('#f2c230'), SHIRT2 = hex('#1f8a4c'), SHORTS = hex('#2a4d8f'), SHOE = hex('#f4f4f4'), PCAR = hex('#e04a2b');
-function buildPlayer(B) {
-  if (player.car) { carMesh(B, groundFrame(player.x, player.z, player.a, 0.0), PCAR); return; }
-  const T = frame(player.x, surfAt(player.x, player.z) + 0.02, player.z, player.a);
-  const sw = Math.sin(player.walk) * 0.7 * Math.min(1, player.speed / 3);
-  const bob = Math.abs(Math.cos(player.walk)) * 0.06 * Math.min(1, player.speed / 3);
+function buildPlayer(B, p, look) {
+  p = p || player; look = look || { shirt: SHIRT, car: PCAR };
+  const SHIRT_ = look.shirt, CAR_ = look.car;
+  if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
+  const T = frame(p.x, surfAt(p.x, p.z) + 0.02, p.z, p.a);
+  const sw = Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
+  const bob = Math.abs(Math.cos(p.walk)) * 0.06 * Math.min(1, p.speed / 3);
   const Tb = { o: [T.o[0], T.o[1] + bob, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
   // legs
   for (const [v, ph] of [[-0.17, sw], [0.17, -sw]]) {
@@ -1474,11 +1479,11 @@ function buildPlayer(B) {
     box(B, L, -0.12, 0.12, -0.85, -0.45, -0.1, 0.1, SKIN, SKIN);
     box(B, L, -0.13, 0.22, -0.88, -0.76, -0.12, 0.12, SHOE, SHOE);
   }
-  box(B, Tb, -0.18, 0.18, 0.8, 1.45, -0.3, 0.3, SHIRT, SHIRT);
+  box(B, Tb, -0.18, 0.18, 0.8, 1.45, -0.3, 0.3, SHIRT_, SHIRT_);
   box(B, Tb, 0.181, 0.19, 1.05, 1.3, -0.12, 0.12, SHIRT2, SHIRT2);
   for (const [v, ph] of [[-0.39, -sw], [0.39, sw]]) {
     const A = swing(Tb, 0, 1.42, v, ph * 0.9);
-    box(B, A, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, SHIRT, SHIRT);
+    box(B, A, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, SHIRT_, SHIRT_);
     box(B, A, -0.08, 0.08, -0.62, -0.3, -0.08, 0.08, SKIN, SKIN);
   }
   box(B, Tb, -0.2, 0.2, 1.47, 1.87, -0.2, 0.2, SKIN, SKIN);
@@ -1570,6 +1575,119 @@ function updateHUD() {
   hudMode.textContent = (player.car ? 'CARRO ' : (keys.ShiftLeft || keys.ShiftRight ? 'CORRENDO ' : 'A PÉ ')) + Math.round(v * 3.6) + ' km/h · alt. ' + Math.round((DEM ? DEM.base : 0) + groundAt(player.x, player.z)) + ' m';
 }
 
+// ---------------- modo online (Firebase Realtime Database) ----------------
+const LOOKS = [
+  { shirt: hex('#f2c230'), car: hex('#e04a2b') }, { shirt: hex('#2f7fd6'), car: hex('#2f5fb0') }, { shirt: hex('#d9493a'), car: hex('#b33a2d') },
+  { shirt: hex('#3fa85a'), car: hex('#2e7d46') }, { shirt: hex('#9b5cc8'), car: hex('#6b3fa0') }, { shirt: hex('#f08a2a'), car: hex('#e9e6df') },
+  { shirt: hex('#f2f2f2'), car: hex('#1d1d22') }, { shirt: hex('#1f2a3a'), car: hex('#9aa3ad') },
+];
+const LOOK_CSS = ['#f2c230', '#2f7fd6', '#d9493a', '#3fa85a', '#9b5cc8', '#f08a2a', '#f2f2f2', '#1f2a3a'];
+let MY_LOOK = LOOKS[0];
+window.__net = (function () {
+  const N = { online: false, others: new Map(), uid: null, name: '', look: 0, db: null, offset: 0 };
+  const $ = id => document.getElementById(id);
+  const lobby = $('lobby'), nameIn = $('lobbyName'), sw = $('lobbySwatches'), msgEl = $('lobbyMsg');
+  const chatBox = $('chatBox'), chatIn = $('chatIn'), chatLog = $('chatLog'), onl = $('online');
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem('mdc_profile') || '{}'); } catch (e) {}
+  nameIn.value = saved.n || ''; N.look = saved.c || 0;
+  LOOK_CSS.forEach((c, i) => { const b = document.createElement('button'); b.className = 'sw' + (i === N.look ? ' on' : ''); b.style.background = c; b.onclick = () => { N.look = i; [...sw.children].forEach((x, k) => x.classList.toggle('on', k === i)); }; sw.appendChild(b); });
+  const CFG = window.FIREBASE_CONFIG;
+  if (!CFG) { $('btnOnline').disabled = true; msgEl.textContent = 'O modo online ainda não foi configurado.'; }
+  const start = () => { MY_LOOK = LOOKS[N.look]; lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
+  $('btnSolo').onclick = () => start();
+  $('btnOnline').onclick = async () => {
+    const n = nameIn.value.trim().replace(/\s+/g, ' ').slice(0, 16);
+    if (!n) { msgEl.textContent = 'Digite um nome para jogar online.'; nameIn.focus(); return; }
+    msgEl.textContent = 'Conectando…'; $('btnOnline').disabled = true;
+    try { await connect(n); start(); }
+    catch (e) { console.error(e); msgEl.textContent = 'Não consegui conectar (' + (e.code || e.message || e) + '). Tente de novo ou jogue sozinho.'; $('btnOnline').disabled = false; }
+  };
+  const load = src => new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => bad(new Error('falha ao carregar ' + src)); document.head.appendChild(s); });
+  async function connect(name) {
+    const V = 'https://www.gstatic.com/firebasejs/10.12.2/';
+    if (!window.firebase) { await load(V + 'firebase-app-compat.js'); await load(V + 'firebase-auth-compat.js'); await load(V + 'firebase-database-compat.js'); }
+    const app = firebase.initializeApp(CFG);
+    const cred = await firebase.auth().signInAnonymously();
+    N.uid = cred.user.uid; N.name = name; N.db = firebase.database();
+    N.db.ref('.info/serverTimeOffset').on('value', s => { N.offset = s.val() || 0; });
+    const me = N.db.ref('players/' + N.uid);
+    me.onDisconnect().remove();
+    await me.set({ n: name, c: N.look, x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0, t: firebase.database.ServerValue.TIMESTAMP });
+    const players = N.db.ref('players');
+    const upsert = s => {
+      if (s.key === N.uid) return; const v = s.val(); if (!v || typeof v.x !== 'number') return;
+      let o = N.others.get(s.key);
+      if (!o) { o = { x: v.x, z: v.z, a: v.a || 0, walk: 0, speed: 0, car: false, el: document.createElement('div') }; o.el.className = 'lbl player'; lblLayer.appendChild(o.el); N.others.set(s.key, o); if (N.online) sys((v.n || '?') + ' entrou no bairro'); }
+      o.tx = v.x; o.tz = v.z; o.ta = v.a || 0; o.car = !!v.car; o.n = String(v.n || '?').slice(0, 16); o.look = LOOKS[(v.c | 0) % LOOKS.length] || LOOKS[0]; o.t = v.t || 0;
+      o.el.textContent = o.n; o.el.style.borderColor = LOOK_CSS[(v.c | 0) % LOOK_CSS.length];
+    };
+    players.on('child_added', upsert); players.on('child_changed', upsert);
+    players.on('child_removed', s => { const o = N.others.get(s.key); if (o) { sys(o.n + ' saiu'); o.el.remove(); if (o.bub) o.bub.remove(); N.others.delete(s.key); } });
+    const since = Date.now() + N.offset - 2000;
+    N.db.ref('chat').orderByChild('t').startAt(since).on('child_added', s => {
+      const v = s.val(); if (!v || typeof v.m !== 'string') return;
+      const who = v.u === N.uid ? N.name : (N.others.get(v.u) || {}).n || v.n || '?';
+      addLog(who, v.m, v.u === N.uid);
+      const target = v.u === N.uid ? N.meBub : N.others.get(v.u);
+      say(v.u === N.uid ? null : target, v.m, v.u);
+    });
+    N.online = true; onl.style.display = 'block'; $('btnChat').style.display = '';
+    sys('Você está online. Aperte Enter (ou CHAT) para falar.');
+  }
+  // chat
+  const esc = t => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function addLog(who, m, mine) { const d = document.createElement('div'); d.innerHTML = '<b' + (mine ? ' class="me"' : '') + '>' + esc(who) + ':</b> ' + esc(m); chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 12000); }
+  function sys(m) { const d = document.createElement('div'); d.className = 'sys'; d.textContent = m; chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 8000); }
+  const myBubble = document.createElement('div'); myBubble.className = 'bubble'; lblLayer.appendChild(myBubble);
+  function say(o, m, uid) {
+    if (uid === N.uid) { myBubble.textContent = m; myBubble.style.display = 'block'; clearTimeout(N.myT); N.myT = setTimeout(() => myBubble.style.display = 'none', 6000); return; }
+    if (!o) return; if (!o.bub) { o.bub = document.createElement('div'); o.bub.className = 'bubble'; lblLayer.appendChild(o.bub); }
+    o.bub.textContent = m; o.bubUntil = performance.now() + 6000;
+  }
+  N.openChat = () => { if (!N.online) return; chatBox.style.display = 'flex'; chatIn.value = ''; chatIn.focus(); for (const k in keys) keys[k] = false; };
+  const send = () => {
+    const m = chatIn.value.trim().slice(0, 120); chatBox.style.display = 'none'; chatIn.blur();
+    if (m && N.db) N.db.ref('chat').push({ u: N.uid, n: N.name, m, t: firebase.database.ServerValue.TIMESTAMP });
+  };
+  chatIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); send(); } if (e.key === 'Escape') { chatBox.style.display = 'none'; chatIn.blur(); } });
+  $('chatSend').onclick = send;
+  $('btnChat').onclick = () => N.openChat();
+  // sync my position ~8x per second
+  let lastSend = 0, lastSent = null;
+  N.frame = (B, dt) => {
+    const now = performance.now();
+    if (N.online && now - lastSend > 125) {
+      const st = { x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0 };
+      const moved = !lastSent || Math.abs(st.x - lastSent.x) > 0.02 || Math.abs(st.z - lastSent.z) > 0.02 || Math.abs(st.a - lastSent.a) > 0.02 || st.car !== lastSent.car;
+      if (moved || now - lastSend > 5000) { st.t = firebase.database.ServerValue.TIMESTAMP; N.db.ref('players/' + N.uid).update(st); lastSent = st; lastSend = now; }
+    }
+    const serverNow = Date.now() + N.offset;
+    for (const o of N.others.values()) {
+      o.stale = o.t && serverNow - o.t > 60000;
+      if (o.stale) continue;
+      const k = Math.min(1, dt * 10), px = o.x, pz = o.z;
+      o.x += (o.tx - o.x) * k; o.z += (o.tz - o.z) * k;
+      let da = o.ta - o.a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; o.a += da * k;
+      const v = Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
+      o.speed += (v - o.speed) * Math.min(1, dt * 6); o.walk += dt * o.speed * 2.3;
+      buildPlayer(B, o, o.look);
+    }
+    onl.textContent = '● ' + (1 + [...N.others.values()].filter(o => !o.stale).length) + ' online';
+  };
+  N.labels = VP => {
+    const now = performance.now();
+    const place = (el, x, y, z, up) => { const q = xform(VP, [x, y, z]); if (q[3] > 0 && Math.abs(q[0]) < 1.2 && Math.abs(q[1]) < 1.2) { el.style.display = 'block'; el.style.transform = `translate(${(q[0] * 0.5 + 0.5) * innerWidth}px,${(-q[1] * 0.5 + 0.5) * innerHeight}px) translate(-50%,${up})`; } else el.style.display = 'none'; };
+    for (const o of N.others.values()) {
+      const y = surfAt(o.x, o.z) + (o.car ? 2.3 : 2.25), far = Math.hypot(o.x - player.x, o.z - player.z) > 220;
+      if (o.stale || far) { o.el.style.display = 'none'; if (o.bub) o.bub.style.display = 'none'; continue; }
+      place(o.el, o.x, y, o.z, '-100%');
+      if (o.bub) { if (now < o.bubUntil) place(o.bub, o.x, y + 0.9, o.z, '-115%'); else o.bub.style.display = 'none'; }
+    }
+    if (myBubble.style.display === 'block') { const q = xform(VP, [player.x, surfAt(player.x, player.z) + 3.1, player.z]); myBubble.style.transform = `translate(${(q[0] * 0.5 + 0.5) * innerWidth}px,${(-q[1] * 0.5 + 0.5) * innerHeight}px) translate(-50%,-115%)`; }
+  };
+  return N;
+})();
+
 // ---------------- loop ----------------
 let last = performance.now(), T0 = last, frames = 0, fpsT = 0, fps = 0;
 function step(dt) {
@@ -1643,7 +1761,8 @@ function frame_() {
   const t = (now - T0) / 1000;
   // dynamic mesh
   dynB.reset();
-  buildPlayer(dynB);
+  buildPlayer(dynB, player, MY_LOOK);
+  if (window.__net) window.__net.frame(dynB, dt);
   for (const f of FLY_SPOTS) for (let k = 0; k < 7; k++) {
     const ph = t * (2.2 + k * 0.37) + k * 1.9, r = 0.25 + 0.18 * Math.sin(t * 1.3 + k);
     const fx = f.x + Math.cos(ph) * r, fz = f.z + Math.sin(ph * 1.1) * r, fy = f.y + 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(t * 3.1 + k * 2.3));
@@ -1736,6 +1855,7 @@ function frame_() {
     if (n.show && q[3] > 0) { n.el.style.display = 'block'; n.el.innerHTML = (n.name ? '<b>' + n.name + ':</b> ' : '') + n.line; n.el.style.transform = `translate(${(q[0] * 0.5 + 0.5) * innerWidth}px,${(-q[1] * 0.5 + 0.5) * innerHeight}px) translate(-50%,-115%)`; }
     else n.el.style.display = 'none';
   }
+  if (window.__net) window.__net.labels(VP);
   hudT += dt; if (hudT > 0.2) { hudT = 0; updateHUD(); drawMini(); }
   frames++; fpsT += dt; if (fpsT > 1) { fps = frames / fpsT; frames = 0; fpsT = 0; document.getElementById('fps').textContent = Math.round(fps) + ' fps'; }
   requestAnimationFrame(frame_);

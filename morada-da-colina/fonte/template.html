@@ -34,6 +34,28 @@
   .bubble.note{background:#fff4c8;font-style:italic}
   .lbl.big{font-size:16px;color:#ffd84a;padding:4px 10px}
   #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Silkscreen',monospace;font-size:18px;background:#1a1f2e;color:#ffd84a;z-index:10}
+  #online{position:fixed;left:12px;top:132px;font-size:18px;color:#7fe07f;padding:3px 10px;pointer-events:none}
+  #chatLog{position:fixed;left:12px;bottom:12px;max-width:min(420px,60vw);font-size:19px;line-height:1.1;pointer-events:none;text-shadow:1px 1px 0 #000,-1px 1px 0 #000}
+  #chatLog div{background:rgba(22,26,38,.6);padding:2px 8px;margin-top:3px;transition:opacity 1s}
+  #chatLog div.old{opacity:0}
+  #chatLog b{color:#9fd0ff;font-weight:normal} #chatLog b.me{color:#ffd84a} #chatLog .sys{color:#bfe3a0;font-style:italic}
+  #chatBox{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:none;gap:6px;width:min(520px,92vw);z-index:6}
+  #chatBox input{flex:1;font-family:'VT323',monospace;font-size:22px;padding:6px 10px;border:3px solid #0d1018;background:#fffbea}
+  #lobby{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,24,.55);z-index:8}
+  #lobby .box{width:min(380px,90vw);padding:18px 20px}
+  #lobby .t{font-family:'Silkscreen',monospace;font-size:20px;color:#ffd84a;text-shadow:2px 2px 0 #000}
+  #lobby .s{font-family:'Silkscreen',monospace;font-size:10px;color:#9fb0cc;margin-bottom:12px}
+  #lobby label{display:block;font-family:'Silkscreen',monospace;font-size:11px;color:#ffd84a;margin:10px 0 4px}
+  #lobby input{width:100%;box-sizing:border-box;font-family:'VT323',monospace;font-size:24px;padding:6px 10px;border:3px solid #0d1018;background:#fffbea}
+  #lobbySwatches{display:flex;gap:6px;flex-wrap:wrap}
+  #lobbySwatches .sw{width:32px;height:32px;border:3px solid #0d1018;cursor:pointer;padding:0}
+  #lobbySwatches .sw.on{outline:3px solid #ffd84a}
+  #lobby .row{display:flex;gap:8px;margin-top:16px}
+  .tbtn.big{flex:1;font-size:13px;padding:12px 8px;margin:0;background:#2f7f4a;cursor:pointer}
+  .tbtn.big.alt{background:#39415a}
+  .tbtn:disabled{opacity:.45}
+  #lobbyMsg{margin-top:10px;font-size:19px;color:#ffb0a0;min-height:20px}
+  .lbl.player{border-color:#ffd84a;color:#fff;font-size:12px}
   #touch{display:none}
   #joy{position:fixed;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.12);border:3px solid rgba(255,255,255,.35);display:none;pointer-events:none}
   #knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,216,74,.7);border:3px solid #0d1018}
@@ -56,14 +78,25 @@
 <canvas id="mini"></canvas>
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
-  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>L</b> sombras · <b>H</b> esconder ajuda</div>
-  <div class="tc">Lado esquerdo: <b>joystick</b><br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)</div>
+  <div class="tc">Lado esquerdo: <b>joystick</b><br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)</div>
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn" id="btnRun">CORRER</button><button class="tbtn" id="btnCar">CARRO</button><button class="tbtn" id="btnMap">MAPA</button></div>
+  <div id="tbtns"><button class="tbtn" id="btnChat" style="display:none">CHAT</button><button class="tbtn" id="btnRun">CORRER</button><button class="tbtn" id="btnCar">CARRO</button><button class="tbtn" id="btnMap">MAPA</button></div>
 </div>
+<div id="online" class="panel" style="display:none"></div>
+<div id="chatLog"></div>
+<div id="chatBox"><input id="chatIn" maxlength="120" placeholder="Fale algo… (Enter envia)" autocomplete="off"><button class="tbtn" id="chatSend">ENVIAR</button></div>
+<div id="lobby"><div class="panel box">
+  <div class="t">MORADA DA COLINA</div><div class="s">RESENDE · RJ · PIXEL 3D</div>
+  <label>SEU NOME</label><input id="lobbyName" maxlength="16" placeholder="Ex.: Lucas" autocomplete="off">
+  <label>COR DA CAMISA</label><div id="lobbySwatches"></div>
+  <div class="row"><button class="tbtn big" id="btnOnline">JOGAR ONLINE</button><button class="tbtn big alt" id="btnSolo">JOGAR SOZINHO</button></div>
+  <div id="lobbyMsg"></div>
+</div></div>
 <div id="load">GERANDO O BAIRRO…</div>
+<script>window.FIREBASE_CONFIG=__FIREBASE__;</script>
 <script>window.WORLD=__WORLD__;</script>
 <script>
 setTimeout(function(){
