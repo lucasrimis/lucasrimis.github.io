@@ -1801,11 +1801,17 @@ window.__net = (function () {
     players.on('child_added', upsert); players.on('child_changed', upsert);
     players.on('child_removed', s => { const o = N.others.get(s.key); if (o) { sys(o.n + ' saiu'); o.el.remove(); if (o.bub) o.bub.remove(); N.others.delete(s.key); } });
     const since = Date.now() + N.offset - 2000;
+    // mensagens anteriores à sua entrada vão só para o histórico
+    try {
+      const old = await N.db.ref('chat').orderByChild('t').endAt(since - 1).limitToLast(40).once('value');
+      const prev = []; old.forEach(c => { const v = c.val(); if (v && typeof v.m === 'string') prev.push({ who: v.u === N.uid ? N.name : v.n || '?', m: v.m, mine: v.u === N.uid, t: (v.t || 0) - N.offset }); });
+      prev.sort((a, b) => a.t - b.t); HIST.unshift(...prev);
+    } catch (e) { console.error(e); }
     N.chatQ = N.db.ref('chat').orderByChild('t').startAt(since); N.players = players; N.me = me;
     N.chatQ.on('child_added', s => {
       const v = s.val(); if (!v || typeof v.m !== 'string') return;
       const who = v.u === N.uid ? N.name : (N.others.get(v.u) || {}).n || v.n || '?';
-      addLog(who, v.m, v.u === N.uid);
+      addLog(who, v.m, v.u === N.uid, typeof v.t === 'number' ? v.t - N.offset : 0);
       const target = v.u === N.uid ? N.meBub : N.others.get(v.u);
       say(v.u === N.uid ? null : target, v.m, v.u);
     });
@@ -1831,8 +1837,19 @@ window.__net = (function () {
   };
   // chat
   const esc = t => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  function addLog(who, m, mine) { const d = document.createElement('div'); d.innerHTML = '<b' + (mine ? ' class="me"' : '') + '>' + esc(who) + ':</b> ' + esc(m); chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 12000); }
-  function sys(m) { const d = document.createElement('div'); d.className = 'sys'; d.textContent = m; chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 8000); }
+  // histórico de mensagens (toque nas mensagens, ou no ☰ da caixa de chat, para abrir)
+  const HIST = [], histEl = $('chatHist'), histList = $('chatHistList');
+  const hhmm = t => { const d = new Date(t || Date.now()); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const histRow = h => '<div' + (h.sys ? ' class="sys"' : '') + '><i>' + hhmm(h.t) + '</i> ' + (h.sys ? esc(h.m) : '<b' + (h.mine ? ' class="me"' : '') + '>' + esc(h.who) + ':</b> ' + esc(h.m)) + '</div>';
+  const renderHist = () => { histList.innerHTML = HIST.length ? HIST.map(histRow).join('') : '<div class="sys">Nenhuma mensagem ainda.</div>'; histList.scrollTop = histList.scrollHeight; };
+  const pushHist = h => { HIST.push(h); if (HIST.length > 300) HIST.shift(); if (histEl.style.display === 'flex') { const atEnd = histList.scrollHeight - histList.scrollTop - histList.clientHeight < 40; histList.insertAdjacentHTML('beforeend', histRow(h)); if (atEnd) histList.scrollTop = histList.scrollHeight; } };
+  N.openHist = () => { renderHist(); histEl.style.display = 'flex'; chatLog.style.visibility = 'hidden'; histList.scrollTop = histList.scrollHeight; };
+  N.closeHist = () => { histEl.style.display = 'none'; chatLog.style.visibility = ''; };
+  $('chatHistClose').onclick = N.closeHist; $('chatHistBtn').onclick = e => { e.preventDefault(); N.openHist(); };
+  chatLog.addEventListener('click', e => { if (e.target.closest('#chatLog div:not(.old)')) N.openHist(); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && histEl.style.display === 'flex') N.closeHist(); });
+  function addLog(who, m, mine, t) { pushHist({ who, m, mine, t: t || Date.now() }); const d = document.createElement('div'); d.innerHTML = '<b' + (mine ? ' class="me"' : '') + '>' + esc(who) + ':</b> ' + esc(m); chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 12000); }
+  function sys(m) { pushHist({ sys: true, m, t: Date.now() }); const d = document.createElement('div'); d.className = 'sys'; d.textContent = m; chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 8000); }
   const myBubble = document.createElement('div'); myBubble.className = 'bubble'; lblLayer.appendChild(myBubble);
   function say(o, m, uid) {
     if (uid === N.uid) { myBubble.textContent = m; myBubble.style.display = 'block'; clearTimeout(N.myT); N.myT = setTimeout(() => myBubble.style.display = 'none', 6000); return; }
