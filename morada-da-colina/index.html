@@ -263,6 +263,7 @@ function frame(x, y, z, ang) { const c = Math.cos(ang), s = Math.sin(ang); retur
 // objetos do cenário que podem ser copiados no esconde-esconde (tipo, posição, ângulo, extras)
 const PROPS = [];
 const LATE_NOTES = [];   // mensagens criadas antes da lista de NPCs existir
+const DOGS = [];         // cachorros soltos em quintais (andam sozinhos)
 const angOf = T => Math.atan2(T.ax[2], T.ax[0]);
 function P(T, u, y, v) { return [T.o[0] + u * T.ax[0] + y * T.ay[0] + v * T.az[0], T.o[1] + u * T.ax[1] + y * T.ay[1] + v * T.az[1], T.o[2] + u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
 function N(T, u, y, v) { return [u * T.ax[0] + y * T.ay[0] + v * T.az[0], u * T.ax[1] + y * T.ay[1] + v * T.az[1], u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
@@ -1176,6 +1177,10 @@ for (const h of W.houses) {
     // antena parabólica no telhado
     { const p = P(T, -3.6, 6.4, -1.2); const Td = frame(p[0], p[1], p[2], Math.atan2(uz, ux) + 2.4); box(B, Td, -0.03, 0.03, -0.4, 0.2, -0.03, 0.03, hex('#777'), hex('#777')); box(B, Td, -0.06, 0.06, 0.05, 0.75, -0.36, 0.36, hex('#d7d7d2'), hex('#bdbdb7')); }
     maskRect(at(0, 0, 0), hu - hw / 2, hu + hw / 2 + 4.4, hv - hd / 2, hv + hd / 2);
+    // os 4 cachorros do quintal: pitbull, bull terrier e dois yorkshires (um de roupinha com brinquedo)
+    { const yard = { x: lm.x, z: lm.z, u: lm.u, v: lm.v, u0: -5.2, u1: 23.2, v0: 5.6, v1: 28.2, nu0: 3.3, nu1: 11.8, nv: 8.0 };
+      for (const [kind, du, dv] of [['pitbull', 14, 10], ['bull', 18, 14], ['yorkie', -2, 7], ['yorkieRoupa', 13, 18]]) {
+        const p = WP(du, dv); DOGS.push({ kind, x: p[0], z: p[1], a: Math.random() * 6.28, yard, tx: p[0], tz: p[1], wait: Math.random() * 3, ph: Math.random() * 6, wag: 0, spd: 0 }); } }
     // árvores: mangueiras grandes ao sul, coqueiro atrás do muro, arbusto que passa por cima do muro
     for (const [tu, tv, s] of [[17.5, 9.5, 2.1], [21.5, 15, 1.9], [16, 20.5, 1.8], [21.5, 24.5, 1.6], [12.5, 24.5, 1.5]]) { const p = WP(tu, tv); tree(chunkB(p[0], p[1]), p[0], p[1], 0, s, true); }
     { const p = WP(14.2, 10.6); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.45, true); }
@@ -2220,6 +2225,98 @@ function buildCaudinho(B, n, t) {
   box(B, H, f, f + 0.01, 1.6, 1.625, -0.1, -0.07, hex('#5a2a1e'), hex('#5a2a1e'));
   box(B, H, f, f + 0.01, 1.6, 1.625, 0.07, 0.1, hex('#5a2a1e'), hex('#5a2a1e'));
 }
+// ---------------- cachorros ----------------
+const DOGDEF = {
+  pitbull:     { L: 0.78, W: 0.34, lh: 0.32, bh: 0.3, s: 1.0, body: '#c08a52', dark: '#a8743f', spd: 1.5 },
+  bull:        { L: 0.74, W: 0.3, lh: 0.33, bh: 0.28, s: 1.0, body: '#f1ece4', dark: '#e2dbd0', spd: 1.4 },
+  yorkie:      { L: 0.44, W: 0.2, lh: 0.14, bh: 0.19, s: 1.0, body: '#1f1c1e', dark: '#141214', spd: 1.9 },
+  yorkieRoupa: { L: 0.44, W: 0.21, lh: 0.14, bh: 0.2, s: 1.0, body: '#cfe6f0', dark: '#b9d6e2', spd: 1.7 },
+};
+function buildDog(B, d, t) {
+  const D = DOGDEF[d.kind], y0 = surfAt(d.x, d.z) + 0.02, T = frame(d.x, y0, d.z, d.a);
+  const { L, W, lh, bh } = D, BODY = hex(D.body), DARK = hex(D.dark);
+  const walk = Math.min(1, d.spd / 0.6), sw = Math.sin(d.ph) * 0.55 * walk;
+  const TAN = hex('#b5702c'), TAN2 = hex('#a3612a'), WHITE = hex('#f3efe8'), PINK = hex('#e8a2a8'), NOSE = hex('#151313'), EYE = hex('#1a1414');
+  // pernas (balançam ao andar)
+  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : d.kind === 'bull' ? [BODY, BODY] : [TAN, TAN];
+  for (const [lu, lv, ph] of [[L * 0.36, -W * 0.3, sw], [L * 0.36, W * 0.3, -sw], [-L * 0.36, -W * 0.3, -sw], [-L * 0.36, W * 0.3, sw]]) {
+    const A = swing(T, lu, lh, lv, ph), lw = W * 0.17, [c1, c2] = legC(lu > 0);
+    box(B, A, -lw, lw, -lh, 0, -lw, lw, c1, c1);
+    box(B, A, -lw * 1.1, lw * 1.3, -lh, -lh * 0.72, -lw * 1.1, lw * 1.1, c2, c2);   // pata
+  }
+  // corpo
+  const yb = lh + (d.sit ? -lh * 0.4 : 0);
+  box(B, T, -L / 2, L / 2, yb, yb + bh, -W / 2, W / 2, BODY, DARK);
+  if (d.kind === 'pitbull') { box(B, T, L * 0.1, L / 2 + 0.01, yb - 0.01, yb + bh * 0.75, -W * 0.3, W * 0.3, WHITE, WHITE); box(B, T, -L * 0.2, L * 0.2, yb - 0.012, yb + 0.03, -W * 0.35, W * 0.35, WHITE, WHITE); }
+  if (d.kind === 'bull') for (const [pu, pv, py] of [[0.1, W / 2, 0.15], [-0.18, -W / 2, 0.1], [0.22, W / 2, 0.06]]) box(B, T, pu - 0.04, pu + 0.03, yb + py, yb + py + 0.05, pv - 0.005, pv + 0.005, PINK, PINK);
+  if (d.kind === 'yorkie') { box(B, T, -L / 2, L / 2, yb - 0.07, yb + 0.02, -W / 2 - 0.02, W / 2 + 0.02, DARK, DARK); box(B, T, L * 0.25, L / 2 + 0.02, yb - 0.04, yb + bh * 0.8, -W / 2 - 0.01, W / 2 + 0.01, TAN, TAN); }   // pelo comprido e peito caramelo
+  if (d.kind === 'yorkieRoupa') { // roupinha azul com estampas rosa e cinza; pernas e rabo marrons
+    for (const [pu, pv, c] of [[0.1, W / 2, '#e2a6c4'], [-0.1, W / 2, '#9a9aa4'], [0.05, -W / 2, '#9a9aa4'], [-0.14, -W / 2, '#e2a6c4']]) box(B, T, pu - 0.04, pu + 0.04, yb + 0.07, yb + 0.14, pv - 0.006, pv + 0.006, hex(c), hex(c));
+    box(B, T, -L * 0.2, L * 0.1, yb + bh, yb + bh + 0.006, -0.04, 0.04, hex('#e2a6c4'), hex('#e2a6c4'));
+    box(B, T, -L / 2 - 0.01, -L * 0.3, yb - 0.04, yb + bh * 0.7, -W / 2 - 0.01, W / 2 + 0.01, TAN2, TAN2); }
+  // rabo (abana)
+  { const wg = Math.sin(t * 14 + d.ph) * 0.6 * d.wag, up = d.kind === 'pitbull' || d.kind === 'bull' ? 0.5 : 1.1;
+    const Tt = { o: P(T, -L / 2, yb + bh * 0.8, 0), ax: N(T, -Math.cos(up) * Math.cos(wg), Math.sin(up), -Math.cos(up) * Math.sin(wg)), ay: T.ay, az: T.az };
+    const tl = d.kind.startsWith('yorkie') ? 0.13 : 0.24, tw = d.kind.startsWith('yorkie') ? 0.035 : 0.025, tc = d.kind === 'yorkie' ? BODY : d.kind === 'yorkieRoupa' ? TAN2 : BODY;
+    beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl, Tt.o[1] + Tt.ax[1] * tl, Tt.o[2] + Tt.ax[2] * tl], tw, tc); }
+  // cabeça (vira um pouco para quem olha)
+  const H = { o: P(T, L / 2 - 0.02, yb + bh * 0.55, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
+  { const ha = d.a + (d.look || 0); H.ax = [Math.cos(ha), 0, Math.sin(ha)]; H.az = [-Math.sin(ha), 0, Math.cos(ha)]; }
+  if (d.kind === 'pitbull') {
+    box(B, H, 0, 0.26, 0.02, 0.3, -0.15, 0.15, BODY, BODY);                       // cabeça larga
+    box(B, H, 0.24, 0.38, 0.03, 0.17, -0.11, 0.11, WHITE, WHITE);                 // focinho branco
+    box(B, H, 0.1, 0.262, 0.17, 0.3, -0.04, 0.04, WHITE, WHITE);                  // faixa branca na testa
+    box(B, H, 0.24, 0.36, 0.02, 0.07, -0.12, 0.12, PINK, PINK);                   // beiço rosado
+    box(B, H, 0.36, 0.395, 0.12, 0.18, -0.045, 0.045, NOSE, NOSE);
+    for (const sv of [-1, 1]) { box(B, H, 0.255, 0.265, 0.19, 0.23, sv * 0.06 - 0.025, sv * 0.06 + 0.025, EYE, EYE); box(B, H, 0.04, 0.14, 0.24, 0.31, sv * 0.15 - 0.02, sv * 0.15 + 0.04 * sv, BODY, hex('#9a6534')); }
+  } else if (d.kind === 'bull') {
+    box(B, H, 0, 0.2, 0.04, 0.27, -0.11, 0.11, BODY, BODY);                       // cabeça em ovo, longa
+    box(B, H, 0.2, 0.34, 0.03, 0.22, -0.085, 0.085, BODY, BODY);
+    box(B, H, 0.34, 0.42, 0.03, 0.15, -0.065, 0.065, BODY, BODY);
+    box(B, H, 0.42, 0.445, 0.08, 0.14, -0.035, 0.035, NOSE, NOSE);
+    box(B, H, 0.3, 0.4, 0.02, 0.05, -0.07, 0.07, PINK, PINK);                     // boca aberta
+    for (const sv of [-1, 1]) { box(B, H, 0.2, 0.21, 0.17, 0.2, sv * 0.065 - 0.015, sv * 0.065 + 0.015, EYE, EYE);
+      box(B, H, 0.02, 0.09, 0.27, 0.42, sv * 0.07 - 0.03, sv * 0.07 + 0.03, BODY, BODY); box(B, H, 0.088, 0.094, 0.29, 0.4, sv * 0.07 - 0.02, sv * 0.07 + 0.02, PINK, PINK); }   // orelhas em pé, rosadas por dentro
+  } else { // yorkshires: cabeça caramelo peluda, orelhinhas, barba
+    const HC = d.kind === 'yorkie' ? TAN : TAN2;
+    box(B, H, -0.02, 0.16, 0.02, 0.2, -0.09, 0.09, HC, HC);
+    box(B, H, 0.0, 0.17, 0.17, 0.25, -0.1, 0.1, hex(d.kind === 'yorkie' ? '#c27d3a' : '#b06c33'), HC);   // topete
+    box(B, H, 0.14, 0.24, 0.0, 0.11, -0.055, 0.055, HC, HC);                       // focinho com barba
+    box(B, H, 0.235, 0.255, 0.07, 0.11, -0.025, 0.025, NOSE, NOSE);
+    for (const sv of [-1, 1]) { box(B, H, 0.16, 0.165, 0.12, 0.15, sv * 0.045 - 0.015, sv * 0.045 + 0.015, EYE, EYE); box(B, H, 0.0, 0.05, 0.22, 0.31, sv * 0.06 - 0.025, sv * 0.06 + 0.025, HC, HC); }
+    if (d.kind === 'yorkieRoupa') box(B, H, 0.2, 0.31, -0.02, 0.06, -0.06, 0.06, hex('#3fae5f'), hex('#2f8f4c'));   // brinquedo verde na boca
+  }
+}
+function dogsFrame(B, dt, t) {
+  for (const d of DOGS) {
+    const Y = d.yard, D = DOGDEF[d.kind];
+    if (Math.hypot(d.x - player.x, d.z - player.z) > 160) continue;
+    const loc = (x, z) => { const dx = x - Y.x, dz = z - Y.z; return [dx * Y.u[0] + dz * Y.u[1], dx * Y.v[0] + dz * Y.v[1]]; };
+    const inside = (x, z) => { const [u, v] = loc(x, z); return u > Y.u0 && u < Y.u1 && v > Y.v0 && v < Y.v1 && !(u > Y.nu0 && u < Y.nu1 && v < Y.nv) && freeAt(x, z, 0.25); };
+    const pd = Math.hypot(player.x - d.x, player.z - d.z);
+    let want = 0;
+    if (pd < 7) {            // alguém chegou perto: para, olha e abana o rabo
+      d.wait = Math.max(d.wait, 0.5); d.spd = 0;
+      let rel = Math.atan2(player.z - d.z, player.x - d.x) - d.a; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+      if (Math.abs(rel) > 0.9) d.a += Math.sign(rel) * Math.min(Math.abs(rel) - 0.9, dt * 3);
+      want = Math.max(-0.8, Math.min(0.8, rel)); d.wag = Math.min(1, d.wag + dt * 3); d.sit = false;
+    } else if (d.wait > 0) {
+      d.wait -= dt; d.spd = 0; d.wag = Math.max(0.15, d.wag - dt * 0.5);
+    } else {
+      const dx = d.tx - d.x, dz = d.tz - d.z, dist = Math.hypot(dx, dz);
+      if (dist < 0.3) { d.wait = 1 + Math.random() * 4; d.sit = Math.random() < 0.3; for (let k = 0; k < 12; k++) { const u = Y.u0 + Math.random() * (Y.u1 - Y.u0), v = Y.v0 + Math.random() * (Y.v1 - Y.v0), x = Y.x + Y.u[0] * u + Y.v[0] * v, z = Y.z + Y.u[1] * u + Y.v[1] * v; if (inside(x, z)) { d.tx = x; d.tz = z; break; } } }
+      else {
+        let ta = Math.atan2(dz, dx) - d.a; while (ta > Math.PI) ta -= 2 * Math.PI; while (ta < -Math.PI) ta += 2 * Math.PI;
+        d.a += Math.max(-dt * 4, Math.min(dt * 4, ta));
+        const sp = D.spd * (Math.abs(ta) > 1 ? 0.3 : 1), nx = d.x + Math.cos(d.a) * sp * dt, nz = d.z + Math.sin(d.a) * sp * dt;
+        if (inside(nx, nz)) { d.x = nx; d.z = nz; d.spd = sp; d.ph += dt * sp * (d.kind.startsWith('yorkie') ? 22 : 12); d.sit = false; d.wag = 0.35; }
+        else { d.tx = d.x; d.tz = d.z; }
+      }
+    }
+    d.look = (d.look || 0) + (want - (d.look || 0)) * Math.min(1, dt * 5);
+    buildDog(B, d, t);
+  }
+}
 function buildNPC(B, n, t) {
   if (n.style === 'caudinho') return buildCaudinho(B, n, t);
   if (n.style === 'note') return;
@@ -2882,6 +2979,7 @@ function frame_() {
     if (dd > (n.r || 6) + 2) n.near = false;
     n.show = dd < (n.r || 6);
   }
+  dogsFrame(dynB, dt, t);
   for (const c of traffic) carMesh(dynB, groundFrame(c.x, c.z, c.a, 0.0), c.col);
   gl.bindBuffer(gl.ARRAY_BUFFER, dynVBO);
   gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(dynB.buf, 0, dynB.n * 20), gl.DYNAMIC_DRAW);
@@ -2976,7 +3074,7 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, PROPS, PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
 
 },30);
@@ -2984,7 +3082,7 @@ window.__game = { player, cam, totalV, NPCS, PROPS, PROPDEF, freeAt, groundAt, d
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261116173139";
+  const BUILD = "v20261116175736";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
