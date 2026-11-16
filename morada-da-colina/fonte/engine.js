@@ -978,8 +978,20 @@ for (const lm of (W.landmarks || [])) {
     const K = at(46.5, 17.2, 0, 0);
     for (const [a, b] of [[-1.6, -1.5], [1.6, -1.5], [1.6, 1.5], [-1.6, 1.5]]) box(B, K, a - 0.06, a + 0.06, 0, 2.5, b - 0.06, b + 0.06, POST, POST);
     box(B, K, -1.9, 1.9, 2.5, 2.62, -1.8, 1.8, hex('#4c78b8'), hex('#3b64a0'));
-    box(B, K, -0.9, 0.9, 0, 0.75, -0.4, 0.4, hex('#d9493a'), hex('#b33a2d')); // table
-    maskRect(K, -1.7, 1.7, -0.5, 0.5);
+    // mesa de cimento quadrada com tabuleiro de xadrez/dama + 4 bancos de cimento
+    const CON = hex('#bdb8ad'), CON2 = hex('#a9a498');
+    box(B, K, -0.18, 0.18, 0, 0.7, -0.18, 0.18, CON2, CON2);                       // pé central
+    box(B, K, -0.55, 0.55, 0.7, 0.8, -0.55, 0.55, CON, CON2);                       // tampo
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+      const u0 = -0.4 + i * 0.1, v0 = -0.4 + j * 0.1, c = (i + j) % 2 ? hex('#1f1f22') : hex('#efece4');
+      B.quad(P(K, u0, 0.805, v0), P(K, u0 + 0.1, 0.805, v0), P(K, u0 + 0.1, 0.805, v0 + 0.1), P(K, u0, 0.805, v0 + 0.1), UP, c, F_PLAIN);
+    }
+    box(B, K, -0.44, 0.44, 0.8, 0.803, -0.44, 0.44, hex('#6b6458'), hex('#6b6458'));    // borda do tabuleiro
+    for (const [su, sv] of [[1.0, 0], [-1.0, 0], [0, 1.0], [0, -1.0]]) {         // bancos
+      box(B, K, su - 0.12, su + 0.12, 0, 0.38, sv - 0.12, sv + 0.12, CON2, CON2);
+      box(B, K, su - 0.22, su + 0.22, 0.38, 0.46, sv - 0.22, sv + 0.22, CON, CON2);
+    }
+    maskRect(K, -1.25, 1.25, -1.25, 1.25);
     // swings (balanço)
     const S = at(35.5, 13.5, 0, 0), sc = hex('#d9493a');
     for (const vv of [-2.2, 2.2]) { beam(B, P(S, -1.1, 0, vv), P(S, 0, 2.6, vv), 0.1, POST); beam(B, P(S, 1.1, 0, vv), P(S, 0, 2.6, vv), 0.1, POST); }
