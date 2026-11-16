@@ -62,6 +62,7 @@ const DAY_SEC = 24 * 60;
 function gameClock() { const sec = Date.now() / 1000 + (window.__timeShift || 0); const day = Math.floor(sec / DAY_SEC); return { day, h: (sec - day * DAY_SEC) / 60, sec, dayStart: day * DAY_SEC }; }
 let PEAK_A = -Math.PI / 2;   // direção (a partir do centro do mapa) do pico mais alto da serra: o sol nasce e se põe atrás dele
 let PORTELA_PARK = null;     // onde a bicicleta do Portela fica parada
+let GATE116 = null;          // portão de correr da casa 116
 const angOf = T => Math.atan2(T.ax[2], T.ax[0]);
 function P(T, u, y, v) { return [T.o[0] + u * T.ax[0] + y * T.ay[0] + v * T.az[0], T.o[1] + u * T.ax[1] + y * T.ay[1] + v * T.az[1], T.o[2] + u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
 function N(T, u, y, v) { return [u * T.ax[0] + y * T.ay[0] + v * T.az[0], u * T.ax[1] + y * T.ay[1] + v * T.az[1], u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
@@ -922,12 +923,10 @@ for (const h of W.houses) {
       // pilar de pedra entre o portão e a parede branca
       box(B, T, gB, gB + 0.4, -0.6, HC, BV - 0.2, BV + 0.2, ST[0], ST[1]); stones(T, gB, gB + 0.4, 0, HC, BV - 0.21);
       // portão de correr no fundo (lado menor do trapézio)
-      box(B, T, gA - 0.2, gB, -0.1, HC, BV - 0.06, BV + 0.06, hex('#d8d6ce'), hex('#cfcdc5'));
-      for (let u = gA - 0.12; u < gB - 0.04; u += 0.14) box(B, T, u, u + 0.04, 0.05, HC - 0.05, BV - 0.085, BV - 0.06, hex('#bfbdb5'), hex('#bfbdb5'));
-      box(B, T, gA - 0.2, gB, -0.1, 0.45, BV - 0.09, BV - 0.06, hex('#a3a199'), hex('#a3a199'));
-      beam(B, P(T, gA + 0.1, 1.05, BV - 0.12), P(T, gA + 0.3, 1.35, BV - 0.12), 0.03, hex('#6b6b6b'));
-      box(B, T, gA - 0.2, gB, HC - 0.12, HC - 0.04, BV - 0.1, BV + 0.1, hex('#7d7b75'), hex('#7d7b75'));
-      maskRect(T, gA - 0.2, gB + 0.4, BV - 0.2, BV + 0.25);
+      // o portão é desenhado a cada quadro (abre rolando para a direita de quem olha da rua); aqui só o trilho e o pilar
+      box(B, T, gA - 3.9, gB, HC - 0.12, HC - 0.04, BV - 0.1, BV + 0.1, hex('#7d7b75'), hex('#7d7b75'));
+      maskRect(T, gB, gB + 0.4, BV - 0.2, BV + 0.25);
+      GATE116 = { T, gA: gA - 0.2, gB, BV, MV, HC, open: 0, target: 0, farT: 0, fired: false, WP, wall: [fN, fS] };
       // bocal de lâmpada vazio pendurado na laje (o Kiko levou a lâmpada)
       { const bu = (gA + gB) / 2 + 0.6, bv = MV + 1.2, Tb = at(bu, bv, gy);
         beam(B, P(Tb, 0, HC, 0), P(Tb, 0, HC - 0.28, 0), 0.012, hex('#1d1d1d'));                                   // fio
@@ -1650,8 +1649,15 @@ const MASK = new Uint8Array(MW * MH);
   const id = mx.getImageData(0, 0, MW, MH).data;
   for (let i = 0; i < MW * MH; i++) MASK[i] = id[i * 4 + 3] > 100 ? 1 : 0;
 }
+function gateBlocks(x, z) {
+  const G = GATE116; if (!G) return false;
+  const dx = x - G.T.o[0], dz = z - G.T.o[2], u = dx * G.T.ax[0] + dz * G.T.ax[2], v = dx * G.T.az[0] + dz * G.T.az[2];
+  const s = G.open * (G.gB - G.gA - 0.15);
+  return Math.abs(v - G.BV) < 0.16 && u > G.gA - s - 0.05 && u < G.gB - s + 0.05;
+}
 function blocked(x, z) {
   if (x < EX0 + 2 || x > EX1 - 2 || z < EZ0 + 2 || z > EZ1 - 2) return true;
+  if (gateBlocks(x, z)) return true;
   return MASK[Math.floor((z - EZ0) * MR) * MW + Math.floor((x - EX0) * MR)] === 1;
 }
 function freeAt(x, z, rad) {
@@ -2141,14 +2147,102 @@ function buildDog(B, d, t) {
     if (d.kind === 'yorkieRoupa') box(B, H, 0.2, 0.31, -0.02, 0.06, -0.06, 0.06, hex('#3fae5f'), hex('#2f8f4c'));   // brinquedo verde na boca
   }
 }
+// ---------------- portão da casa 116 + fuga dos yorkshires ----------------
+function gateFrame(B, dt) {
+  const G = GATE116; if (!G) return;
+  const c = G.WP((G.gA + G.gB) / 2, G.BV), pd = Math.hypot(player.x - c[0], player.z - c[1]);
+  if (pd < 3.4) { G.target = 1; G.farT = 0; }
+  else if (G.target === 1) {
+    G.farT += dt;
+    const dogInGate = DOGS.some(d => { const dx = d.x - G.T.o[0], dz = d.z - G.T.o[2], v = dx * G.T.az[0] + dz * G.T.az[2]; return Math.abs(v - G.BV) < 1.6 && (d.mode === 'escape' || d.mode === 'enter'); });
+    if (G.farT > 5 && pd > 5 && !dogInGate) G.target = 0;
+  }
+  G.open += Math.max(-dt * 0.55, Math.min(dt * 0.55, G.target - G.open));
+  if (!G.fired && G.open > 0.55) { G.fired = true; yorkieEscape(); }
+  // painel do portão
+  const T = G.T, s = G.open * (G.gB - G.gA - 0.15), a = G.gA - s, b = G.gB - s, BV = G.BV, HC = G.HC;
+  box(B, T, a, b, -0.1, HC - 0.13, BV - 0.06, BV + 0.06, hex('#d8d6ce'), hex('#cfcdc5'));
+  for (let u = a + 0.08; u < b - 0.04; u += 0.14) box(B, T, u, u + 0.04, 0.05, HC - 0.18, BV - 0.085, BV - 0.06, hex('#bfbdb5'), hex('#bfbdb5'));
+  box(B, T, a, b, -0.1, 0.45, BV - 0.09, BV - 0.06, hex('#a3a199'), hex('#a3a199'));
+  // puxador do lado esquerdo (de quem olha da rua)
+  beam(B, P(T, b - 0.3, 1.0, BV - 0.13), P(T, b - 0.3, 1.45, BV - 0.13), 0.035, hex('#5f5f5f'));
+  for (const y of [1.0, 1.45]) beam(B, P(T, b - 0.3, y, BV - 0.13), P(T, b - 0.3, y, BV - 0.06), 0.03, hex('#5f5f5f'));
+  box(B, T, a + 0.05, a + 0.2, -0.1, 0.0, BV - 0.04, BV + 0.04, hex('#3a3a3a'), hex('#3a3a3a'));   // rodinha
+  box(B, T, b - 0.2, b - 0.05, -0.1, 0.0, BV - 0.04, BV + 0.04, hex('#3a3a3a'), hex('#3a3a3a'));
+}
+function blockLoop(G) {   // volta no quarteirão pelas calçadas, mantendo o quarteirão da casa sempre do mesmo lado
+  const Gr = roadGraph(), out = G.WP((G.gA + G.gB) / 2, G.MV - 2.5), H = G.WP((G.gA + G.gB) / 2, G.BV + 8);
+  let A = null, bd = 1e9; for (const n of Gr) { const d = Math.hypot(n.x - out[0], n.z - out[1]); if (d < bd && n.e.length) { bd = d; A = n; } }
+  if (!A) return [];
+  const crs = (ax, az, bx, bz) => ax * bz - az * bx;
+  let first = null, sideSign = 1;
+  for (const e of A.e) { const cr = crs(e.n.x - A.x, e.n.z - A.z, H[0] - A.x, H[1] - A.z); if (!first || Math.abs(cr) > Math.abs(first.cr)) first = { e, cr }; }
+  sideSign = Math.sign(first.cr) || 1;
+  const nodes = [A]; let prev = A, cur = first.e.n, len = first.e.L;
+  for (let it = 0; it < 80 && cur !== A && len < 1600; it++) {
+    nodes.push(cur);
+    const ain = Math.atan2(cur.z - prev.z, cur.x - prev.x);
+    let best = null;
+    for (const e of cur.e) {
+      if (e.n === prev && cur.e.length > 1) continue;
+      let tr = Math.atan2(e.n.z - cur.z, e.n.x - cur.x) - ain; while (tr > Math.PI) tr -= 2 * Math.PI; while (tr <= -Math.PI) tr += 2 * Math.PI;
+      const sc = tr * sideSign; if (!best || sc > best.sc) best = { e, sc };
+    }
+    prev = cur; cur = best.e.n; len += best.e.L;
+  }
+  if (cur !== A) {   // não fechou a volta: vai e volta pela rua
+    const half = nodes.slice(0, Math.min(nodes.length, 6)); nodes.length = 0; nodes.push(...half, ...half.slice(0, -1).reverse());
+  } else nodes.push(A);
+  const pts = [];
+  for (let i = 0; i < nodes.length; i++) {   // pela calçada do lado do quarteirão
+    const a = nodes[Math.max(0, i - 1)], b = nodes[Math.min(nodes.length - 1, i + 1)], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1;
+    const nx = -dz / l * sideSign, nz = dx / l * sideSign;   // normal apontando para o quarteirão
+    pts.push([nodes[i].x + nx * 4.2, nodes[i].z + nz * 4.2]);
+  }
+  return pts;
+}
+function yorkieEscape() {
+  const G = GATE116, loop = blockLoop(G);
+  const cu = (G.gA + G.gB) / 2, inside = G.WP(cu, G.BV + 1.6), gate = G.WP(cu, G.BV), mouth = G.WP(cu, G.MV + 0.2), out = G.WP(cu, G.MV - 2.2);
+  let k = 0;
+  for (const d of DOGS) {
+    if (!d.kind.startsWith('yorkie')) continue;
+    const lag = k++ * 1.1, front = G.WP(cu + (k === 1 ? -0.6 : 0.6), G.MV - 1.2);
+    d.mode = 'escape'; d.pi = 0; d.delay = 0.3 + lag * 0.5; d.sit = false;
+    d.path = [[inside[0], inside[1]], [gate[0], gate[1]], [mouth[0], mouth[1]], [out[0], out[1]], ...loop, [out[0], out[1]], [front[0], front[1]]];
+    d.front = front;
+  }
+}
+function dogRun(d, dt, spd) {   // segue d.path; devolve true ao terminar
+  if (d.delay > 0) { d.delay -= dt; d.spd = 0; d.wag = 1; return false; }
+  const tg = d.path[d.pi]; if (!tg) return true;
+  const dx = tg[0] - d.x, dz = tg[1] - d.z, dist = Math.hypot(dx, dz);
+  if (dist < 0.35) { d.pi++; return d.pi >= d.path.length; }
+  let ta = Math.atan2(dz, dx) - d.a; while (ta > Math.PI) ta -= 2 * Math.PI; while (ta < -Math.PI) ta += 2 * Math.PI;
+  d.a += Math.max(-dt * 7, Math.min(dt * 7, ta));
+  const st = Math.min(dist, spd * dt * (Math.abs(ta) > 1.2 ? 0.4 : 1));
+  d.x += Math.cos(d.a) * st; d.z += Math.sin(d.a) * st; d.spd = spd; d.ph += dt * spd * 22; d.wag = 1;
+  return false;
+}
 function dogsFrame(B, dt, t) {
   for (const d of DOGS) {
     const Y = d.yard, D = DOGDEF[d.kind];
-    if (Math.hypot(d.x - player.x, d.z - player.z) > 160) continue;
+    if (Math.hypot(d.x - player.x, d.z - player.z) > 160 && !d.mode) continue;   // fugindo: continua andando mesmo longe
     const loc = (x, z) => { const dx = x - Y.x, dz = z - Y.z; return [dx * Y.u[0] + dz * Y.u[1], dx * Y.v[0] + dz * Y.v[1]]; };
     const inside = (x, z) => { const [u, v] = loc(x, z); return u > Y.u0 && u < Y.u1 && v > Y.v0 && v < Y.v1 && !(u > Y.nu0 && u < Y.nu1 && v < Y.nv) && freeAt(x, z, 0.25); };
     const pd = Math.hypot(player.x - d.x, player.z - d.z);
     let want = 0;
+    if (d.mode === 'escape') { if (dogRun(d, dt, 4.2)) { d.mode = 'wait'; d.spd = 0; } d.look = 0; buildDog(B, d, t); continue; }
+    if (d.mode === 'wait') {   // esperando na frente do portão
+      d.spd = 0; d.sit = !(pd < 7); d.wag = pd < 7 ? 1 : 0.4;
+      let rel = Math.atan2(GATE116.WP(0, 9)[1] - d.z, GATE116.WP(0, 9)[0] - d.x);
+      if (pd < 7) rel = Math.atan2(player.z - d.z, player.x - d.x);
+      let tr = rel - d.a; while (tr > Math.PI) tr -= 2 * Math.PI; while (tr < -Math.PI) tr += 2 * Math.PI; d.a += Math.max(-dt * 3, Math.min(dt * 3, tr));
+      if (GATE116.open > 0.9) { const G = GATE116, cu = (G.gA + G.gB) / 2, g = G.WP(cu, G.BV), m = G.WP(cu, G.MV + 0.2), ins = G.WP(cu + (d.kind === 'yorkie' ? -1 : 1), G.BV + 2.4);
+        d.mode = 'enter'; d.pi = 0; d.delay = d.kind === 'yorkie' ? 0 : 0.6; d.path = [[m[0], m[1]], [g[0], g[1]], [ins[0], ins[1]]]; d.sit = false; }
+      buildDog(B, d, t); continue;
+    }
+    if (d.mode === 'enter') { if (dogRun(d, dt, 2.6)) { d.mode = null; d.tx = d.x; d.tz = d.z; d.wait = 1.5; } buildDog(B, d, t); continue; }
     if (pd < 7) {            // alguém chegou perto: para, olha e abana o rabo
       d.wait = Math.max(d.wait, 0.5); d.spd = 0;
       let rel = Math.atan2(player.z - d.z, player.x - d.x) - d.a; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
@@ -2918,6 +3012,7 @@ function frame_() {
     if (dd > (n.r || 6) + 2) n.near = false;
     n.show = dd < (n.r || 6);
   }
+  gateFrame(dynB, dt);
   dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
     if (SKY.night > 0.05) for (const p of PROPS) if ((p.k === 'luminaria' || p.k === 'poste') && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
@@ -3023,5 +3118,5 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
