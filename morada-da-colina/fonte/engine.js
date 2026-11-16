@@ -683,11 +683,24 @@ for (const h of W.houses) {
 // ---------------- utility poles with wires (Rua Albert Sabin) ----------------
 {
   const PL = W.poles || [], wire = hex('#1b1b1b');
-  const tops = PL.map(([x, z]) => { const y = surfAt(x, z); const B = chunkB(x, z), T = frame(x, y, z, 0);
+  const tops = PL.map(([x, z]) => { const y = surfAt(x, z); const B = chunkB(x, z);
+    // rua mais próxima: o braço da luminária aponta para ela
+    let best = null, bd = 1e9;
+    for (const sg of SEGS) { if (sg.t === 'footway') continue; const [d, t] = segDistT(x, z, sg.a[0], sg.a[1], sg.b[0], sg.b[1]); if (d < bd) { bd = d; best = { sg, t }; } }
+    let ra = 0;
+    if (best) { const { sg, t } = best, qx = sg.a[0] + (sg.b[0] - sg.a[0]) * t, qz = sg.a[1] + (sg.b[1] - sg.a[1]) * t; ra = Math.atan2(qz - z, qx - x); if (bd < 0.3) ra = Math.atan2(sg.b[1] - sg.a[1], sg.b[0] - sg.a[0]) + Math.PI / 2; }
+    const T = frame(x, y, z, ra);   // u = em direção à rua, v = ao longo da rua
     box(B, T, -0.14, 0.14, -0.3, 9, -0.14, 0.14, hex('#b9b6ad'), hex('#a7a49b'));
-    box(B, T, -0.9, 0.9, 8.4, 8.55, -0.07, 0.07, hex('#8a8780'), hex('#8a8780'));
+    box(B, T, -0.07, 0.07, 8.4, 8.55, -0.9, 0.9, hex('#8a8780'), hex('#8a8780'));   // cruzeta ao longo da rua
+    for (const v of [-0.75, 0, 0.75]) { box(B, T, -0.05, 0.05, 8.55, 8.75, v - 0.05, v + 0.05, hex('#f0eee8'), hex('#d9d6cf')); }   // isoladores
     box(B, T, -0.2, 0.2, 6.4, 6.9, -0.2, 0.2, hex('#7e848c'), hex('#6c7279'));
-    maskCircle(x, z, 0.2); PROPS.push({ k: 'poste', x, z, a: 0 }); return [x, y, z]; });
+    // braço curvo de iluminação pública + luminária "pétala" (como na foto)
+    const ARM = hex('#9a9890'), arm = [[0.12, 6.0], [0.6, 6.25], [1.1, 6.6], [1.5, 7.05], [1.85, 7.45], [2.2, 7.65], [2.55, 7.7]];
+    for (let k = 0; k < arm.length - 1; k++) beam(B, P(T, arm[k][0], arm[k][1], 0), P(T, arm[k + 1][0], arm[k + 1][1], 0), 0.08, ARM);
+    box(B, T, 2.35, 3.05, 7.58, 7.74, -0.22, 0.22, hex('#c9cbc6'), hex('#aeb1ad'));   // corpo da luminária
+    box(B, T, 2.45, 2.95, 7.66, 7.8, -0.17, 0.17, hex('#d8dad5'), hex('#bfc2bd'));     // tampa arredondada
+    box(B, T, 2.42, 2.98, 7.52, 7.58, -0.18, 0.18, hex('#e9e4d0'), hex('#e9e4d0'));   // difusor (acende à noite)
+    maskCircle(x, z, 0.2); PROPS.push({ k: 'poste', x, z, a: ra }); return [x, y, z]; });
   for (let i = 0; i < tops.length - 1; i++) {
     const a = tops[i], b = tops[i + 1]; if (Math.hypot(b[0] - a[0], b[2] - a[2]) > 45) continue;
     const B = chunkB((a[0] + b[0]) / 2, (a[2] + b[2]) / 2);
@@ -1502,8 +1515,11 @@ function buildProp(B, k, x, z, a, o) {
   }
   if (k === 'poste') {
     box(B, T, -0.14, 0.14, -0.3, 9, -0.14, 0.14, hex('#b9b6ad'), hex('#a7a49b'));
-    box(B, T, -0.9, 0.9, 8.4, 8.55, -0.07, 0.07, hex('#8a8780'), hex('#8a8780'));
-    box(B, T, -0.2, 0.2, 6.4, 6.9, -0.2, 0.2, hex('#7e848c'), hex('#6c7279')); return;
+    box(B, T, -0.07, 0.07, 8.4, 8.55, -0.9, 0.9, hex('#8a8780'), hex('#8a8780'));
+    box(B, T, -0.2, 0.2, 6.4, 6.9, -0.2, 0.2, hex('#7e848c'), hex('#6c7279'));
+    const arm = [[0.12, 6.0], [0.6, 6.25], [1.1, 6.6], [1.5, 7.05], [1.85, 7.45], [2.2, 7.65], [2.55, 7.7]];
+    for (let q = 0; q < arm.length - 1; q++) beam(B, P(T, arm[q][0], arm[q][1], 0), P(T, arm[q + 1][0], arm[q + 1][1], 0), 0.08, hex('#9a9890'));
+    box(B, T, 2.35, 3.05, 7.58, 7.74, -0.22, 0.22, hex('#c9cbc6'), hex('#aeb1ad')); box(B, T, 2.42, 2.98, 7.52, 7.58, -0.18, 0.18, hex('#e9e4d0'), hex('#e9e4d0')); return;
   }
   if (k === 'luminaria') {
     const g = hex('#7d838c');
@@ -1795,9 +1811,9 @@ function drawSky(B, eye, S) {   // sol, lua, estrelas e luz dos postes
 }
 function lampState(S, cx, cz) {   // os 8 postes de luz mais próximos acendem a rua em volta
   const out = new Float32Array(32); if (S.night < 0.01) return out;
-  const L = []; for (const p of PROPS) if (p.k === 'luminaria') L.push(p);
+  const L = []; for (const p of PROPS) if (p.k === 'luminaria' || p.k === 'poste') L.push(p);
   L.sort((a, b) => Math.hypot(a.x - cx, a.z - cz) - Math.hypot(b.x - cx, b.z - cz));
-  for (let i = 0; i < Math.min(8, L.length); i++) { const p = L[i], T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), q = P(T, 1.75, 6.3, 0); out.set([q[0], q[1], q[2], 1.0], i * 4); }
+  for (let i = 0; i < Math.min(8, L.length); i++) { const p = L[i], T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), q = p.k === 'poste' ? P(T, 2.7, 7.2, 0) : P(T, 1.75, 6.3, 0); out.set([q[0], q[1], q[2], 1.0], i * 4); }
   return out;
 }
 const player = { x: W.spawn[0], z: W.spawn[1], a: 0, va: 0, walk: 0, speed: 0, car: false, cv: 0 };
@@ -2903,9 +2919,10 @@ function frame_() {
   }
   dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
-    if (SKY.night > 0.05) for (const p of PROPS) if (p.k === 'luminaria' && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
-      const T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), g = Math.round(150 + 105 * SKY.night);
-      box(dynB, T, 1.42, 2.08, 6.52, 6.6, -0.22, 0.22, [g, Math.round(g * 0.93), Math.round(g * 0.7)], [g, Math.round(g * 0.93), Math.round(g * 0.7)], F_GLOW);
+    if (SKY.night > 0.05) for (const p of PROPS) if ((p.k === 'luminaria' || p.k === 'poste') && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
+      const T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), g = Math.round(150 + 105 * SKY.night), c = [g, Math.round(g * 0.86), Math.round(g * 0.6)];
+      if (p.k === 'luminaria') box(dynB, T, 1.42, 2.08, 6.52, 6.6, -0.22, 0.22, c, c, F_GLOW);
+      else { box(dynB, T, 2.4, 3.0, 7.48, 7.57, -0.19, 0.19, c, c, F_GLOW); box(dynB, T, 2.47, 2.93, 7.42, 7.48, -0.14, 0.14, c, c, F_GLOW); }
     }
     drawSky(dynB, [player.x, groundAt(player.x, player.z) + 2, player.z], SKY); }
   for (const c of traffic) carMesh(dynB, groundFrame(c.x, c.z, c.a, 0.0), c.col);
