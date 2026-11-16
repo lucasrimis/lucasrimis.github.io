@@ -1062,21 +1062,49 @@ for (const h of W.houses) {
     };
     // Street View 10/2024: muro de pedra do quadro de luz até 3 painéis ao norte; ao sul vai até ~2 m depois da portinha, depois muro liso
     wallRun(-6, 3.5); wallRun(11.6, 14.2); wallRun(14.2, 24, true, true);
-    // portaria: quadro de luz | portão de garagem | portinha
-    { const gy = g0(7.5, MV), T = at(0, 0, gy);
-      for (const [a, b] of [[3.3, 3.75], [5.55, 6.0], [9.4, 9.85], [10.95, 11.6]]) { box(B, T, a, b, -0.6, HW + 0.45, MV - 0.2, MV + 0.2, ST[0], ST[1]); stones(T, a, b, 0, HW, MV - 0.21); }
-      box(B, T, 3.75, 5.55, -0.6, HW, MV - 0.1, MV + 0.1, PL, PL); box(B, T, 3.75, 5.55, -0.6, 0.35, MV - 0.115, MV + 0.115, GRIME, GRIME);
-      box(B, T, 4.3, 4.95, 0.95, 1.5, MV - 0.16, MV - 0.1, hex('#4a2c22'), hex('#3b231b'));                          // quadro de luz
-      box(B, T, 6.0, 9.4, -0.1, HW - 0.05, MV - 0.05, MV + 0.05, hex('#d9d8d2'), hex('#cfcec8'));                    // portão branco
-      for (const u of [6.05, 7.7, 9.35]) box(B, T, u - 0.04, u + 0.04, -0.1, HW - 0.05, MV - 0.08, MV - 0.05, hex('#bdbcb5'), hex('#bdbcb5'));
-      box(B, T, 6.0, 9.4, 0.0, 0.25, MV - 0.07, MV - 0.05, hex('#a9a7a0'), hex('#a9a7a0'));
-      box(B, T, 9.85, 10.95, -0.1, HW - 0.05, MV - 0.06, MV + 0.06, hex('#d2d0c9'), hex('#cac8c1'));               // portinha
-      box(B, T, 10.05, 10.15, 0.95, 1.15, MV - 0.1, MV - 0.06, hex('#3a3a3a'), hex('#3a3a3a'));
-      box(B, T, 10.4, 10.6, 1.55, 1.68, MV - 0.09, MV - 0.06, hex('#5a5a5a'), hex('#5a5a5a'));                     // número
-      box(B, T, 3.3, 11.6, HW, HW + 0.45, MV - 0.2, MV + 0.2, ST[1], ST[0]); stones(T, 3.3, 11.6, HW, HW + 0.45, MV - 0.21);  // faixa de pedra sobre o portão
-      maskRect(T, 3.3, 11.6, MV - 0.25, MV + 0.25);
-      // entrada da garagem em concreto com grama no meio
-      for (const [a, b] of [[6.2, 7.3], [8.1, 9.2]]) { const q = [[a, 2.6], [b, 2.6], [b, MV - 0.1], [a, MV - 0.1]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.09, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#b5b2a8'), F_TEX); }
+    // entrada recuada e coberta (Street View 10/2024): moldura de pedra, laje por cima, portão de correr no fundo
+    { const gy = g0(7.5, MV), T = at(0, 0, gy), D = 2.6, BV = MV + D, HC = 2.6, TOP = 3.2;
+      const uN = 3.5, uS = 11.6;                                    // jambas externas (norte / sul)
+      const jamb = (a, b) => { box(B, T, a, b, -0.6, TOP, MV - 0.22, MV + 0.22, ST[0], ST[1]); stones(T, a, b, 0, TOP, MV - 0.23); };
+      jamb(uN, uN + 0.65); jamb(uS - 0.65, uS);
+      // paredes laterais do recuo, revestidas de pedra
+      for (const [a, b, sg] of [[uN, uN + 0.65, 1], [uS - 0.65, uS, -1]]) {
+        box(B, T, a, b, -0.6, HC, MV, BV, ST[1], ST[0]);
+        const fu = sg > 0 ? b : a, Ts = { o: P(T, fu, 0, 0), ax: [AZ[0] * sg, 0, AZ[2] * sg], ay: [0, 1, 0], az: [-AX[0] * sg, 0, -AX[2] * sg] };
+        for (let y = 0; y < HC - 0.05; y += 0.17) for (let v = MV + (Math.floor(y / 0.17) % 2) * 0.09; v < BV - 0.05; v += 0.2) {
+          const c = ST[Math.floor(r() * 4)], v1 = Math.min(BV, v + 0.12 + r() * 0.08), y1 = Math.min(HC, y + 0.1 + r() * 0.06);
+          box(B, T, Math.min(fu, fu + sg * 0.024), Math.max(fu, fu + sg * 0.024), y, y1, v, v1, c, c);
+        }
+      }
+      // laje de cobertura + verga de pedra na frente (mais alta que o muro)
+      box(B, T, uN, uS, HC, HC + 0.18, MV - 0.25, BV + 0.1, hex('#c4c1b8'), hex('#a9a69e'));
+      box(B, T, uN, uS, HC + 0.18, TOP, MV - 0.24, MV + 0.24, ST[1], ST[0]); stones(T, uN, uS, HC, TOP, MV - 0.25);
+      box(B, T, uN + 0.65, uS - 0.65, HC + 0.18, TOP - 0.1, MV + 0.24, BV + 0.1, hex('#bcb9b0'), hex('#bcb9b0'));   // cobertura por cima
+      // piso de concreto do recuo
+      { const q = [[uN + 0.65, MV - 0.1], [uS - 0.65, MV - 0.1], [uS - 0.65, BV], [uN + 0.65, BV]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.07, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#aaa79e'), F_TEX); }
+      // fundo: portão de correr (norte) | pilar de pedra | parede branca com o 116 (sul)
+      const gA = uN + 0.65, gB = gA + 3.4, pB = gB + 0.5;
+      box(B, T, gA, gB, -0.1, HC, BV - 0.06, BV + 0.06, hex('#d8d6ce'), hex('#cfcdc5'));                       // portão branco de correr
+      for (let u = gA + 0.08; u < gB - 0.04; u += 0.14) box(B, T, u, u + 0.04, 0.05, HC - 0.05, BV - 0.085, BV - 0.06, hex('#bfbdb5'), hex('#bfbdb5'));  // frisos
+      box(B, T, gA, gB, -0.1, 0.45, BV - 0.09, BV - 0.06, hex('#a3a199'), hex('#a3a199'));                     // sujeira embaixo
+      beam(B, P(T, gA + 0.25, 1.05, BV - 0.12), P(T, gA + 0.45, 1.35, BV - 0.12), 0.03, hex('#6b6b6b'));      // puxador
+      box(B, T, gA, gB + 0.6, HC - 0.12, HC - 0.04, BV - 0.1, BV + 0.1, hex('#7d7b75'), hex('#7d7b75'));       // trilho
+      box(B, T, gB, pB, -0.6, HC, BV - 0.25, BV + 0.25, ST[0], ST[1]); stones(T, gB, pB, 0, HC, BV - 0.26);
+      box(B, T, pB, uS - 0.65, -0.6, HC, BV - 0.12, BV + 0.12, hex('#dedbd1'), hex('#d3d0c6'));               // parede branca
+      for (let k = 0; k < 9; k++) { const u0 = pB + 0.2 + r() * 2.0, y0 = 0.2 + r() * 2.0; wallFeat(B, T, u0, u0 + 0.12 + r() * 0.2, y0, y0 + 0.1 + r() * 0.25, BV - 0.12, -1, hex('#bdbab1')); }
+      wallFeat(B, T, pB, uS - 0.65, 0.0, 0.5, BV - 0.12, -1, hex('#a9a69d'));
+      // "116" pintado (quem olha da rua vê o eixo u crescer para a esquerda, então desenha espelhado no u)
+      { const D6 = hex('#2a2a2a'), L0 = uS - 0.65 - 0.55, y0 = 1.85, seg = (x0, x1, a, b) => wallFeat(B, T, L0 - x1, L0 - x0, y0 + a, y0 + b, BV - 0.13, -1, D6);
+        seg(0, 0.04, 0, 0.28); seg(0.12, 0.16, 0, 0.28);                                          // 1 1
+        seg(0.24, 0.28, 0, 0.27); seg(0.24, 0.38, 0, 0.04); seg(0.34, 0.38, 0, 0.14); seg(0.24, 0.38, 0.12, 0.16); seg(0.26, 0.37, 0.25, 0.29); }   // 6
+      box(B, T, pB + 1.25, pB + 1.6, 1.15, 1.75, BV - 0.17, BV - 0.12, hex('#9b9a94'), hex('#8a8983'));       // caixa de cartas
+      box(B, T, pB + 1.3, pB + 1.55, 1.62, 1.66, BV - 0.18, BV - 0.17, hex('#3a3a3a'), hex('#3a3a3a'));
+      box(B, T, pB + 0.85, pB + 1.05, 1.5, 1.72, BV - 0.16, BV - 0.12, hex('#e9e7e1'), hex('#d5d3cc'));       // interfone
+      box(B, T, uN + 0.65, uN + 0.69, 1.0, 1.6, MV + 1.4, MV + 1.75, hex('#4a2c22'), hex('#3b231b'));         // quadro de luz na lateral
+      // colisão: só o fundo e as laterais (dá para ficar embaixo da cobertura)
+      maskRect(T, uN, uN + 0.65, MV - 0.25, BV); maskRect(T, uS - 0.65, uS, MV - 0.25, BV); maskRect(T, uN, uS, BV - 0.25, BV + 0.25);
+      // entrada da garagem em concreto com grama no meio, até o portão
+      for (const [a, b] of [[gA + 0.3, gA + 1.3], [gB - 1.3, gB - 0.3]]) { const q = [[a, 2.6], [b, 2.6], [b, MV - 0.1], [a, MV - 0.1]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.09, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#b5b2a8'), F_TEX); }
     }
     // caixa de correio no poste + touceira de capim
     { const T = at(12.3, 4.15); box(B, T, -0.035, 0.035, 0, 1.25, -0.035, 0.035, hex('#2e2e2e'), hex('#2e2e2e'));
@@ -1125,7 +1153,7 @@ for (const h of W.houses) {
     // árvores: mangueiras grandes ao sul, coqueiro atrás do muro, arbusto que passa por cima do muro
     for (const [tu, tv, s] of [[16.5, 9.5, 2.1], [21, 16, 1.9], [15.5, 22, 1.7], [21.5, 25, 1.6], [9.5, 25, 1.5], [-1.5, 24, 1.4]]) { const p = WP(tu, tv); tree(chunkB(p[0], p[1]), p[0], p[1], 0, s, true); }
     { const p = WP(12.2, 10.8); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.45, true); }
-    for (const [bu, bv, h] of [[10.2, 6.6, 2.9], [12.6, 6.9, 2.6], [1.5, 6.4, 2.2]]) box(B, at(bu, bv), -1.1, 1.1, 0, h, -0.9, 0.9, hex('#4f8a3a'), hex('#41772f'), F_TEX);
+    for (const [bu, bv, h] of [[13.2, 7.3, 2.9], [15.2, 7.0, 2.6], [1.5, 6.4, 2.2]]) box(B, at(bu, bv), -1.1, 1.1, 0, h, -0.9, 0.9, hex('#4f8a3a'), hex('#41772f'), F_TEX);
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'weedlot') { // terreno baldio: mato alto
     const r = rngFor(lm.x, lm.z, 5), B = chunkB(lm.x, lm.z);
