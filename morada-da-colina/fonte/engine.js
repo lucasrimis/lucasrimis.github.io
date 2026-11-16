@@ -194,7 +194,8 @@ const LAKE = W.areas.find(a => a.t === 'water');
 const LAKE_LEVEL = LAKE ? Math.min(...LAKE.pts.map(p => demRaw(p[0], p[1]))) - 0.3 : 0;
 const PITCH = W.areas.find(a => a.t === 'pitch');
 const PITCH_H = PITCH ? PITCH.pts.reduce((s, p) => s + demRaw(p[0], p[1]), 0) / PITCH.pts.length : 0;
-const CREEK = W.creek || null;
+const CREEK = W.creek || null, CREEK2 = W.creek2 || null;
+const creekD = (x, z, C) => { let d = 1e9; for (let k = 0; k < C.length - 1; k++) d = Math.min(d, segDistT(x, z, C[k][0], C[k][1], C[k + 1][0], C[k + 1][1])[0]); return d; };
 
 const TS = 5; // terrain lattice spacing (m)
 const LW = Math.ceil((EX1 - EX0) / TS) + 1, LH = Math.ceil((EZ1 - EZ0) / TS) + 1;
@@ -218,6 +219,7 @@ for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
     let d = 1e9; for (let k = 0; k < CREEK.length - 1; k++) d = Math.min(d, segDistT(x, z, CREEK[k][0], CREEK[k][1], CREEK[k + 1][0], CREEK[k + 1][1])[0]);
     if (d < 6) h -= 1.5 * sstep(6, 1.5, d);
   }
+  if (CREEK2) { const d = creekD(x, z, CREEK2); if (d < 4.5) h -= 1.1 * sstep(4.5, 1.2, d); }   // valinha da continuação do riacho
   if (rs && rs.e < TS + 0.8) h = Math.min(h, rs.h - (rs.foot ? 0.12 : 0.22));
   LAT[j * LW + i] = h;
 }
@@ -256,6 +258,7 @@ function latH(i, j, x, z) { return (i >= 0 && j >= 0 && i < LW && j < LH) ? LAT[
     if (inner) {
       if (LAKE && (inPoly(x, z, LAKE.pts) || polyEdgeDist(x, z, LAKE.pts) < 3)) return [SAND, F_TEX];
       if (CREEK) { let d = 1e9; for (let k = 0; k < CREEK.length - 1; k++) d = Math.min(d, segDistT(x, z, CREEK[k][0], CREEK[k][1], CREEK[k + 1][0], CREEK[k + 1][1])[0]); if (d < 3.2) return [MUD, F_TEX]; }
+      if (CREEK2 && creekD(x, z, CREEK2) < 1.3) return [MUD, F_TEX];
       if (PITCH && inPoly(x, z, PITCH.pts)) return [C.pitch, F_TEX];
       for (const a of strips) if (inPoly(x, z, a.pts)) return [hex('#4f8f3e'), F_TEX];
       for (const a of wood) if (inPoly(x, z, a.pts)) return [jit(C.wood, () => h2(x, z), 0.05), F_TEX];
@@ -459,6 +462,44 @@ if (CREEK) {
     }
     POIS.push({ n: 'Riacho', x: centroid(cp)[0], z: centroid(cp)[1], y: 3 });
   }
+}
+// continuação do riacho na faixa entre a R. Carlos Ferreira Pinto e a R. Eurycliders (passa por tubos de cimento)
+if (CREEK2) {
+  const cp = CREEK2;
+  for (let i = 0; i < cp.length - 1; i += 5) {
+    const piece = cp.slice(i, i + 6); if (piece.length < 2) continue;
+    const [cx, cz] = centroid(piece), B = chunkB(cx, cz), r = rngFor(cx, cz, 12);
+    strip(B, piece, 0.9, 0.45, hex('#3a7fb0'), F_WATER, 2, groundAt);
+    for (let k = 0; k < piece.length - 1; k++) {
+      const a = piece[k], b = piece[k + 1];
+      for (let j = 0; j < 2; j++) {
+        if (r() < 0.45) continue;
+        const t = r(), side = r() < 0.5 ? -1 : 1, dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, o = 1.25 + r() * 0.8;
+        const x = a[0] + dx * t - dz / l * side * o, z = a[1] + dz * t + dx / l * side * o, sz = 0.2 + r() * 0.3, g = jit(hex('#8a8a82'), r, 0.12);
+        box(B, frame(x, groundAt(x, z) - 0.1, z, r() * 3), -sz, sz, 0, sz * 0.9, -sz * 0.8, sz * 0.8, g, g);
+      }
+    }
+  }
+}
+// tubos de cimento (manilhas) com cabeceira de concreto
+for (const c of (W.culverts || [])) {
+  const B = chunkB(c.x, c.z), g = groundAt(c.x, c.z), yc = g + 0.55, T = frame(c.x, 0, c.z, c.a);
+  const CON = hex('#a9a69d'), CON2 = hex('#8f8c84'), DARK = hex('#1c1f22'), n = 10, R0 = 0.62, R1 = 0.47, U0 = -0.35, U1 = 2.2;
+  const ring = (k, r, u) => { const a = k / n * Math.PI * 2; return P(T, u, yc + Math.sin(a) * r, Math.cos(a) * r); };
+  for (let k = 0; k < n; k++) {
+    const a0 = ring(k, R0, U0), a1 = ring(k + 1, R0, U0), b1 = ring(k + 1, R0, U1), b0 = ring(k, R0, U1);
+    B.quad(a0, a1, b1, b0, faceN(a0, a1, b1), k % 2 ? CON : CON2, F_PLAIN);                      // casca externa
+    const i0 = ring(k, R1, U0), i1 = ring(k + 1, R1, U0), j1 = ring(k + 1, R1, U1), j0 = ring(k, R1, U1);
+    B.quad(i0, i1, j1, j0, faceN(j0, j1, i1), DARK, F_PLAIN);                                       // interior escuro
+    B.quad(a0, a1, i1, i0, N(T, -1, 0, 0), CON, F_PLAIN);                                           // borda da boca
+  }
+  { const cc = P(T, U1 - 0.05, yc, 0); for (let k = 0; k < n; k++) B.tri(cc, ring(k, R1, U1 - 0.05), ring(k + 1, R1, U1 - 0.05), N(T, -1, 0, 0), DARK, F_PLAIN); }
+  B.quad(P(T, U0, yc - 0.3, -0.36), P(T, U1, yc - 0.3, -0.36), P(T, U1, yc - 0.3, 0.36), P(T, U0, yc - 0.3, 0.36), UP, hex('#2d5c7a'), F_PLAIN);  // fio d'água dentro
+  // cabeceira de concreto em volta da boca
+  const top = yc + 1.0, bot = g - 0.6;
+  box(B, T, 0.15, 0.5, bot, top, -1.6, -R0, CON, CON2); box(B, T, 0.15, 0.5, bot, top, R0, 1.6, CON, CON2);
+  box(B, T, 0.15, 0.5, yc + R0 - 0.05, top, -R0, R0, CON, CON2); box(B, T, 0.15, 0.5, bot, yc - R0 + 0.05, -R0, R0, CON, CON2);
+  box(B, T, 0.1, 0.55, top, top + 0.12, -1.7, 1.7, hex('#bdb9ae'), CON2);
 }
 
 // ---------------- collision mask ----------------
@@ -1706,7 +1747,7 @@ const mapImg = document.createElement('canvas'); mapImg.width = MMW; mapImg.heig
   g.setTransform(s, 0, 0, s, -EX0 * s, -EZ0 * s);
   const fillA = (a, c) => { g.fillStyle = c; g.beginPath(); a.pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill(); };
   for (const a of W.areas) fillA(a, { water: '#2f78b8', wood: '#3f7a37', park: '#86bd60', pitch: '#4ea64b', uni: '#c9c3b6', building: '#d9d2c3', grass: '#7db556', island: '#7db556', strip: '#4f8f3e' }[a.t]);
-  if (W.creek) { g.strokeStyle = '#3a7fb0'; g.lineWidth = 3; g.beginPath(); W.creek.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); }
+  for (const C of [W.creek, W.creek2]) if (C) { g.strokeStyle = '#3a7fb0'; g.lineWidth = 3; g.beginPath(); C.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); }
   { // hillshade from the real elevation
     const hc = document.createElement('canvas'); hc.width = LW; hc.height = LH;
     const hx = hc.getContext('2d'), im = hx.createImageData(LW, LH);

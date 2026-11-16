@@ -643,6 +643,58 @@ trees = [t for t in trees if not in_lot9(t[0], t[1], 1)]
 landmarks.append({'type': 'sobrado9', 'x': J9[0], 'z': J9[1], 'u': [round(A9[0], 4), round(A9[1], 4)], 'v': [round(N9[0], 4), round(N9[1], 4)],
                   'sd': [round(SD[0], 4), round(SD[1], 4)], 'sn': [round(SN[0], 4), round(SN[1], 4)]})
 print('sobrado9 at', J9, 'removed houses', _nb - len(houses), 'SD', SD, 'SN', SN)
+# ---- continuação do riacho: faixa de grama entre R. Carlos Ferreira Pinto e R. Eurycliders de Jesus Zerbini ----
+# o riacho atravessa a R. Darci por um tubo de cimento e desce pelo meio da faixa até a R. Albert Sabin
+_cf = next(r for r in roads if r['n'] == 'Rua Carlos Ferreira Pinto')['pts']; _ej = next(r for r in roads if r['n'] == 'Rua Eurycliders de Jesus Zerbini')['pts']
+_A, _B = _cf[0], _cf[-1]                    # Albert Sabin -> Darci
+_L = math.hypot(_B[0] - _A[0], _B[1] - _A[1]); _d = ((_B[0] - _A[0]) / _L, (_B[1] - _A[1]) / _L)
+_C = _ej[-1]; _off = ((_C[0] - _A[0]) * -_d[1] + (_C[1] - _A[1]) * _d[0]) / 2     # meia largura (com sinal) até o eixo da faixa
+_nrm = (-_d[1], _d[0])
+def _mid(t):  # ponto no eixo da faixa, t em metros a partir da ponta da Albert Sabin
+    return (_A[0] + _d[0] * t + _nrm[0] * _off, _A[1] + _d[1] * t + _nrm[1] * _off)
+# limites da faixa: projeção das pontas das duas ruas
+def _hit(rname):   # t onde o eixo da faixa cruza a rua
+    best = None
+    for r_ in roads:
+        if r_['n'] != rname: continue
+        for (ax, az), (bx, bz) in zip(r_['pts'], r_['pts'][1:]):
+            m0 = _mid(-50); ex, ez = _d[0] * 200, _d[1] * 200; fx, fz = bx - ax, bz - az
+            den = ex * fz - ez * fx
+            if abs(den) < 1e-9: continue
+            u = ((ax - m0[0]) * fz - (az - m0[1]) * fx) / den; w_ = ((ax - m0[0]) * ez - (az - m0[1]) * ex) / den
+            if 0 <= u <= 1 and 0 <= w_ <= 1: t = -50 + u * 200; best = t if best is None else best
+    return best
+_t_as, _t_dc = _hit('Rua Albert Sabin'), _hit('Rua Darci de Carvalho')
+_t0, _t1 = _t_as + 8.0, _t_dc - 7.5
+creek2 = []
+_n = max(2, int((_t1 - _t0) / 3.5))
+for k in range(_n + 1):
+    t = _t0 + (_t1 - _t0) * k / _n
+    w = math.sin(t * 0.21) * 1.1 + math.sin(t * 0.47 + 1.3) * 0.5      # pequenas curvas
+    m = _mid(t); creek2.append((m[0] + _nrm[0] * w, m[1] + _nrm[1] * w))
+creek2 = creek2[::-1]   # nasce no tubo da Darci e desce para a Albert Sabin
+def _cdist(x, z, pts):
+    best = 1e9
+    for (ax, az), (bx, bz) in zip(pts, pts[1:]):
+        dx, dz = bx - ax, bz - az; L2 = dx * dx + dz * dz or 1; t = max(0, min(1, ((x - ax) * dx + (z - az) * dz) / L2))
+        best = min(best, math.hypot(x - ax - dx * t, z - az - dz * t))
+    return best
+def in_strip2(x, z, m=0):
+    t = (x - _A[0]) * _d[0] + (z - _A[1]) * _d[1]; v = (x - _A[0]) * _nrm[0] + (z - _A[1]) * _nrm[1]
+    return _t_as + 3 - m < t < _t_dc - 3 + m and min(0, 2 * _off) + 2 - m < v < max(0, 2 * _off) - 2 + m
+# tubos: um ligando ao riacho principal (sob a Darci), outro levando a água para baixo da Albert Sabin
+_cm = min(creek, key=lambda p: math.hypot(p[0] - creek2[0][0], p[1] - creek2[0][1]))
+_ang1 = math.atan2(_cm[1] - creek2[0][1], _cm[0] - creek2[0][0])
+_ang2 = math.atan2(-_d[1], -_d[0])
+culverts = [
+    {'x': creek2[0][0], 'z': creek2[0][1], 'a': _ang1},                                     # boca do lado da faixa
+    {'x': _cm[0] - math.cos(_ang1) * 2.0, 'z': _cm[1] - math.sin(_ang1) * 2.0, 'a': _ang1 + math.pi},  # boca no barranco do riacho
+    {'x': creek2[-1][0], 'z': creek2[-1][1], 'a': _ang2},                                   # desce para baixo da Albert Sabin
+]
+_nb = len(houses)
+houses = [h for h in houses if not in_strip2(h[0], h[1], 2)]
+trees = [t for t in trees if _cdist(t[0], t[1], creek2) > 3.2 and min(math.hypot(t[0] - c['x'], t[1] - c['z']) for c in culverts) > 3]
+print('creek2', len(creek2), 'pts; t', round(_t_as,1), round(_t_dc,1), 'removed houses', _nb - len(houses))
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
@@ -656,6 +708,8 @@ data = {
     'proj': {'lat0': lat0, 'lon0': lon0, 'KX': KX, 'KZ': KZ},
     'landmarks': landmarks + landmarks_pre,
     'creek': [[round(x, 1), round(z, 1)] for x, z in creek],
+    'creek2': [[round(x, 1), round(z, 1)] for x, z in creek2],
+    'culverts': [{'x': round(c['x'], 2), 'z': round(c['z'], 2), 'a': round(c['a'], 3)} for c in culverts],
     'houses': houses, 'trees': trees, 'lamps': lamps,
     'spawn': [round(best[1], 1), round(best[2], 1)],
     'label': [round(target[0], 1), round(target[1], 1)],
