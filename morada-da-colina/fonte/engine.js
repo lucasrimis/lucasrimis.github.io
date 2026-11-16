@@ -941,7 +941,7 @@ for (const h of W.houses) {
         mx.beginPath(); mx.lineWidth = 0.4; mx.moveTo(pa[0], pa[1]); mx.lineTo(pb[0], pb[1]); mx.stroke(); }
     }
     // ---- sobrado: branco encardido, telhado de barro com beiral largo, varanda no andar de cima ----
-    const hu = 7.6, hv = 14.2, hw = 11, hd = 9, HC = at(hu, hv, 0), [hmin, hmax] = cornersH(HC, hw, hd);
+    const hu = 0.6, hv = 14.2, hw = 11, hd = 9, HC = at(hu, hv, 0), [hmin, hmax] = cornersH(HC, hw, hd);
     const T = at(hu, hv, hmax + 0.1), WALL = hex('#e0ded6'), WALL2 = hex('#d2d0c8'), DARK = hex('#3a2c25');
     const fv = -hd / 2;
     box(B, T, -hw / 2, hw / 2, hmin - hmax - 0.5, 0.3, -hd / 2, hd / 2, hex('#bdb9ae'), hex('#bdb9ae'));
@@ -970,9 +970,9 @@ for (const h of W.houses) {
     { const p = P(T, -3.6, 6.4, -1.2); const Td = frame(p[0], p[1], p[2], Math.atan2(uz, ux) + 2.4); box(B, Td, -0.03, 0.03, -0.4, 0.2, -0.03, 0.03, hex('#777'), hex('#777')); box(B, Td, -0.06, 0.06, 0.05, 0.75, -0.36, 0.36, hex('#d7d7d2'), hex('#bdbdb7')); }
     maskRect(at(0, 0, 0), hu - hw / 2, hu + hw / 2 + 4.4, hv - hd / 2, hv + hd / 2);
     // árvores: mangueiras grandes ao sul, coqueiro atrás do muro, arbusto que passa por cima do muro
-    for (const [tu, tv, s] of [[16.5, 9.5, 2.1], [21, 16, 1.9], [15.5, 22, 1.7], [21.5, 25, 1.6], [9.5, 25, 1.5], [-1.5, 24, 1.4]]) { const p = WP(tu, tv); tree(chunkB(p[0], p[1]), p[0], p[1], 0, s, true); }
-    { const p = WP(12.2, 10.8); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.45, true); }
-    for (const [bu, bv, h] of [[13.2, 7.3, 2.9], [15.2, 7.0, 2.6], [1.5, 6.4, 2.2]]) box(B, at(bu, bv), -1.1, 1.1, 0, h, -0.9, 0.9, hex('#4f8a3a'), hex('#41772f'), F_TEX);
+    for (const [tu, tv, s] of [[17.5, 9.5, 2.1], [21.5, 15, 1.9], [16, 20.5, 1.8], [21.5, 24.5, 1.6], [12.5, 24.5, 1.5]]) { const p = WP(tu, tv); tree(chunkB(p[0], p[1]), p[0], p[1], 0, s, true); }
+    { const p = WP(14.2, 10.6); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.45, true); }
+    for (const [bu, bv, h] of [[14.4, 7.3, 2.9], [17.4, 7.0, 2.6], [-3.0, 6.6, 2.2]]) box(B, at(bu, bv), -1.1, 1.1, 0, h, -0.9, 0.9, hex('#4f8a3a'), hex('#41772f'), F_TEX);
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'weedlot') { // terreno baldio: mato alto
     const r = rngFor(lm.x, lm.z, 5), B = chunkB(lm.x, lm.z);
