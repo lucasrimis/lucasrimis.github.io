@@ -252,6 +252,7 @@ function faceN(a, b, c, up) {
 function frame(x, y, z, ang) { const c = Math.cos(ang), s = Math.sin(ang); return { o: [x, y, z], ax: [c, 0, s], ay: [0, 1, 0], az: [-s, 0, c] }; }
 // objetos do cenário que podem ser copiados no esconde-esconde (tipo, posição, ângulo, extras)
 const PROPS = [];
+const LATE_NOTES = [];   // mensagens criadas antes da lista de NPCs existir
 const angOf = T => Math.atan2(T.ax[2], T.ax[0]);
 function P(T, u, y, v) { return [T.o[0] + u * T.ax[0] + y * T.ay[0] + v * T.az[0], T.o[1] + u * T.ax[1] + y * T.ay[1] + v * T.az[1], T.o[2] + u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
 function N(T, u, y, v) { return [u * T.ax[0] + y * T.ay[0] + v * T.az[0], u * T.ax[1] + y * T.ay[1] + v * T.az[1], u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
@@ -1104,6 +1105,14 @@ for (const h of W.houses) {
       beam(B, P(T, gA + 0.1, 1.05, BV - 0.12), P(T, gA + 0.3, 1.35, BV - 0.12), 0.03, hex('#6b6b6b'));
       box(B, T, gA - 0.2, gB, HC - 0.12, HC - 0.04, BV - 0.1, BV + 0.1, hex('#7d7b75'), hex('#7d7b75'));
       maskRect(T, gA - 0.2, gB + 0.4, BV - 0.2, BV + 0.25);
+      // bocal de lâmpada vazio pendurado na laje (o Kiko levou a lâmpada)
+      { const bu = (gA + gB) / 2 + 0.6, bv = MV + 1.2, Tb = at(bu, bv, gy);
+        beam(B, P(Tb, 0, HC, 0), P(Tb, 0, HC - 0.28, 0), 0.012, hex('#1d1d1d'));                                   // fio
+        box(B, Tb, -0.045, 0.045, HC - 0.42, HC - 0.28, -0.045, 0.045, hex('#2b2722'), hex('#3a342d'));             // bocal
+        box(B, Tb, -0.03, 0.03, HC - 0.45, HC - 0.42, -0.03, 0.03, hex('#8f8a80'), hex('#8f8a80'));                  // rosca vazia
+        box(B, Tb, -0.06, 0.06, HC - 0.02, HC, -0.06, 0.06, hex('#d9d6cd'), hex('#d9d6cd'));                         // canopla
+        const p = P(Tb, 0, 0, 0);
+        LATE_NOTES.push({ name: '', style: 'note', x: p[0], z: p[2], y: gy + 1.25, base: 0, look: 0, t: 0, r: 2.2, says: ['O Kiko roubou a lâmpada de novo.'] }); }
       // laje de cobertura + verga de pedra na frente (mais alta que o muro)
       box(B, T, uN, uS, HC, HC + 0.18, MV - 0.25, BV + 0.15, hex('#c4c1b8'), hex('#a9a69e'));
       box(B, T, uN, uS, HC + 0.18, TOP, MV - 0.24, MV + 0.24, ST[1], ST[0]); stones(T, uN, uS, HC, TOP, MV - 0.25);
@@ -1255,6 +1264,7 @@ function pixelText(B, T, text, u0, y0, vf, px, col) { // text on the wall plane 
   }
 }
 const NPCS = [];
+NPCS.push(...LATE_NOTES);
 const FLY_SPOTS = [];
 for (const lm of (W.landmarks || [])) {
   if (lm.type !== 'guarita') continue;
