@@ -2442,7 +2442,7 @@ function buildRider(B, n, t) {   // Portela pedalando, de boné
   const T = frame(n.x, n.y, n.z, n.hd), ph = n.ped;
   const hip = P(T, -0.2, 1.02, 0);
   for (const sv of [-1, 1]) {   // pernas nos pedais
-    const pa = ph + (sv > 0 ? 0 : Math.PI), ped = P(T, -0.05 + Math.cos(pa) * 0.17, 0.33 + Math.sin(pa) * 0.17, sv * 0.13);
+    const pa = ph + (sv > 0 ? 0 : Math.PI), ped = P(T, -0.05 + Math.cos(pa) * 0.17, 0.33 - Math.sin(pa) * 0.17, sv * 0.13);   // pedal da frente desce: pedalada para a frente
     const h = P(T, -0.2, 1.02, sv * 0.12), mid = [(h[0] + ped[0]) / 2, (h[1] + ped[1]) / 2, (h[2] + ped[2]) / 2], kn = P({ o: mid, ax: T.ax, ay: T.ay, az: T.az }, 0.22, 0.12, 0);
     beam(B, h, kn, 0.17, P_PANTS); beam(B, kn, ped, 0.15, P_PANTS); box(B, frame(ped[0], ped[1] - 0.05, ped[2], n.hd), -0.08, 0.13, 0, 0.09, -0.06, 0.06, P_SHOE, P_SHOE);
   }
@@ -3238,7 +3238,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, PROPDEF, freeAt, groun
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261116222359";
+  const BUILD = "v20261116223459";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
