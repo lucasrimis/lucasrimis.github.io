@@ -829,6 +829,103 @@ for (const h of W.houses) {
     { const p = WP(sideU(22) + 2.5, 22); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 1.1, true); }
     for (const [pu, pv] of [[19.5, 6.0], [22.5, 6.2], [sideU(12) + 1.2, 12], [sideU(16) + 1.2, 16]]) { const S = at(pu, pv); box(B, S, -0.5, 0.5, 0, 0.8, -0.5, 0.5, hex('#4c8f3d'), hex('#3f7c33'), F_TEX); PROPS.push({ k: 'arbusto', x: S.o[0], z: S.o[2], a: Math.atan2(uz, ux), s: 1.0 }); }
   }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'casa127') { // casa 127 da R. Albert Sabin (Street View 10/2024)
+    const [ux, uz] = lm.u, [vx, vz] = lm.v;
+    const WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz];
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const B = chunkB(...WP(10, 14)), r = rngFor(lm.x, lm.z, 127);
+    const PL = hex('#c9c8c1'), PL2 = hex('#b3b2ab'), GRIME = hex('#9d9b93');
+    const ST = [hex('#a99d89'), hex('#958b7a'), hex('#b8ae9b'), hex('#8a8172')], MORT = hex('#6f6a61');
+    const MV = 4.9, HW = 2.0;
+    // pedras irregulares numa face (pilares e faixa do topo)
+    const stones = (T, u0, u1, y0, y1, v) => {
+      for (let y = y0; y < y1 - 0.05; y += 0.17) for (let u = u0 + (Math.floor(y / 0.17) % 2) * 0.09; u < u1 - 0.05; u += 0.2) {
+        const a = Math.min(u1, u + 0.12 + r() * 0.08), b = Math.min(y1, y + 0.1 + r() * 0.06), c = ST[Math.floor(r() * 4)];
+        box(B, T, u, a, y, b, v - 0.012, v + 0.012, c, c);
+      }
+    };
+    const g0 = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
+    // muro de frente: painéis rebocados entre pilares de pedra + faixa de pedra no topo
+    const wallRun = (u0, u1, plain) => {
+      const n = Math.max(1, Math.round((u1 - u0) / 3.6));
+      for (let k = 0; k < n; k++) {
+        const a = u0 + (u1 - u0) * k / n, b = u0 + (u1 - u0) * (k + 1) / n, gy = Math.min(g0(a, MV), g0(b, MV)), T = at(0, 0, gy);
+        box(B, T, a, b, -0.6, HW, MV - 0.1, MV + 0.1, PL, PL);
+        box(B, T, a, b, -0.6, 0.35, MV - 0.115, MV + 0.115, GRIME, GRIME);          // barra suja embaixo
+        if (r() < 0.6) box(B, T, a + 0.4 + r() * (b - a - 1.2), a + 0.9 + r() * (b - a - 1.2), 0.6, HW - 0.3, MV - 0.112, MV - 0.105, PL2, PL2);  // mancha
+        if (!plain || k === 0) { box(B, T, a - 0.2, a + 0.2, -0.6, HW + 0.45, MV - 0.18, MV + 0.18, ST[0], ST[1]); stones(T, a - 0.2, a + 0.2, 0, HW, MV - 0.19); }
+        box(B, T, a, b, HW, HW + 0.45, MV - 0.16, MV + 0.16, ST[1], ST[0]); stones(T, a, b, HW, HW + 0.45, MV - 0.17);
+        mx.beginPath(); mx.lineWidth = 0.5; const p0 = WP(a, MV), p1 = WP(b, MV); mx.moveTo(p0[0], p0[1]); mx.lineTo(p1[0], p1[1]); mx.stroke();
+      }
+      const gy = g0(u1, MV), T = at(0, 0, gy); box(B, T, u1 - 0.2, u1 + 0.2, -0.6, HW + 0.45, MV - 0.18, MV + 0.18, ST[0], ST[1]); stones(T, u1 - 0.2, u1 + 0.2, 0, HW, MV - 0.19);
+    };
+    wallRun(-4, 3.5); wallRun(11.6, 24);
+    // portaria: quadro de luz | portão de garagem | portinha
+    { const gy = g0(7.5, MV), T = at(0, 0, gy);
+      for (const [a, b] of [[3.3, 3.75], [5.55, 6.0], [9.4, 9.85], [10.95, 11.6]]) { box(B, T, a, b, -0.6, HW + 0.45, MV - 0.2, MV + 0.2, ST[0], ST[1]); stones(T, a, b, 0, HW, MV - 0.21); }
+      box(B, T, 3.75, 5.55, -0.6, HW, MV - 0.1, MV + 0.1, PL, PL); box(B, T, 3.75, 5.55, -0.6, 0.35, MV - 0.115, MV + 0.115, GRIME, GRIME);
+      box(B, T, 4.3, 4.95, 0.95, 1.5, MV - 0.16, MV - 0.1, hex('#4a2c22'), hex('#3b231b'));                          // quadro de luz
+      box(B, T, 6.0, 9.4, -0.1, HW - 0.05, MV - 0.05, MV + 0.05, hex('#d9d8d2'), hex('#cfcec8'));                    // portão branco
+      for (const u of [6.05, 7.7, 9.35]) box(B, T, u - 0.04, u + 0.04, -0.1, HW - 0.05, MV - 0.08, MV - 0.05, hex('#bdbcb5'), hex('#bdbcb5'));
+      box(B, T, 6.0, 9.4, 0.0, 0.25, MV - 0.07, MV - 0.05, hex('#a9a7a0'), hex('#a9a7a0'));
+      box(B, T, 9.85, 10.95, -0.1, HW - 0.05, MV - 0.06, MV + 0.06, hex('#d2d0c9'), hex('#cac8c1'));               // portinha
+      box(B, T, 10.05, 10.15, 0.95, 1.15, MV - 0.1, MV - 0.06, hex('#3a3a3a'), hex('#3a3a3a'));
+      box(B, T, 10.4, 10.6, 1.55, 1.68, MV - 0.09, MV - 0.06, hex('#5a5a5a'), hex('#5a5a5a'));                     // número
+      box(B, T, 3.3, 11.6, HW, HW + 0.45, MV - 0.2, MV + 0.2, ST[1], ST[0]); stones(T, 3.3, 11.6, HW, HW + 0.45, MV - 0.21);  // faixa de pedra sobre o portão
+      maskRect(T, 3.3, 11.6, MV - 0.25, MV + 0.25);
+      // entrada da garagem em concreto com grama no meio
+      for (const [a, b] of [[6.2, 7.3], [8.1, 9.2]]) { const q = [[a, 2.6], [b, 2.6], [b, MV - 0.1], [a, MV - 0.1]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.09, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#b5b2a8'), F_TEX); }
+    }
+    // caixa de correio no poste + touceira de capim
+    { const T = at(12.3, 4.15); box(B, T, -0.035, 0.035, 0, 1.25, -0.035, 0.035, hex('#2e2e2e'), hex('#2e2e2e'));
+      box(B, T, -0.32, 0.32, 1.25, 1.27, -0.2, 0.2, hex('#3b3b3b'), hex('#3b3b3b'));
+      for (const uu of [-0.3, -0.15, 0, 0.15, 0.3]) box(B, T, uu - 0.015, uu + 0.015, 1.27, 1.55, -0.2, 0.2, hex('#3b3b3b'), hex('#3b3b3b'));
+      box(B, T, -0.32, 0.32, 1.53, 1.56, -0.2, 0.2, hex('#d8d6cf'), hex('#3b3b3b')); maskCircle(...WP(12.3, 4.15), 0.15); }
+    for (const [cu, cv, s] of [[13.3, 4.4, 1], [2.0, 4.5, 0.7], [18.5, 4.4, 0.6]]) { const T = at(cu, cv);
+      for (let k = 0; k < 7; k++) { const a = r() * 6.28, d = r() * 0.25 * s, h = (0.5 + r() * 0.6) * s; box(B, frame(T.o[0] + Math.cos(a) * d, T.o[1], T.o[2] + Math.sin(a) * d, r() * 3), -0.05, 0.05, 0, h, -0.22 * s, 0.22 * s, hex('#5f9443'), hex('#4e7f37')); } }
+    // muros laterais do lote
+    for (const [u0, v0, u1, v1] of [[-4, MV, -4, 29], [24, MV, 24, 29], [-4, 29, 24, 29]]) {
+      const n = Math.max(1, Math.round(Math.hypot(u1 - u0, v1 - v0) / 4));
+      for (let k = 0; k < n; k++) { const a = [u0 + (u1 - u0) * k / n, v0 + (v1 - v0) * k / n], b = [u0 + (u1 - u0) * (k + 1) / n, v0 + (v1 - v0) * (k + 1) / n];
+        const pa = WP(...a), pb = WP(...b), ya = groundAt(pa[0], pa[1]), yb = groundAt(pb[0], pb[1]), Tw = frame(pa[0], 0, pa[1], Math.atan2(pb[1] - pa[1], pb[0] - pa[0])), l = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
+        box(B, Tw, 0, l, Math.min(ya, yb) - 0.5, Math.max(ya, yb) + 2.0, -0.1, 0.1, PL2, PL2);
+        mx.beginPath(); mx.lineWidth = 0.4; mx.moveTo(pa[0], pa[1]); mx.lineTo(pb[0], pb[1]); mx.stroke(); }
+    }
+    // ---- sobrado: branco encardido, telhado de barro com beiral largo, varanda no andar de cima ----
+    const hu = 7.6, hv = 14.2, hw = 11, hd = 9, HC = at(hu, hv, 0), [hmin, hmax] = cornersH(HC, hw, hd);
+    const T = at(hu, hv, hmax + 0.1), WALL = hex('#e0ded6'), WALL2 = hex('#d2d0c8'), DARK = hex('#3a2c25');
+    const fv = -hd / 2;
+    box(B, T, -hw / 2, hw / 2, hmin - hmax - 0.5, 0.3, -hd / 2, hd / 2, hex('#bdb9ae'), hex('#bdb9ae'));
+    box(B, T, -hw / 2, hw / 2, 0.3, 3.0, -hd / 2, hd / 2, WALL2, WALL2);                 // térreo
+    box(B, T, -hw / 2, 1.0, 3.0, 5.8, -hd / 2, hd / 2, WALL, WALL);                     // andar de cima (lado norte)
+    box(B, T, 1.0, hw / 2, 3.0, 5.8, fv + 1.7, hd / 2, WALL, WALL);                      // parte recuada da varanda
+    box(B, T, 1.0, hw / 2, 2.95, 3.15, fv - 0.1, fv + 1.7, hex('#cfcdc4'), hex('#b9b7ae')); // piso da varanda
+    box(B, T, 1.0, hw / 2, 3.15, 4.0, fv - 0.05, fv + 0.12, hex('#d6d4cc'), hex('#c8c6be')); // parapeito
+    box(B, T, 1.0, hw / 2, 4.0, 4.08, fv - 0.1, fv + 0.17, hex('#8f8d86'), hex('#8f8d86'));
+    for (const cu of [1.15, hw / 2 - 0.15]) box(B, T, cu - 0.1, cu + 0.1, 4.0, 5.8, fv - 0.05, fv + 0.15, hex('#ecebe5'), hex('#dcdbd4'));   // colunas finas
+    wallFeat(B, T, 2.6, 3.5, 3.15, 5.2, fv + 1.7, -1, DARK);                              // porta escura da varanda
+    wallFeat(B, T, 3.6, 3.8, 3.4, 5.2, fv + 1.7, -1, hex('#6a5546'));
+    wallFeat(B, T, -3.6, -2.4, 4.0, 4.9, fv, -1, DARK);                                   // janelinha do lado norte
+    wallFeat(B, T, 1.4, 4.6, 0.9, 2.3, fv, -1, hex('#5d6a72'));                           // janela do térreo com grade azulada
+    for (let gu = 1.5; gu < 4.6; gu += 0.22) wallFeat(B, T, gu, gu + 0.05, 0.9, 2.3, fv - 0.02, -1, hex('#7fa0b6'));
+    wallFeat(B, T, -2.8, -1.6, 0.4, 2.5, fv, -1, DARK);                                   // porta do térreo
+    // encardido: faixa embaixo do beiral e escorridos
+    wallFeat(B, T, -hw / 2, 1.0, 5.35, 5.8, fv, -1, GRIME);
+    for (const su of [-4.7, -3.0, -0.6, 0.6]) wallFeat(B, T, su, su + 0.25, 3.3 + r() * 0.8, 5.4, fv, -1, hex('#b8b6ad'));
+    wallFeat(B, T, -hw / 2, hw / 2, 2.7, 3.0, fv, -1, GRIME);
+    for (const sv of [-3, 0, 3]) { sideFeat(B, T, sv - 0.5, sv + 0.5, 4.0, 4.9, -hw / 2, -1, DARK); sideFeat(B, T, sv - 0.5, sv + 0.5, 1.1, 2.1, -hw / 2, -1, DARK); }
+    hipRoof(B, T, hw, hd, 5.8, 1.7, 0.95, hex('#b8653f'));
+    // ala baixa ao sul com telhado próprio
+    { const Tw = at(hu + hw / 2 + 2.2, hv + 1.5, hmax + 0.1); box(B, Tw, -2.2, 2.2, hmin - hmax - 0.5, 2.9, -3.2, 3.2, WALL2, WALL2); wallFeat(B, Tw, -1.0, 0.4, 1.0, 2.1, -3.2, -1, DARK); hipRoof(B, Tw, 4.4, 6.4, 2.9, 1.0, 0.7, hex('#ad5c39')); }
+    // antena parabólica no telhado
+    { const p = P(T, -3.6, 6.4, -1.2); const Td = frame(p[0], p[1], p[2], Math.atan2(uz, ux) + 2.4); box(B, Td, -0.03, 0.03, -0.4, 0.2, -0.03, 0.03, hex('#777'), hex('#777')); box(B, Td, -0.06, 0.06, 0.05, 0.75, -0.36, 0.36, hex('#d7d7d2'), hex('#bdbdb7')); }
+    maskRect(at(0, 0, 0), hu - hw / 2, hu + hw / 2 + 4.4, hv - hd / 2, hv + hd / 2);
+    // árvores: mangueiras grandes ao sul, coqueiro atrás do muro, arbusto que passa por cima do muro
+    for (const [tu, tv, s] of [[16.5, 9.5, 2.1], [21, 16, 1.9], [15.5, 22, 1.7], [21.5, 25, 1.6], [9.5, 25, 1.5], [-1.5, 24, 1.4]]) { const p = WP(tu, tv); tree(chunkB(p[0], p[1]), p[0], p[1], 0, s, true); }
+    { const p = WP(12.2, 10.8); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.45, true); }
+    for (const [bu, bv, h] of [[10.2, 6.6, 2.9], [12.6, 6.9, 2.6], [1.5, 6.4, 2.2]]) box(B, at(bu, bv), -1.1, 1.1, 0, h, -0.9, 0.9, hex('#4f8a3a'), hex('#41772f'), F_TEX);
+  }
   for (const lm of (W.landmarks || [])) if (lm.type === 'weedlot') { // terreno baldio: mato alto
     const r = rngFor(lm.x, lm.z, 5), B = chunkB(lm.x, lm.z);
     for (let k = 0; k < 160; k++) { const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 13, x = lm.x + Math.cos(a) * d, z = lm.z + Math.sin(a) * d;

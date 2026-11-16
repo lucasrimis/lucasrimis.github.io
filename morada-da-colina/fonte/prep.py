@@ -695,6 +695,25 @@ _nb = len(houses)
 houses = [h for h in houses if not in_strip2(h[0], h[1], 2)]
 trees = [t for t in trees if _cdist(t[0], t[1], creek2) > 3.2 and min(math.hypot(t[0] - c['x'], t[1] - c['z']) for c in culverts) > 3]
 print('creek2', len(creek2), 'pts; t', round(_t_as,1), round(_t_dc,1), 'removed houses', _nb - len(houses))
+# ---- casa 127 da R. Albert Sabin (Street View 10/2024): em frente à ponta do riacho novo, um pouco ao sul ----
+_as2 = next(r for r in roads if r['n'] == 'Rua Albert Sabin')['pts']
+_cv = culverts[-1]
+_seg = min(zip(_as2, _as2[1:]), key=lambda ab: _cdist(_cv['x'], _cv['z'], list(ab)))
+(_ax, _az), (_bx, _bz) = _seg
+_l = math.hypot(_bx - _ax, _bz - _az); _u = ((_bx - _ax) / _l, (_bz - _az) / _l)
+if _u[1] < 0: _u = (-_u[0], -_u[1]); (_ax, _az) = (_bx, _bz)              # u aponta para o sul (z+)
+_t = (_cv['x'] - _ax) * _u[0] + (_cv['z'] - _az) * _u[1]
+_O = (_ax + _u[0] * _t, _az + _u[1] * _t)
+_v = (-_u[1], _u[0]) if ((-_u[1]) * (_cv['x'] - _O[0]) + _u[0] * (_cv['z'] - _O[1])) < 0 else (_u[1], -_u[0])   # v aponta para longe do riacho (lado oposto da rua)
+_O = (_O[0] + _u[0] * 12, _O[1] + _u[1] * 12)   # a casa fica um pouco à esquerda de quem olha o riacho descendo
+def in_lot127(x, z, m=0):
+    dx, dz = x - _O[0], z - _O[1]; uu = dx * _u[0] + dz * _u[1]; vv = dx * _v[0] + dz * _v[1]
+    return -4 - m < uu < 24 + m and 4.2 - m < vv < 30 + m
+_nb = len(houses)
+houses = [h for h in houses if not any(in_lot127(x, z, 0.5) for x, z in _hcorners(h))]
+trees = [t for t in trees if not in_lot127(t[0], t[1], 1)]
+landmarks.append({'type': 'casa127', 'x': round(_O[0], 2), 'z': round(_O[1], 2), 'u': [round(_u[0], 4), round(_u[1], 4)], 'v': [round(_v[0], 4), round(_v[1], 4)]})
+print('casa127 at', [round(c, 1) for c in _O], 'removed houses', _nb - len(houses))
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
