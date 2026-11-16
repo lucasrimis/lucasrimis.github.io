@@ -1555,7 +1555,15 @@ const player = { x: W.spawn[0], z: W.spawn[1], a: 0, va: 0, walk: 0, speed: 0, c
   player.a = ang;
 }
 let camY = groundAt(player.x, player.z);
-const cam = { yaw: 0, pitch: 0.62, dist: 24, tyaw: 0, follow: 0 };
+const cam = { yaw: 0, pitch: 0.62, dist: 24, tyaw: 0, follow: 0, fp: false };
+// primeira pessoa (V / botão 👁) — vale para todos os modos
+function setFP(on) {
+  cam.fp = !!on;
+  document.body.classList.toggle('fp', cam.fp);
+  if (cam.fp) { cam.pitch = 0.05; } else { cam.pitch = Math.max(0.12, cam.pitch); if (document.pointerLockElement) document.exitPointerLock(); }
+  const b = document.getElementById('btnView'); if (b) { b.classList.toggle('on', cam.fp); b.innerHTML = cam.fp ? '👁<span>1ª PESSOA</span>' : '👁<span>3ª PESSOA</span>'; }
+  try { localStorage.setItem('mdc_fp', cam.fp ? '1' : '0'); } catch (e) {}
+}
 cam.yaw = Math.atan2(-Math.cos(player.a), -Math.sin(player.a));
 let pixel = 3, shadowsOn = shadowOK;
 const keys = {};
@@ -1596,6 +1604,7 @@ addEventListener('keydown', e => {
   if (!e.repeat && window.__hunt && window.__hunt.key(e.code)) { e.preventDefault(); return; }
   keys[e.code] = true;
   if (e.code === 'KeyC') toggleCar();
+  if (e.code === 'KeyV') setFP(!cam.fp);
   if (e.code === 'KeyP') { pixel = pixel === 2 ? 3 : pixel === 3 ? 4 : 2; resize(); }
   if (e.code === 'KeyM') document.getElementById('mini').classList.toggle('big');
   if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hide');
@@ -1605,10 +1614,22 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 let drag = null;
-cv.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') return; drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId); hideHelpSoon(); });
-cv.addEventListener('pointermove', e => { if (!drag) return; cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = Math.max(0.12, Math.min(1.45, cam.pitch + (e.clientY - drag.y) * 0.005)); drag = { x: e.clientX, y: e.clientY }; cam.follow = 1.5; });
+cv.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return; hideHelpSoon();
+  if (cam.fp) {
+    if (document.pointerLockElement !== cv) { try { cv.requestPointerLock(); } catch (er) {} }
+    else if (e.button === 0 && window.__hunt && window.__hunt.active()) window.__hunt.key('Space');
+    return;
+  }
+  drag = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId);
+});
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement !== cv) return;
+  cam.yaw -= e.movementX * 0.0035; cam.pitch = Math.max(-1.35, Math.min(1.45, cam.pitch + e.movementY * 0.0035)); cam.follow = 1.5;
+});
+cv.addEventListener('pointermove', e => { if (!drag) return; cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = Math.max(cam.fp ? -1.35 : 0.12, Math.min(1.45, cam.pitch + (e.clientY - drag.y) * 0.005)); drag = { x: e.clientX, y: e.clientY }; cam.follow = 1.5; });
 cv.addEventListener('pointerup', () => { drag = null; });
-cv.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(7, Math.min(260, cam.dist * Math.exp(e.deltaY * 0.0012))); }, { passive: false });
+cv.addEventListener('wheel', e => { e.preventDefault(); if (cam.fp) { if (e.deltaY > 0) setFP(false); return; } cam.dist = Math.max(7, Math.min(260, cam.dist * Math.exp(e.deltaY * 0.0012))); }, { passive: false });
 function toggleCar() {
   if (window.__hunt && window.__hunt.active() && !player.car) return;   // sem carro no esconde-esconde
   if (player.car) { // step out to the side
@@ -1636,8 +1657,8 @@ cv.addEventListener('touchmove', e => {
     if (t.identifier === joy.id) { let dx = t.clientX - joy.x, dy = t.clientY - joy.y; const l = Math.hypot(dx, dy); const R = 60; if (l > R) { dx *= R / l; dy *= R / l; } joy.dx = dx / R; joy.dy = dy / R; jKnob.style.transform = `translate(${dx}px,${dy}px)`; jEl.classList.toggle('run', Math.hypot(joy.dx, joy.dy) > 0.82); }
     else if (t.identifier === look.id) {
       const t2 = [...e.touches].find(q => q.identifier === pinch.id2);
-      if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) cam.dist = Math.max(7, Math.min(260, cam.dist * pinch.d / d)); pinch.d = d; }
-      else { cam.yaw -= (t.clientX - look.x) * 0.008; cam.pitch = Math.max(0.12, Math.min(1.45, cam.pitch + (t.clientY - look.y) * 0.006)); cam.follow = 1.5; }
+      if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) { if (cam.fp) { if (d < pinch.d * 0.7) setFP(false); } else cam.dist = Math.max(7, Math.min(260, cam.dist * pinch.d / d)); } if (!cam.fp || !pinch.d) pinch.d = d; }
+      else { cam.yaw -= (t.clientX - look.x) * 0.008; cam.pitch = Math.max(cam.fp ? -1.35 : 0.12, Math.min(1.45, cam.pitch + (t.clientY - look.y) * 0.006)); cam.follow = 1.5; }
       look.x = t.clientX; look.y = t.clientY;
     }
   }
@@ -1651,6 +1672,8 @@ cv.addEventListener('touchend', e => {
   }
 });
 document.getElementById('btnCar').addEventListener('click', toggleCar);
+document.getElementById('btnView').addEventListener('click', () => setFP(!cam.fp));
+try { if (localStorage.getItem('mdc_fp') === '1') setTimeout(() => setFP(true), 0); } catch (e) {}
 document.getElementById('btnMap').addEventListener('click', () => document.getElementById('mini').classList.toggle('big'));
 let helpTimer = null;
 function hideHelpSoon() { if (helpTimer) return; helpTimer = setTimeout(() => document.getElementById('help').classList.add('hide'), 6000); }
@@ -1957,7 +1980,7 @@ window.__net = (function () {
     if (!o) return; if (!o.bub) { o.bub = document.createElement('div'); o.bub.className = 'bubble'; lblLayer.appendChild(o.bub); }
     o.bub.textContent = m; o.bubUntil = performance.now() + 6000; o.bubTaunt = false;
   }
-  N.openChat = () => { if (!N.online) return; chatBox.style.display = 'flex'; chatIn.value = ''; chatIn.focus(); for (const k in keys) keys[k] = false; };
+  N.openChat = () => { if (!N.online) return; if (document.pointerLockElement) document.exitPointerLock(); chatBox.style.display = 'flex'; chatIn.value = ''; chatIn.focus(); for (const k in keys) keys[k] = false; };
   const send = () => {
     const m = chatIn.value.trim().slice(0, 120); chatBox.style.display = 'none'; chatIn.blur();
     if (m && N.db) N.db.ref(N.base + 'chat').push({ u: N.uid, n: N.name, m, t: firebase.database.ServerValue.TIMESTAMP });
@@ -2050,14 +2073,30 @@ window.__net = (function () {
     return false;
   };
   H.tracers = [];
-  const muzzle = (p, a, ap) => { const c = Math.cos(a), s_ = Math.sin(a), y = surfAt(p.x, p.z) + 0.02 + 1.42, sx = p.x - s_ * 0.39, sz = p.z + c * 0.39, f = Math.cos(ap) * 1.0; return [sx + c * f, y + Math.sin(ap) * 1.0, sz + s_ * f]; };
+  function fpGun() { // referencial da arma na tela em primeira pessoa
+    const e = H.eye, d = [H.tgt[0] - e[0], H.tgt[1] - e[1], H.tgt[2] - e[2]], L = Math.hypot(...d); d[0] /= L; d[1] /= L; d[2] /= L;
+    let r = [-d[2], 0, d[0]]; const rl = Math.hypot(r[0], r[2]) || 1; r = [r[0] / rl, 0, r[2] / rl];
+    const u = [r[1] * d[2] - r[2] * d[1], r[2] * d[0] - r[0] * d[2], r[0] * d[1] - r[1] * d[0]];
+    const o = [e[0] + d[0] * 0.55 + r[0] * 0.2 - u[0] * 0.2, e[1] + d[1] * 0.55 + r[1] * 0.2 - u[1] * 0.2, e[2] + d[2] * 0.55 + r[2] * 0.2 - u[2] * 0.2];
+    return { o, ax: d, ay: u, az: r };
+  }
+  const muzzle = (p, a, ap) => {
+    if (p === player && cam.fp && H.eye) return P(fpGun(), 0.4, 0, 0); const c = Math.cos(a), s_ = Math.sin(a), y = surfAt(p.x, p.z) + 0.02 + 1.42, sx = p.x - s_ * 0.39, sz = p.z + c * 0.39, f = Math.cos(ap) * 1.0; return [sx + c * f, y + Math.sin(ap) * 1.0, sz + s_ * f]; };
   H.draw = B => {
     const now = performance.now();
+    if (cam.fp && player.gun !== undefined && H.eye) { // arma em primeira pessoa
+      const T = fpGun(), G = hex('#26282c'), G2 = hex('#3a3d42');
+      box(B, T, -0.05, 0.38, -0.035, 0.035, -0.03, 0.03, G2, G);       // ferrolho/cano
+      box(B, T, -0.04, 0.05, -0.17, -0.03, -0.028, 0.028, G, G2);      // cabo
+      box(B, T, -0.06, 0.06, -0.2, -0.13, -0.045, 0.045, SKIN, SKIN);  // mão
+      box(B, T, 0.34, 0.37, 0.035, 0.05, -0.006, 0.006, hex('#e8e4d6'), hex('#e8e4d6'));
+    }
     H.tracers = H.tracers.filter(t => now < t.until);
     for (const t of H.tracers) {
       const k = Math.min(1, (t.until - now) / 260);
-      beam(B, t.a, t.b, 0.035 + 0.04 * k, hex('#ffe066'), F_UNLIT);
-      if (k > 0.55) box(B, frame(t.a[0], t.a[1] - 0.1, t.a[2], 0), -0.12, 0.12, 0, 0.2, -0.12, 0.12, hex('#fff6c8'), hex('#ffb347'), F_UNLIT);   // clarão no cano
+      beam(B, t.a, t.b, t.small ? 0.012 + 0.012 * k : 0.035 + 0.04 * k, hex('#ffe066'), F_UNLIT);
+      const fs = t.small ? 0.035 : 0.12;
+      if (k > 0.55) box(B, frame(t.a[0], t.a[1] - fs, t.a[2], 0), -fs, fs, 0, fs * 2, -fs, fs, hex('#fff6c8'), hex('#ffb347'), F_UNLIT);   // clarão no cano
       box(B, frame(t.b[0], t.b[1] - 0.12, t.b[2], now * 0.02), -0.12, 0.12, 0, 0.24, -0.12, 0.12, t.hit ? hex('#ff5a3c') : hex('#d8d2c0'), t.hit ? hex('#ffb347') : hex('#a8a294'), F_UNLIT);   // impacto
     }
   };
@@ -2068,6 +2107,7 @@ window.__net = (function () {
     tone(220, 60, 0.14, 0.25 * v, 'square'); tone(1600, 400, 0.05, 0.12 * v, 'sawtooth');
   };
   N.setCam = (eye, tgt) => { H.eye = eye; H.tgt = tgt; };
+  N.eyeH = () => (H.code && H.myProp && H.role(N.uid) === 'hider' && (H.phase() === 'hide' || H.phase() === 'seek')) ? Math.max(0.45, Math.min(1.7, PROPDEF[H.myProp.k].h * 0.85)) : 0;
   // ---- som (WebAudio) ----
   let AC = null;
   const audio = () => { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (AC && AC.state === 'suspended') AC.resume(); return AC; };
@@ -2106,6 +2146,7 @@ window.__net = (function () {
     document.body.classList.toggle('hunting', on); document.body.classList.toggle('inroom', !!H.code && ph === 'lobby');
     blind.style.display = on && me === 'seeker' && ph === 'hide' ? 'flex' : 'none';
     cross.style.display = on && me === 'seeker' && ph === 'seek' ? 'block' : 'none';
+    document.body.classList.toggle('aim', on && me === 'seeker' && ph === 'seek');
     bCar.style.display = H.code ? 'none' : '';
     const el = (sNow() - (m.t0 || 0)) / 1000;
     if (on) {
@@ -2160,7 +2201,7 @@ window.__net = (function () {
       for (const t of [tc - half, tc, tc + half]) { if (t < 0 || t > ht) continue; const y = oy + dy * t; if (y >= base - 0.25 && y <= base + def.h + 0.25) { hit = uid; ht = t; break; } }
     }
     const end = hit ? [ox + dx * ht, oy + dy * ht, oz + dz * ht] : (() => { let t = 0.5; while (t < 40) { const x = ox + dx * t, y = oy + dy * t, z = oz + dz * t; if (y < groundAt(x, z) || !freeAt(x, z, 0.05)) break; t += 0.5; } return [ox + dx * t, oy + dy * t, oz + dz * t]; })();
-    H.tracers.push({ a: muzzle(player, player.a, player.gun || 0), b: end, hit: !!hit, until: now + (window.__trLife || 260) });
+    H.tracers.push({ a: muzzle(player, player.a, player.gun || 0), b: end, hit: !!hit, small: cam.fp, until: now + (window.__trLife || 260) });
     H.nShot = (H.nShot || 0) + 1; H.shot = [H.nShot, ...end.map(v => +v.toFixed(2)), hit ? 1 : 0].join(','); N.force = true;
     sndShot();
     if (hit) { sndHit(); N.db.ref(N.base + 'caught/' + hit).set(TS()); toast('🎯 ACERTOU! Era ' + nameOf(hit) + '!'); }
@@ -2338,7 +2379,7 @@ function step(dt) {
   if (keys.KeyQ) cam.yaw += dt * 1.8;
   if (keys.KeyE) cam.yaw -= dt * 1.8;
   if (keys.KeyR) cam.pitch = Math.min(1.45, cam.pitch + dt);
-  if (keys.KeyF) cam.pitch = Math.max(0.12, cam.pitch - dt);
+  if (keys.KeyF) cam.pitch = Math.max(cam.fp ? -1.35 : 0.12, cam.pitch - dt);
   if (keys.Equal || keys.NumpadAdd) cam.dist = Math.max(7, cam.dist * (1 - dt));
   if (keys.Minus || keys.NumpadSubtract) cam.dist = Math.min(260, cam.dist * (1 + dt));
   const jl = joy.id !== null ? Math.min(1, Math.hypot(joy.dx, joy.dy)) : 0;
@@ -2365,7 +2406,7 @@ function step(dt) {
       }
       player.walk += dt * player.speed * 2.3;
     }
-    if (window.__hunt && window.__hunt.shoulder()) player.a = Math.atan2(-Math.cos(cam.yaw), -Math.sin(cam.yaw));   // pegador olha para a mira
+    if (cam.fp || (window.__hunt && window.__hunt.shoulder())) player.a = Math.atan2(-Math.cos(cam.yaw), -Math.sin(cam.yaw));   // pegador olha para a mira
   } else {
     const thr = joy.id !== null ? Math.max(-1, Math.min(1, iy)) : Math.sign(iy);
     const acc = thr > 0.05 ? 9 * Math.min(1, thr / 0.6) : thr < -0.05 ? (player.cv > 0.5 ? -16 : -6) * Math.min(1, -thr / 0.6) : -Math.sign(player.cv) * 3;
@@ -2406,7 +2447,13 @@ function frame_() {
   const t = (now - T0) / 1000;
   // dynamic mesh
   dynB.reset();
-  if (!(window.__net && window.__net.drawMe && window.__net.drawMe(dynB))) buildPlayer(dynB, player, MY_LOOK);
+  if (!cam.fp && !(window.__net && window.__net.drawMe && window.__net.drawMe(dynB))) buildPlayer(dynB, player, MY_LOOK);
+  if (cam.fp && player.car) { // capô e painel do carro em primeira pessoa
+    const T = groundFrame(player.x, player.z, player.a, 0.0), cc = MY_LOOK.car || PCAR;
+    box(dynB, T, 1.25, 2.1, 0.35, 0.98, -0.9, 0.9, cc, cc);
+    box(dynB, T, 0.95, 1.25, 0.94, 1.0, -0.88, 0.88, hex('#1b1d22'), hex('#26282c'));
+    for (const v of [-0.9, 0.9]) box(dynB, T, 0.2, 0.95, 1.05, 1.65, v - 0.04, v + 0.04, cc, cc);   // colunas
+  }
   if (window.__net) window.__net.frame(dynB, dt);
   for (const f of FLY_SPOTS) for (let k = 0; k < 7; k++) {
     const ph = t * (2.2 + k * 0.37) + k * 1.9, r = 0.25 + 0.18 * Math.sin(t * 1.3 + k);
@@ -2432,15 +2479,23 @@ function frame_() {
   // camera
   const gy = surfAt(player.x, player.z);
   camY += (gy - camY) * Math.min(1, dt * 8);
-  const tgt = [player.x, camY + (player.car ? 1.2 : 1.3), player.z];
-  if (window.__hunt && window.__hunt.shoulder()) { tgt[0] += Math.cos(cam.yaw) * 0.9; tgt[2] -= Math.sin(cam.yaw) * 0.9; tgt[1] += 0.35; }   // mira por cima do ombro
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-  const eye = [tgt[0] + Math.sin(cam.yaw) * cp * cam.dist, tgt[1] + sp * cam.dist, tgt[2] + Math.cos(cam.yaw) * cp * cam.dist];
-  eye[1] = Math.max(eye[1], groundAt(eye[0], eye[2]) + 1.5);
+  let eye, tgt;
+  if (cam.fp) { // primeira pessoa: olhos na altura da cabeça (ou do objeto, no esconde-esconde)
+    const eh = (window.__net && window.__net.eyeH && window.__net.eyeH()) || (player.car ? 1.48 : 1.68);
+    const fx = Math.cos(player.a), fz = Math.sin(player.a);
+    eye = player.car ? [player.x + fx * 0.15 - fz * 0.38, camY + eh, player.z + fz * 0.15 + fx * 0.38] : [player.x + fx * 0.12, camY + eh, player.z + fz * 0.12];
+    tgt = [eye[0] - Math.sin(cam.yaw) * cp, eye[1] - sp, eye[2] - Math.cos(cam.yaw) * cp];
+  } else {
+    tgt = [player.x, camY + (player.car ? 1.2 : 1.3), player.z];
+    if (window.__hunt && window.__hunt.shoulder()) { tgt[0] += Math.cos(cam.yaw) * 0.9; tgt[2] -= Math.sin(cam.yaw) * 0.9; tgt[1] += 0.35; }   // mira por cima do ombro
+    eye = [tgt[0] + Math.sin(cam.yaw) * cp * cam.dist, tgt[1] + sp * cam.dist, tgt[2] + Math.cos(cam.yaw) * cp * cam.dist];
+    eye[1] = Math.max(eye[1], groundAt(eye[0], eye[2]) + 1.5);
+  }
   if (window.__net && window.__net.setCam) window.__net.setCam(eye, tgt);
-  const proj = persp(cam.dist > 60 ? 0.6 : 0.75, cv.width / cv.height, 1.0, 2600);
+  const proj = persp(cam.fp ? 0.95 : cam.dist > 60 ? 0.6 : 0.75, cv.width / cv.height, cam.fp ? 0.3 : 1.0, 2600);
   const VP = mul(proj, lookAt(eye, tgt, [0, 1, 0]));
-  const fogR = [Math.max(220, cam.dist * 3), Math.max(760, cam.dist * 6)];
+  const fogR = cam.fp ? [220, 760] : [Math.max(220, cam.dist * 3), Math.max(760, cam.dist * 6)];
 
   // shadow pass
   const SR = Math.min(170, 70 + cam.dist * 1.2);

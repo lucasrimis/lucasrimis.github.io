@@ -92,6 +92,8 @@
   #toast{position:fixed;left:50%;top:38%;transform:translateX(-50%);display:none;z-index:7;font-family:'Silkscreen',monospace;font-size:20px;color:#fff;background:rgba(13,16,24,.82);padding:8px 16px;border:3px solid #0d1018;text-align:center;pointer-events:none}
   .tbtn.rb.act{background:rgba(138,63,176,.88)} .tbtn.rb.act.shoot{background:rgba(200,50,40,.9)}
   .tbtn.rb.on{background:rgba(47,127,74,.9)}
+  body.fp #cross{display:block!important;width:8px;height:8px;margin:-4px 0 0 -4px;background:#fff;border:2px solid #000;border-radius:50%;box-shadow:none}
+  body.fp.aim #cross{width:26px;height:26px;margin:-13px 0 0 -13px;background:linear-gradient(#fff,#fff) center/2px 10px no-repeat,linear-gradient(#fff,#fff) center/10px 2px no-repeat;border:2px solid rgba(255,255,255,.85);box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000}
   .lbl.seeker{border-color:#e0483a!important;color:#ffb0a0}
 
   #chatLog b{color:#9fd0ff;font-weight:normal} #chatLog b.me{color:#ffd84a} #chatLog .sys{color:#bfe3a0;font-style:italic}
@@ -142,12 +144,12 @@
 <canvas id="mini"></canvas>
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
-  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
-  <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
+  <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)<br>Botão <b>👁</b> primeira/terceira pessoa</div>
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnMap">🗺<span>MAPA</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
+  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnView">👁<span>3ª PESSOA</span></button><button class="tbtn rb" id="btnMap">🗺<span>MAPA</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
 </div>
 <div id="online" class="panel" style="display:none"><span id="onlineTxt"></span><button id="btnLeave">SAIR</button></div>
 <div id="chatLog"></div>
