@@ -847,20 +847,24 @@ for (const h of W.houses) {
     };
     const g0 = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
     // muro de frente: painéis rebocados entre pilares de pedra + faixa de pedra no topo
-    const wallRun = (u0, u1, plain) => {
+    const wallRun = (u0, u1, plain, smooth) => {
       const n = Math.max(1, Math.round((u1 - u0) / 3.6));
       for (let k = 0; k < n; k++) {
         const a = u0 + (u1 - u0) * k / n, b = u0 + (u1 - u0) * (k + 1) / n, gy = Math.min(g0(a, MV), g0(b, MV)), T = at(0, 0, gy);
         box(B, T, a, b, -0.6, HW, MV - 0.1, MV + 0.1, PL, PL);
         box(B, T, a, b, -0.6, 0.35, MV - 0.115, MV + 0.115, GRIME, GRIME);          // barra suja embaixo
         if (r() < 0.6) box(B, T, a + 0.4 + r() * (b - a - 1.2), a + 0.9 + r() * (b - a - 1.2), 0.6, HW - 0.3, MV - 0.112, MV - 0.105, PL2, PL2);  // mancha
-        if (!plain || k === 0) { box(B, T, a - 0.2, a + 0.2, -0.6, HW + 0.45, MV - 0.18, MV + 0.18, ST[0], ST[1]); stones(T, a - 0.2, a + 0.2, 0, HW, MV - 0.19); }
-        box(B, T, a, b, HW, HW + 0.45, MV - 0.16, MV + 0.16, ST[1], ST[0]); stones(T, a, b, HW, HW + 0.45, MV - 0.17);
+        if (smooth) { box(B, T, a - 0.15, a + 0.15, -0.6, HW + 0.1, MV - 0.15, MV + 0.15, PL2, PL2); box(B, T, a, b, HW, HW + 0.08, MV - 0.13, MV + 0.13, hex('#bcbab2'), hex('#bcbab2')); }   // muro liso do vizinho
+        else {
+          if (!plain || k === 0) { box(B, T, a - 0.2, a + 0.2, -0.6, HW + 0.45, MV - 0.18, MV + 0.18, ST[0], ST[1]); stones(T, a - 0.2, a + 0.2, 0, HW, MV - 0.19); }
+          box(B, T, a, b, HW, HW + 0.45, MV - 0.16, MV + 0.16, ST[1], ST[0]); stones(T, a, b, HW, HW + 0.45, MV - 0.17);
+        }
         mx.beginPath(); mx.lineWidth = 0.5; const p0 = WP(a, MV), p1 = WP(b, MV); mx.moveTo(p0[0], p0[1]); mx.lineTo(p1[0], p1[1]); mx.stroke();
       }
-      const gy = g0(u1, MV), T = at(0, 0, gy); box(B, T, u1 - 0.2, u1 + 0.2, -0.6, HW + 0.45, MV - 0.18, MV + 0.18, ST[0], ST[1]); stones(T, u1 - 0.2, u1 + 0.2, 0, HW, MV - 0.19);
+      if (!smooth) { const gy = g0(u1, MV), T = at(0, 0, gy); box(B, T, u1 - 0.2, u1 + 0.2, -0.6, HW + 0.45, MV - 0.18, MV + 0.18, ST[0], ST[1]); stones(T, u1 - 0.2, u1 + 0.2, 0, HW, MV - 0.19); }
     };
-    wallRun(-4, 3.5); wallRun(11.6, 24);
+    // Street View 10/2024: muro de pedra do quadro de luz até 3 painéis ao norte; ao sul vai até ~2 m depois da portinha, depois muro liso
+    wallRun(-6, 3.5); wallRun(11.6, 14.2); wallRun(14.2, 24, true, true);
     // portaria: quadro de luz | portão de garagem | portinha
     { const gy = g0(7.5, MV), T = at(0, 0, gy);
       for (const [a, b] of [[3.3, 3.75], [5.55, 6.0], [9.4, 9.85], [10.95, 11.6]]) { box(B, T, a, b, -0.6, HW + 0.45, MV - 0.2, MV + 0.2, ST[0], ST[1]); stones(T, a, b, 0, HW, MV - 0.21); }
@@ -885,7 +889,7 @@ for (const h of W.houses) {
     for (const [cu, cv, s] of [[13.3, 4.4, 1], [2.0, 4.5, 0.7], [18.5, 4.4, 0.6]]) { const T = at(cu, cv);
       for (let k = 0; k < 7; k++) { const a = r() * 6.28, d = r() * 0.25 * s, h = (0.5 + r() * 0.6) * s; box(B, frame(T.o[0] + Math.cos(a) * d, T.o[1], T.o[2] + Math.sin(a) * d, r() * 3), -0.05, 0.05, 0, h, -0.22 * s, 0.22 * s, hex('#5f9443'), hex('#4e7f37')); } }
     // muros laterais do lote
-    for (const [u0, v0, u1, v1] of [[-4, MV, -4, 29], [24, MV, 24, 29], [-4, 29, 24, 29]]) {
+    for (const [u0, v0, u1, v1] of [[-6, MV, -6, 29], [24, MV, 24, 29], [-6, 29, 24, 29]]) {
       const n = Math.max(1, Math.round(Math.hypot(u1 - u0, v1 - v0) / 4));
       for (let k = 0; k < n; k++) { const a = [u0 + (u1 - u0) * k / n, v0 + (v1 - v0) * k / n], b = [u0 + (u1 - u0) * (k + 1) / n, v0 + (v1 - v0) * (k + 1) / n];
         const pa = WP(...a), pb = WP(...b), ya = groundAt(pa[0], pa[1]), yb = groundAt(pb[0], pb[1]), Tw = frame(pa[0], 0, pa[1], Math.atan2(pb[1] - pa[1], pb[0] - pa[0])), l = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);

@@ -705,10 +705,10 @@ if _u[1] < 0: _u = (-_u[0], -_u[1]); (_ax, _az) = (_bx, _bz)              # u ap
 _t = (_cv['x'] - _ax) * _u[0] + (_cv['z'] - _az) * _u[1]
 _O = (_ax + _u[0] * _t, _az + _u[1] * _t)
 _v = (-_u[1], _u[0]) if ((-_u[1]) * (_cv['x'] - _O[0]) + _u[0] * (_cv['z'] - _O[1])) < 0 else (_u[1], -_u[0])   # v aponta para longe do riacho (lado oposto da rua)
-_O = (_O[0] + _u[0] * 12, _O[1] + _u[1] * 12)   # a casa fica um pouco à esquerda de quem olha o riacho descendo
+_O = (_O[0] - _u[0] * 14.1, _O[1] - _u[1] * 14.1)   # Street View 10/2024: portão ~6 m ao norte da ponta do riacho (à direita de quem olha o riacho descendo)
 def in_lot127(x, z, m=0):
     dx, dz = x - _O[0], z - _O[1]; uu = dx * _u[0] + dz * _u[1]; vv = dx * _v[0] + dz * _v[1]
-    return -4 - m < uu < 24 + m and 4.2 - m < vv < 30 + m
+    return -6.5 - m < uu < 24 + m and 4.2 - m < vv < 30 + m
 _nb = len(houses)
 houses = [h for h in houses if not any(in_lot127(x, z, 0.5) for x, z in _hcorners(h))]
 trees = [t for t in trees if not in_lot127(t[0], t[1], 1)]
