@@ -6,6 +6,11 @@ Jogo 3D em pixel art do bairro Morada da Colina (Resende, RJ), feito a partir de
 
 **Link alternativo (Cloudflare Pages, atualiza sozinho a cada push):** https://morada-da-colina.pages.dev/
 
+## Instalar no celular
+- **Android (Chrome):** abra o link e toque em **📲 INSTALAR O JOGO** na tela inicial do jogo (ou no menu ⋮ → *Instalar app*).
+- **iPhone (Safari):** toque em **Compartilhar** → **Adicionar à Tela de Início**.
+- O jogo instalado abre em tela cheia, funciona sozinho sem internet depois da primeira visita e se atualiza automaticamente.
+
 ## Controles
 - **Computador:** WASD / setas para andar, Shift corre, C entra e sai do carro, arrastar o mouse gira a câmera, roda do mouse dá zoom, M abre o mapa, V alterna entre primeira e terceira pessoa (clique na tela para travar o mouse).
 - **Celular:** joystick no lado esquerdo da tela, arrastar no lado direito gira a câmera, dois dedos dão zoom, botão 👁 alterna primeira/terceira pessoa.
