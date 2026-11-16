@@ -685,6 +685,104 @@ for (const h of W.houses) {
     };
     WL(U0, V0 + 3.5, U0, V1); WL(U0 + 3.5, V0, U1, V0);
   }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'sobrado9') { // sobrado de esquina Albert Sabin x Rua Nove A (Street View 10/2024)
+    const [ux, uz] = lm.u, [vx, vz] = lm.v;
+    const WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const B = chunkB(...WP(15, 14));
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz];
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const gy = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
+    const GREEN = hex('#cfe6a8'), GREEN2 = hex('#c6df9c'), STONEC = hex('#cdbfa9'), STONED = hex('#b3a58f'), CAP = hex('#e6e0cf'), TILE = hex('#c45a3a'), TILE2 = hex('#b44f33');
+    const BROWN = hex('#5b3326'), BROWN2 = hex('#4a2a1f'), CREAM = hex('#f6efd8'), CREAM2 = hex('#e8ecc8'), BRICK = hex('#9c4a36'), WHITE = hex('#f3f1ea');
+    // garden lawn + patio inside the lot
+    const U0 = 5.6, U1 = 24.5, V0 = 4.85, V1 = 24.5;
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
+      const a0 = U0 + (U1 - U0) * i / 6, a1 = U0 + (U1 - U0) * (i + 1) / 6, b0 = V0 + (V1 - V0) * j / 6, b1 = V0 + (V1 - V0) * (j + 1) / 6;
+      const q = [[a0, b0], [a1, b0], [a1, b1], [a0, b1]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.05, p[1]]; });
+      const patio = a0 >= 10 && b1 <= 9.5;
+      B.quad(q[0], q[1], q[2], q[3], UP, patio ? hex('#cfc6b4') : (i + j) % 2 ? hex('#6aa64a') : hex('#72ae50'), F_TEX);
+    }
+    // ---- muro: painéis verde-claro entre pilares revestidos de pedra ----
+    const panel = (u0, v0, u1, v1, h) => {
+      const L = Math.hypot(u1 - u0, v1 - v0), m = Math.max(1, Math.round(L / 3.2));
+      for (let k = 0; k < m; k++) {
+        const ua = u0 + (u1 - u0) * k / m, va = v0 + (v1 - v0) * k / m, ub = u0 + (u1 - u0) * (k + 1) / m, vb = v0 + (v1 - v0) * (k + 1) / m;
+        const a = WP(ua, va), b = WP(ub, vb), ya = groundAt(a[0], a[1]), yb = groundAt(b[0], b[1]), yl = Math.min(ya, yb) - 0.5, yt = Math.max(ya, yb) + h;
+        const T = frame(a[0], 0, a[1], Math.atan2(b[1] - a[1], b[0] - a[0])), l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        box(B, T, 0, l, yl, Math.max(ya, yb) + 0.35, -0.16, 0.16, STONED, STONED);           // rodapé de pedra
+        box(B, T, 0, l, Math.max(ya, yb) + 0.35, yt, -0.12, 0.12, CAP, k % 2 ? GREEN : GREEN2);
+        box(B, T, -0.02, l + 0.02, yt, yt + 0.08, -0.17, 0.17, CAP, CAP);                    // capa
+        box(B, T, -0.28, 0.28, yl, yt + 0.16, -0.24, 0.24, STONEC, STONEC);                  // pilar
+        if (k === m - 1) box(B, T, l - 0.28, l + 0.28, yl, yt + 0.16, -0.24, 0.24, STONEC, STONEC);
+        mx.beginPath(); mx.lineWidth = 0.5; mx.strokeStyle = '#000'; mx.moveTo(a[0], a[1]); mx.lineTo(b[0], b[1]); mx.stroke();
+      }
+    };
+    const MV = 5.0, H = 2.15;
+    panel(5.7, 24.5, 5.7, 6.7, H);            // lado da Rua Nove A
+    panel(5.7, 6.7, 7.4, MV, H);             // canto chanfrado
+    panel(7.4, MV, 11.0, MV, H);             // frente, à esquerda do portão
+    panel(18.3, MV, 24.5, MV, H);            // frente, à direita da portaria
+    // ---- portaria: pilares de pedra, portão de garagem marrom, portinha e telhadinho de barro ----
+    const g0 = gy(14.5, MV), G = at(0, 0, g0);
+    for (const [a, b] of [[11.0, 11.7], [15.5, 16.4], [17.5, 18.3]]) box(B, G, a, b, -0.5, 2.55, MV - 0.3, MV + 0.3, STONEC, STONEC);
+    box(B, G, 11.7, 15.5, -0.1, 2.35, MV - 0.06, MV + 0.06, BROWN, BROWN);                  // portão da garagem
+    for (let k = 1; k < 9; k++) box(B, G, 11.75, 15.45, k * 0.26, k * 0.26 + 0.03, MV - 0.09, MV + 0.09, BROWN2, BROWN2);
+    for (const [a, b] of [[12.1, 13.4], [13.8, 15.1]]) box(B, G, a, b, 1.5, 1.8, MV - 0.1, MV + 0.1, hex('#8e7f6a'), hex('#8e7f6a'));
+    box(B, G, 16.4, 17.5, -0.1, 2.3, MV - 0.06, MV + 0.06, BROWN, BROWN);                  // portinha social
+    box(B, G, 16.55, 17.35, 1.5, 1.85, MV - 0.09, MV + 0.09, hex('#8e7f6a'), hex('#8e7f6a'));
+    box(B, G, 15.75, 16.15, 1.6, 1.85, MV - 0.33, MV - 0.3, hex('#e9e4d6'), hex('#e9e4d6'));   // número
+    box(B, G, 10.8, 18.5, 2.55, 2.7, MV - 0.55, MV + 0.55, CAP, CAP);                       // laje
+    { const TR = at(14.65, MV, g0 + 2.7); hipRoof(B, TR, 7.7, 1.1, 0.0, 0.55, 0.25, TILE); }
+    maskRect(at(0, 0, 0), 11.0, 18.3, MV - 0.2, MV + 0.2);
+    // caixa de correio + medidor no painel da direita
+    box(B, G, 19.6, 20.1, 1.0, 1.55, MV - 0.22, MV - 0.12, hex('#7a4a2c'), hex('#6a3f25'));
+    box(B, G, 22.3, 22.9, 0.6, 1.1, MV - 0.18, MV - 0.12, hex('#b9b6ad'), hex('#a7a49b'));
+    // ---- sobrado ----
+    const hu0 = 7.6, hu1 = 24.0, hv0 = 9.0, hv1 = 21.0, hw = hu1 - hu0, hd = hv1 - hv0;
+    const HC = at((hu0 + hu1) / 2, (hv0 + hv1) / 2, 0);
+    const [hmin, hmax] = cornersH(HC, hw, hd);
+    const T = at((hu0 + hu1) / 2, (hv0 + hv1) / 2, hmax + 0.1), u = x => x - (hu0 + hu1) / 2, v = y => y - (hv0 + hv1) / 2;
+    box(B, T, -hw / 2, hw / 2, hmin - hmax - 0.5, 0.3, -hd / 2, hd / 2, hex('#c9c5bb'), hex('#c9c5bb'));
+    box(B, T, -hw / 2, hw / 2, 0.3, 3.1, v(hv0 + 0.4), hd / 2, CREAM2, CREAM2);              // térreo
+    box(B, T, -hw / 2 - 0.1, hw / 2 + 0.1, 3.0, 3.3, v(hv0) - 0.6, hd / 2 + 0.1, CAP, CAP); // laje da varanda
+    box(B, T, -hw / 2, hw / 2, 3.3, 6.1, v(hv0 + 1.8), hd / 2, CREAM, CREAM);               // andar de cima recuado
+    // beiral de telha entre os andares, lado da Rua Nove A
+    { const Ts = { o: P(T, -hw / 2 - 0.5, 3.15, 0), ax: [-AX[0], 0, -AX[2]], ay: [0, 1, 0], az: AZ };
+      const q = (a, y, b) => P(Ts, a, y, b); B.quad(q(-0.05, 0.25, -hd / 2), q(-0.05, 0.25, hd / 2), q(0.75, -0.15, hd / 2), q(0.75, -0.15, -hd / 2), UP, TILE2, F_TEX); }
+    // varanda de cima: colunas, arcos e balaústre branco trabalhado
+    const vf = v(hv0) - 0.45, vw = v(hv0 + 1.8);
+    const cols = [];
+    for (let k = 0; k <= 5; k++) cols.push(-hw / 2 + 0.3 + (hw - 0.6) * k / 5);
+    for (const cu of cols) box(B, T, cu - 0.17, cu + 0.17, 3.3, 5.75, vf - 0.17, vf + 0.17, WHITE, hex('#e8e4d8'));
+    box(B, T, -hw / 2, hw / 2, 5.75, 6.15, vf - 0.2, vw, CAP, WHITE);                        // viga
+    for (let k = 0; k < cols.length - 1; k++) { const a = cols[k] + 0.17, b = cols[k + 1] - 0.17, m = (a + b) / 2, s = (b - a) / 2;
+      for (let j = 0; j < 4; j++) { const t = (j + 1) / 5, h = 5.75 - 0.42 * Math.sqrt(1 - t * t) * 0 - 0.42 * (1 - Math.sqrt(1 - t * t * 0.95)) - 0.08 * j; // arcos
+        box(B, T, m - s, m - s * t, h - 0.12, 5.75, vf - 0.13, vf + 0.13, WHITE, WHITE); box(B, T, m + s * t, m + s, h - 0.12, 5.75, vf - 0.13, vf + 0.13, WHITE, WHITE); } }
+    for (let k = 0; k < cols.length - 1; k++) { const a = cols[k] + 0.17, b = cols[k + 1] - 0.17;
+      box(B, T, a, b, 4.25, 4.35, vf - 0.08, vf + 0.08, WHITE, WHITE); box(B, T, a, b, 3.3, 3.4, vf - 0.06, vf + 0.06, WHITE, WHITE);
+      for (let q = a + 0.12; q < b - 0.05; q += 0.3) { box(B, T, q - 0.035, q + 0.035, 3.4, 4.25, vf - 0.03, vf + 0.03, WHITE, WHITE); box(B, T, q - 0.11, q + 0.11, 3.75, 3.9, vf - 0.025, vf + 0.025, WHITE, WHITE); } }
+    // portas-janelas em arco, marrom escuro com venezianas
+    const archWin = (cu, y0, y1, wv, sg, side) => {
+      const F = side ? (a, b, c, d) => sideFeat(B, T, a, b, c, d, wv, sg, BROWN2) : (a, b, c, d) => wallFeat(B, T, a, b, c, d, wv, sg, BROWN2);
+      F(cu - 0.6, cu + 0.6, y0, y1 - 0.3); F(cu - 0.45, cu + 0.45, y1 - 0.3, y1 - 0.1); F(cu - 0.25, cu + 0.25, y1 - 0.1, y1);
+      const S = side ? (a, b) => sideFeat(B, T, a, b, y0, y1 - 0.3, wv, sg, BROWN) : (a, b) => wallFeat(B, T, a, b, y0, y1 - 0.3, wv, sg, BROWN);
+      S(cu - 1.0, cu - 0.65); S(cu + 0.65, cu + 1.0);
+    };
+    for (let k = 0; k < cols.length - 1; k++) if (k !== 3) archWin((cols[k] + cols[k + 1]) / 2, 3.3, 5.6, vw, -1);
+    for (const cu of [-4.5, 0, 4.5]) archWin(cu, 0.6, 2.7, v(hv0 + 0.4), -1);
+    for (const cv of [-3.5, 1, 4.5]) { archWin(cv, 3.4, 5.6, -hw / 2, -1, true); archWin(cv, 0.7, 2.7, -hw / 2, -1, true); }
+    // colunas de tijolinho
+    for (const bu of [cols[3] + 0.9]) { box(B, T, bu - 0.3, bu + 0.3, 3.3, 5.75, vw - 0.05, vw + 0.3, BRICK, BRICK); box(B, T, bu - 0.3, bu + 0.3, 0.3, 3.0, v(hv0 + 0.4) - 0.3, v(hv0 + 0.4), BRICK, BRICK); }
+    box(B, T, hw / 2 - 1.6, hw / 2 - 0.9, 4.9, 5.35, vw - 0.25, vw, hex('#e9e9e4'), hex('#d6d6d0'));     // ar-condicionado
+    // telhado de barro em quatro águas + chaminé de tijolo
+    hipRoof(B, T, hw, hd, 6.15, 2.3, 0.8, TILE);
+    box(B, T, 1.6, 2.5, 6.6, 9.1, -1.5, -0.6, BRICK, BRICK); box(B, T, 1.45, 2.65, 9.1, 9.3, -1.65, -0.45, hex('#6c3426'), hex('#6c3426'));
+    maskRect(at(0, 0, 0), hu0, hu1, hv0, hv1);
+    // coqueiro no canto do jardim, árvore escura ao fundo, plantas junto ao muro
+    { const p = WP(8.4, 7.6); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.25, true); }
+    { const p = WP(7.2, 23); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 1.1, true); }
+    for (const [pu, pv] of [[19.5, 6.0], [22.5, 6.2], [7.2, 12], [7.2, 16]]) box(B, at(pu, pv), -0.5, 0.5, 0, 0.8, -0.5, 0.5, hex('#4c8f3d'), hex('#3f7c33'), F_TEX);
+  }
   for (const lm of (W.landmarks || [])) if (lm.type === 'weedlot') { // terreno baldio: mato alto
     const r = rngFor(lm.x, lm.z, 5), B = chunkB(lm.x, lm.z);
     for (let k = 0; k < 160; k++) { const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 13, x = lm.x + Math.cos(a) * d, z = lm.z + Math.sin(a) * d;

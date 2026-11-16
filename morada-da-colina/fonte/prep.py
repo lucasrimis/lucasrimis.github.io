@@ -612,6 +612,22 @@ trees = [t for t in trees if not in_block(t[0], t[1])]
 landmarks.append({'type': 'parque', 'x': SW[0], 'z': SW[1], 'ang': round(pang, 5), 'L': round(L, 2), 'W': round(Wd, 2)})
 print('parque: removed houses', before - len(houses), 'L', round(L, 1), 'W', round(Wd, 1))
 
+# ---- sobrado da esquina Albert Sabin x Rua Nove A (Street View 10/2024): lote limpo para o landmark ----
+_as = next(r for r in roads if r['n'] == 'Rua Albert Sabin'); _n9 = next(r for r in roads if r['n'] == 'Rua Nove A')
+J9 = min(((p, q) for p in _as['pts'] for q in _n9['pts']), key=lambda pq: math.hypot(pq[0][0] - pq[1][0], pq[0][1] - pq[1][1]))[0]
+_i = _as['pts'].index(J9); _pp = _as['pts'][_i - 1]
+_L = math.hypot(_pp[0] - J9[0], _pp[1] - J9[1]); A9 = ((_pp[0] - J9[0]) / _L, (_pp[1] - J9[1]) / _L)
+_q = _n9['pts'][1] if _n9['pts'][0] == J9 else _n9['pts'][-2]
+N9 = (-A9[1], A9[0]) if (-A9[1]) * (_q[0] - J9[0]) + A9[0] * (_q[1] - J9[1]) > 0 else (A9[1], -A9[0])
+def in_lot9(x, z, m=0):
+    dx, dz = x - J9[0], z - J9[1]; u = dx * A9[0] + dz * A9[1]; v = dx * N9[0] + dz * N9[1]
+    return 4.5 - m < u < 25 + m and 4 - m < v < 25 + m
+def _hcorners(h):
+    c, s_ = math.cos(h[4]), math.sin(h[4])
+    return [(h[0], h[1])] + [(h[0]+uu*c-vv*s_, h[1]+uu*s_+vv*c) for uu, vv in ((-h[2]/2, -h[3]/2), (h[2]/2, -h[3]/2), (h[2]/2, h[3]/2), (-h[2]/2, h[3]/2))]
+houses = [h for h in houses if not any(in_lot9(x, z, 0.5) for x, z in _hcorners(h))]
+trees = [t for t in trees if not in_lot9(t[0], t[1], 1)]
+landmarks.append({'type': 'sobrado9', 'x': J9[0], 'z': J9[1], 'u': [round(A9[0], 4), round(A9[1], 4)], 'v': [round(N9[0], 4), round(N9[1], 4)]})
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
