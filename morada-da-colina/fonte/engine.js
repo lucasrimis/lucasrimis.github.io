@@ -1778,8 +1778,18 @@ window.__net = (function () {
     N.uid = cred.user.uid; N.name = name; N.db = firebase.database();
     N.db.ref('.info/serverTimeOffset').on('value', s => { N.offset = s.val() || 0; });
     const me = N.db.ref('players/' + N.uid);
+    N.full = () => ({ n: N.name, c: N.look, x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0, t: firebase.database.ServerValue.TIMESTAMP });
     me.onDisconnect().remove();
-    await me.set({ n: name, c: N.look, x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0, t: firebase.database.ServerValue.TIMESTAMP });
+    await me.set(N.full());
+    // se a conexão cair (celular troca de rede, app vai pro fundo), o servidor apaga players/uid pelo onDisconnect.
+    // Ao reconectar: rearma o onDisconnect e grava o registro completo de novo, senão os outros não te veem mais.
+    let wasDown = false;
+    N.connRef = N.db.ref('.info/connected');
+    N.connRef.on('value', s => {
+      if (!s.val()) { wasDown = true; return; }
+      if (!wasDown || !N.online) return;
+      wasDown = false; me.onDisconnect().remove(); me.set(N.full()).catch(e => console.error(e));
+    });
     const players = N.db.ref('players');
     const upsert = s => {
       if (s.key === N.uid) return; const v = s.val(); if (!v || typeof v.x !== 'number') return;
@@ -1806,7 +1816,7 @@ window.__net = (function () {
   N.leave = async () => {
     if (!N.online) return;
     N.online = false;
-    try { N.players.off(); N.chatQ.off(); N.me.onDisconnect().cancel(); await N.me.remove(); } catch (e) { console.error(e); }
+    try { N.players.off(); N.chatQ.off(); N.connRef.off(); N.me.onDisconnect().cancel(); await N.me.remove(); } catch (e) { console.error(e); }
     for (const o of N.others.values()) { o.el.remove(); if (o.bub) o.bub.remove(); }
     N.others.clear();
     offPill(); $('btnChat').style.display = 'none'; chatBox.style.display = 'none';
@@ -1844,7 +1854,7 @@ window.__net = (function () {
     if (N.online && now - lastSend > 125) {
       const st = { x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0 };
       const moved = !lastSent || Math.abs(st.x - lastSent.x) > 0.02 || Math.abs(st.z - lastSent.z) > 0.02 || Math.abs(st.a - lastSent.a) > 0.02 || st.car !== lastSent.car;
-      if (moved || now - lastSend > 5000) { st.t = firebase.database.ServerValue.TIMESTAMP; N.db.ref('players/' + N.uid).update(st); lastSent = st; lastSend = now; }
+      if (moved || now - lastSend > 5000) { st.t = firebase.database.ServerValue.TIMESTAMP; N.db.ref('players/' + N.uid).update(st).catch(() => N.online && N.db.ref('players/' + N.uid).set(N.full())); lastSent = st; lastSend = now; }
     }
     const serverNow = Date.now() + N.offset;
     for (const o of N.others.values()) {
