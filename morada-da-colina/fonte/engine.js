@@ -408,16 +408,17 @@ for (const r of W.roads) {
   for (let i = 1; i < pts.length; i++) {
     acc += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
     pieces[pieces.length - 1].push(pts[i]);
-    if (acc > 70 && i < pts.length - 1) { pieces.push([pts[i]]); acc = 0; }
+    if ((acc > 70 || (r.real && acc > 15)) && i < pts.length - 1) { pieces.push([pts[i]]); acc = 0; }
   }
   for (const pc of pieces) {
     const [cx, cz] = centroid(pc);
     const B = chunkB(cx, cz);
     if (r.t === 'footway') { strip(B, pc, r.h, 0.03, C.path, F_TEX, 1, null, 0.5); continue; }
     if (r.sw > 0) { strip(B, pc, r.h + r.sw, 0.06, C.walk, F_TEX, 1, null, 0.9); strip(B, pc, r.h + 0.25, 0.12, C.curb, F_PLAIN); }
-    strip(B, pc, r.h, 0.18, r.pave ? hex('#8f8c84') : r.dirt ? C.dirt : (r.t === 'secondary' ? C.asphalt : C.asphalt2), r.pave ? F_PAVE : F_TEX, 1, null, r.sw > 0 ? 0 : 0.9);
+    const pv = r.pave || (r.real && (W.paveZones || []).some(([zx, zz, zr]) => Math.hypot(cx - zx, cz - zz) < zr));
+    strip(B, pc, r.h, 0.18, pv ? hex('#8f8c84') : r.dirt ? C.dirt : (r.t === 'secondary' ? C.asphalt : r.real ? hex('#5a5b62') : C.asphalt2), pv ? F_PAVE : F_TEX, 1, null, r.sw > 0 ? 0 : 0.9);
   }
-  if (!r.dirt && !r.ring && !r.pave) {
+  if (!r.dirt && !r.ring && !r.pave && !r.real) {
     const tp = trim(pts, 7, 7);
     if (tp) {
       const [cx, cz] = centroid(tp); const B = chunkB(cx, cz);

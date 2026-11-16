@@ -32,6 +32,8 @@ for n in root.findall('node'):
     if 'name' in tags:
         named_nodes.append((tags['name'], p))
 
+# streets already recreated from Street View (Oct 2024)
+REAL_STREETS = {'Rua Albert Sabin', 'Rua Darci de Carvalho', 'Rua Coronel José Fernando Bruno'}
 ROAD = {  # type: (half width of carriageway, sidewalk width)
     'secondary': (5.0, 2.5), 'secondary_link': (2.6, 0), 'residential': (3.6, 2.0),
     'living_street': (2.8, 1.2), 'service': (2.0, 0), 'unclassified': (2.6, 0),
@@ -51,11 +53,14 @@ for w in root.findall('way'):
         if hw == 'residential' and tags.get('oneway') == 'yes':
             half = 3.2
         pave = False
+        real = tags.get('name') in REAL_STREETS
         if tags.get('name') == 'Rua Albert Sabin':   # Street View (out/2024): bloquete, ~6 m, calçadas estreitas
             half, sw, pave = 3.0, 1.5, True
+        elif real:                                   # Darci de Carvalho / Cel. José Fernando Bruno: asfalto, ~6.6 m
+            half, sw = 3.3, 1.8
         roads.append({'id': w.get('id'), 't': hw, 'h': half, 'sw': sw, 'n': tags.get('name', ''),
                       'ring': tags.get('junction') == 'roundabout',
-                      'dirt': tags.get('surface') == 'unpaved', 'pave': pave,
+                      'dirt': tags.get('surface') == 'unpaved', 'pave': pave, 'real': real,
                       'pts': pts})
         continue
     kind = None
@@ -244,8 +249,11 @@ poles = []
 # a grassy empty lot on the north side at the start of the long SE straight
 WALL_IDX = {'amarelo': 1, 'creme': 0, 'pessego': 2, 'rosa': 3, 'verde': 5, 'branco': 6, 'amarelo2': 7, 'terracota': 8}
 weed_lot = proj(-22.48612, -44.47790)
+_b0 = proj(-22.48705, -44.47562); _brg = math.radians(127)
+grass_bank = (_b0[0] + math.sin(_brg) * 13, _b0[1] - math.cos(_brg) * 13)
+EMPTY = [(weed_lot, 16), (grass_bank, 16), (proj(-22.48858, -44.47548), 20), (proj(-22.48822, -44.47708), 20)]
 for r in roads:
-    if not r.get('pave'):
+    if not r.get('real'):
         continue
     pts = r['pts']
     for a, bb in zip(pts, pts[1:]):
@@ -263,7 +271,7 @@ for r in roads:
                 setback = random.uniform(2.2, 4.5)
                 off = r['h'] + r['sw'] + setback + d / 2
                 cx = a[0] + ux * t + nx * off; cz = a[1] + uz * t + nz * off
-                if math.hypot(cx - weed_lot[0], cz - weed_lot[1]) < 16:
+                if any(math.hypot(cx - p[0], cz - p[1]) < rr for p, rr in EMPTY):
                     t += 3; continue
                 corners = rect_corners(cx, cz, w, d, ang)
                 if rect_ok(corners, 0.6) and rect_free(rect_corners(cx, cz, w + 0.8, d + 1, ang)):
@@ -300,9 +308,11 @@ for r in roads:
             t += 32
         acc = (acc + L) % 32
 landmarks_pre = [{'type': 'weedlot', 'x': round(weed_lot[0], 1), 'z': round(weed_lot[1], 1)}]
+# bloquete stretch where Darci, Cel. Bruno and Albert Sabin meet
+pave_zones = [[*[round(v, 1) for v in proj(-22.48680, -44.47525)], 50]]
 
 for r in roads:
-    if r['t'] not in ('residential', 'living_street') or r.get('pave'):
+    if r['t'] not in ('residential', 'living_street') or r.get('real'):
         continue
     pts = r['pts']
     for a, bb in zip(pts, pts[1:]):
@@ -567,8 +577,9 @@ print('parque: removed houses', before - len(houses), 'L', round(L, 1), 'W', rou
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
     'bounds': [round(BX0, 1), round(BZ0, 1), round(BX1, 1), round(BZ1, 1)],
-    'roads': [{'t': r['t'], 'h': r['h'], 'sw': r['sw'], 'n': r['n'], 'ring': r['ring'], 'dirt': r['dirt'], 'pave': r.get('pave', False), 'pts': R(r['pts'])} for r in roads],
+    'roads': [{'t': r['t'], 'h': r['h'], 'sw': r['sw'], 'n': r['n'], 'ring': r['ring'], 'dirt': r['dirt'], 'pave': r.get('pave', False), 'real': r.get('real', False), 'pts': R(r['pts'])} for r in roads],
     'poles': poles,
+    'paveZones': pave_zones,
     'areas': [{'t': a['t'], 'n': a['n'], 'pts': R(a['pts'])} for a in areas],
     'dem': None if dem is None else {'lon0': dem['lon0'], 'lat0': dem['lat0'], 'step': dem['step'], 'rows': dem['rows'], 'cols': dem['cols'],
             'base': 400, 'data': [int(round((v - 400) * 10)) for v in dem['a'].flatten()]},
