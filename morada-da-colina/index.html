@@ -228,7 +228,7 @@ const jit = (c, r, amt) => { const m = 1 + (r() - 0.5) * 2 * amt; return [Math.m
 const pick = (arr, r) => arr[Math.floor(r() * arr.length)];
 
 // vertex flag (stored in colour alpha)
-const F_PLAIN = 255, F_TEX = 204, F_WATER = 140, F_PAVE = 100, F_FAR = 50, F_UNLIT = 20, F_SKY = 5;
+const F_PLAIN = 255, F_TEX = 204, F_WATER = 140, F_PAVE = 100, F_FAR = 50, F_UNLIT = 20, F_GLOW = 11, F_SKY = 5;
 
 // ---------------- mesh builder ----------------
 class Builder {
@@ -264,6 +264,11 @@ function frame(x, y, z, ang) { const c = Math.cos(ang), s = Math.sin(ang); retur
 const PROPS = [];
 const LATE_NOTES = [];   // mensagens criadas antes da lista de NPCs existir
 const DOGS = [];         // cachorros soltos em quintais (andam sozinhos)
+// relógio do jogo: 1 hora do jogo = 1 minuto real (o dia inteiro dura 24 minutos), igual para todos os jogadores
+const DAY_SEC = 24 * 60;
+function gameClock() { const sec = Date.now() / 1000 + (window.__timeShift || 0); const day = Math.floor(sec / DAY_SEC); return { day, h: (sec - day * DAY_SEC) / 60, sec, dayStart: day * DAY_SEC }; }
+let PEAK_A = -Math.PI / 2;   // direção (a partir do centro do mapa) do pico mais alto da serra: o sol nasce e se põe atrás dele
+let PORTELA_PARK = null;     // onde a bicicleta do Portela fica parada
 const angOf = T => Math.atan2(T.ax[2], T.ax[0]);
 function P(T, u, y, v) { return [T.o[0] + u * T.ax[0] + y * T.ay[0] + v * T.az[0], T.o[1] + u * T.ax[1] + y * T.ay[1] + v * T.az[1], T.o[2] + u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
 function N(T, u, y, v) { return [u * T.ax[0] + y * T.ay[0] + v * T.az[0], u * T.ax[1] + y * T.ay[1] + v * T.az[1], u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
@@ -1331,26 +1336,15 @@ for (const lm of (W.landmarks || [])) {
   }
   // blue water bowl
   { const Bw = yawChild(T, 0.05, 0, d / 2 + 0.55, 0); box(B, Bw, -0.13, 0.13, 0, 0.1, -0.13, 0.13, hex('#2f6fd6'), hex('#2559b0')); box(B, Bw, -0.09, 0.09, 0.1, 0.105, -0.09, 0.09, hex('#5aa8e6'), hex('#5aa8e6'), F_WATER); }
-  // parked bicycle pointing to the street
-  {
-    const K = yawChild(T, 0.85, 0, d / 2 + 1.05, Math.PI / 2 + 0.12);
-    const tire = hex('#17181b'), fr = hex('#2f6a42'), steel = hex('#9aa0a6');
-    const wheel = (cu) => { const n = 12, r = 0.33; for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; beam(B, P(K, cu + Math.cos(a0) * r, r + Math.sin(a0) * r, 0), P(K, cu + Math.cos(a1) * r, r + Math.sin(a1) * r, 0), 0.06, tire); } beam(B, P(K, cu - r, r, 0), P(K, cu + r, r, 0), 0.015, steel); beam(B, P(K, cu, 0, 0), P(K, cu, 2 * r, 0), 0.015, steel); };
-    wheel(-0.52); wheel(0.52);
-    const rear = P(K, -0.52, 0.33, 0), crank = P(K, -0.05, 0.33, 0), seatP = P(K, -0.18, 0.92, 0), head = P(K, 0.42, 0.95, 0), front = P(K, 0.52, 0.33, 0);
-    beam(B, rear, crank, 0.04, fr); beam(B, rear, seatP, 0.04, fr); beam(B, crank, seatP, 0.045, fr); beam(B, crank, head, 0.05, fr); beam(B, seatP, head, 0.045, fr); beam(B, head, front, 0.04, fr);
-    beam(B, P(K, -0.18, 0.92, 0), P(K, -0.2, 1.0, 0), 0.03, steel);
-    box(B, K, -0.32, -0.08, 1.0, 1.06, -0.07, 0.07, tire, tire);
-    beam(B, P(K, 0.42, 0.95, 0), P(K, 0.38, 1.12, 0), 0.03, steel);
-    beam(B, P(K, 0.38, 1.12, -0.28), P(K, 0.38, 1.12, 0.28), 0.03, steel);
-    box(B, K, -0.75, -0.4, 0.62, 0.66, -0.1, 0.1, steel, steel); // rack
-    maskRect(K, -0.9, 0.9, -0.2, 0.2); { const p = P(K, 0, 0, 0); PROPS.push({ k: 'bike', x: p[0], z: p[2], a: angOf(K) }); }
-  }
+  // bicicleta do Portela: desenhada a cada quadro (some quando ele sai para a volta no bairro)
+  { const K = yawChild(T, 0.85, 0, d / 2 + 1.05, Math.PI / 2 + 0.12), p = P(K, 0, 0, 0);
+    PORTELA_PARK = { x: p[0], z: p[2], a: angOf(K) };
+    maskRect(K, -0.9, 0.9, -0.2, 0.2); PROPS.push({ k: 'bike', x: p[0], z: p[2], a: angOf(K) }); }
   // the two trees framing the booth (tall one on the left, mangueira on the right)
   { const a = P(T, -4.6, 0, 0.6); tree(chunkB(a[0], a[2]), a[0], a[2], 0, 1.55, true); const b = P(T, 4.7, 0, 0.9); tree(chunkB(b[0], b[2]), b[0], b[2], 2, 1.35, true); }
   // Portela, standing by the door
   const np = P(T, 1.55, 0, d / 2 + 0.95);
-  NPCS.push({ name: 'Portela', x: np[0], z: np[2], y: y0 + 0.02, base: lm.front + 0.9, look: 0, t: 0 });
+  NPCS.push({ name: 'Portela', x: np[0], z: np[2], y: y0 + 0.02, base: lm.front + 0.9, look: 0, t: 0, home: { x: np[0], z: np[2], y: y0 + 0.02, base: lm.front + 0.9 } });
   maskCircle(np[0], np[2], 0.35);
   POIS.push({ n: 'Portela', x: np[0], z: np[2], y: 2.5, npc: true });
 }
@@ -1824,6 +1818,7 @@ function buildProp(B, k, x, z, a, o) {
     const S = {"h":[0.0,0.0,0.001,0.002,0.003,0.005,0.006,0.008,0.01,0.012,0.014,0.015,0.017,0.018,0.019,0.02,0.02,0.041,0.045,0.026,0.047,0.044,0.094,0.103,0.144,0.151,0.142,0.156,0.191,0.201,0.208,0.227,0.22,0.192,0.187,0.185,0.172,0.176,0.205,0.25,0.247,0.272,0.307,0.309,0.335,0.352,0.357,0.372,0.386,0.403,0.413,0.414,0.427,0.436,0.44,0.43,0.432,0.432,0.435,0.458,0.468,0.478,0.499,0.515,0.508,0.521,0.538,0.556,0.599,0.616,0.638,0.652,0.672,0.667,0.694,0.703,0.698,0.684,0.697,0.711,0.732,0.751,0.776,0.813,0.881,0.916,0.945,0.994,0.976,0.963,0.871,0.861,0.889,0.855,0.911,0.9,0.889,0.867,0.848,0.873,0.866,0.876,0.884,0.867,0.862,0.842,0.807,0.814,0.845,0.861,0.863,0.848,0.854,0.829,0.817,0.806,0.778,0.754,0.765,0.728,0.664,0.623,0.608,0.56,0.521,0.503,0.492,0.47,0.468,0.468,0.468,0.469,0.469,0.473,0.483,0.493,0.495,0.478,0.47,0.449,0.438,0.42,0.423,0.395,0.398,0.4,0.386,0.386,0.383,0.385,0.403,0.414,0.431,0.429,0.413,0.402,0.407,0.417,0.42,0.427,0.428,0.434,0.454,0.499,0.534,0.53,0.508,0.508,0.489,0.475,0.454,0.414,0.392,0.379,0.379,0.378,0.382,0.391,0.386,0.4,0.374,0.379,0.373,0.38,0.393,0.407,0.436,0.467,0.487,0.497,0.517,0.533,0.554,0.573,0.576,0.588,0.59,0.601,0.61,0.6,0.577],"c":["405b633357603a59602d535c044e591a505b33555e","405b633357603a59602d535c044e591a505b33555e","385a6134575f39585f3f5960495c614a5d62505f63","385a6134575f39585f3f5960495c614a5d62505f63","014e5d31575f044f5c24515c475c62606667656969","014f5e18505d024f5c044f5c445c61576266666b6b","014f5e18505d024f5c044f5c445c61576266666b6b","014e5e014e5d014f5d034f5d10515c566265606869","014e5e014e5d014f5d034f5d10515c566265606869","014f5e024e5e014f5d034f5c0d4f5c515e63495c63","024f5e054e5d014e5e024f5d094f5c25535e596668","024f5e054e5d014e5e024f5d094f5c25535e596668","014e5e024e5d014e5d024f5c084f5c24535e6b6c6a","014e5e024e5d014e5d024f5c084f5c24535e6b6c6a","014e5e014e5d014e5c034e5c094f5c23535e5d6568","014e5e014d5d024e5c024e5c0a4f5d1f535e3e5b63","014e5e014d5d024e5c024e5c0a4f5d1f535e3e5b63","024e5d0a4e5d024e5d014e5c0d4f5c21535e405b64","024e5d0a4e5d024e5d014e5c0d4f5c21535e405b64","054e5d27535e024e5c014e5d0c4f5c34576259666a","0a4f5d0d4f5d014d5d014e5d0f505d3c5b63465d64","0a4f5d0d4f5d014d5d014e5d0f505d3c5b63465d64","20535f054f5d014d5d014e5c485e642654604e6167","20535f054f5d014d5d014e5c485e642654604e6167","1e535f0e505d004d5c19505c20545f465e6459666b","044d5e104d5d014c5c22525d2e58604d6167566469","044d5e104d5d014c5c22525d2e58604d6167566469","1d535e024b5b1d4f5b26555f3a596154646a526268","1d535e024b5b1d4f5b26555f3a596154646a526268","19525e024b5a28545e24525e13505d4a5e66516069","2452601b525d25545d1b515c3e5b62506268526268","2452601b525d25545d1b515c3e5b62506268526268","024f6010505c20535d27555f4e61674f62685c676c","024f6010505c20535d27555f4e61674f62685c676c","0150610e505c20525c2e575f5163675f696c556569","014f6210515f34585f3a5a605564695a676b5d696c","014f6210515f34585f3a5a605564695a676b5d696c","0150620b506023545e30565e586769606a6c5f6a6d","0150620b506023545e30565e586769606a6c5f6a6d","01506103506116515c2f565e2c5761616a6c636a6e","01506202506112505c395a624761675e696d646c6e","01506202506112505c395a624761675e696d646c6e","0150610350610f4f5c1d545e446066606a6d636c6e","0150610350610f4f5c1d545e446066606a6d636c6e","024f61035061124e5c0c4f5d496167506369616c6e","014e60024f5f2d565f024e5b4c6167536569656d6f","014e60024f5f2d565f024e5b4c6167536569656d6f","365a65034f5f23545f335a625062685a686c5f6b6d","365a65034f5f23545f335a625062685a686c5f6b6d","2d5761024f6019525f435e654e636a54666a5b686b","2b5963024f5f08505f2c57614861684f63685d696d","2b5963024f5f08505f2c57614861684f63685d696d","2b5b64014e5f024f5f15525d47616752656a59696b","2b5b64014e5f024f5f15525d47616752656a59696b","2a5b66014f5f015060355b6344606854666b5e6b6d","205a6504506001506006515f3a5d654f656a53666a","205a6504506001506006515f3a5d654f656a53666a","0f556210526002505e03515e3a5c6351666b5f6b6e","0f556210526002505e03515e3a5c6351666b5f6b6e","235a64325b640d51600f535f0e536059686c4e6469","3e61692d5c66024f5e365c643b5d6557686c55676b","3e61692d5c66024f5e365c643b5d6557686c55676b","4160680953600b505f1f5560355d6551656b57676b","4160680953600b505f1f5560355d6551656b57676b","47636b1155611c5261085360345b644c6469626d6f","356169185761305e660d5460315c64355b63676f70","356169185761305e660d5460315c64355b63676f70","45636b0e53600a55614a646b2f5b64405f66656d70","45636b0e53600a55614a646b2f5b64405f66656d70","40626a0d535f0e55604362694161684462685f6b6f","1c57641d586316576123586347636a52676c4d656c","1c57641d586316576123586347636a52676c4d656c","0c55621f5863145861025461456268596b6e616e70","0c55621f5863145861025461456268596b6e616e70","1e5963275c641558620653614562694863685b6b6f","1b55620953600c54610353613a5d6650676c52686d","1b55620953600c54610353613a5d6650676c52686d","4a636c1958630d55601857623d5f674e656b626e71","4a636c1958630d55601857623d5f674e656b626e71","2f5f671d5863205863095662305b654b656b616e70","265a6402515f2e5b650254621859644c656b596b6e","265a6402515f2e5b650254621859644c656b596b6e","0954610252601054610b54611b59644f676b576b6e","0954610252601054610b54611b59644f676b576b6e","225764025160045361355f681858644a656a5b6c70","08506102505f0855621f586319596449636a54696d","08506102505f0855621f586319596449636a54696d","0f50600b535f15586128596318586448656b51676c","0f50600b535f15586128596318586448656b51676c","2d58651354602c5d652f5f671658643d626b50686d","3a5e6b1e57621157621d5864195763325f684b656c","3a5e6b1e57621157621d5864195763325f684b656c","55686f1f58620253610254611357633d616943636a","55686f1f58620253610254611357633d616943636a","44626a1c58620153600355621d5a6447666d4f686c","2757660a5360035461015462396069516a6f576b6e","2757660a5360035461015462396069516a6f576b6e","41616b1154600854610454623d636a4d696f44656b","41616b1154600854610454623d636a4d696f44656b","52676e0453600353600c576242656b4b686d406169","4b666e04515f04536136616947666c5d707247646a","4b666e04515f04536136616947666c5d707247646a","4c656d1155621e5a642d5e6647666c546c704f676c","4c656d1155621e5a642d5e6647666c546c704f676c","40636b0955612b5d650556613e636a5b6e71416369","3c60680b56620453602e5f6747676d586e71436369","3c60680b56620453602e5f6747676d586e71436369","065262025261095561305e663260695c6f73406167","065262025261095561305e663260695c6f73406167","0250610253620654611759633f646b5e6f723b6167","0e52620454611259642b5d663c626a596d6f3b5f66","0e52620454611259642b5d663c626a596d6f3b5f66","1557620c5661055462325f663b636a50696e4b6569","1557620c5661055462325f663b636a50696e4b6569","0b54611959630153611859623862684e686d54696c","17576203536102536135606643666c4e686c3d5e66","17576203536102536135606643666c4e686c3d5e66","01526001536101546247676a4d696d51696d375c64","01526001536101546247676a4d696d51696d375c64","025160005260015460375e65506a6d43656a385c63","03515f02515f366267165963536c6f4f696b395d64","03515f02515f366267165963536c6f4f696b395d64","3d6167435f663f636743656a536b6e4d6669375c63","3d6167435f663f636743656a536b6e4d6669375c63","355f63396165315e6449676c546d6f4d666b365a62","1c59601357600155601058624d686c4f686b3d5d62","1c59601357600155601058624d686c4f686b3d5d62","22585f08555f0155600e5762235d664d666a3a5a60","22585f08555f0155600e5762235d664d666a3a5a60","15586101535f015560095661235b644262673f5b60","0a545e01535f0254600656601d5a633159603b595e","0a545e01535f0254600656601d5a633159603b595e","02515e01535f0154600856601f5a632b555d37575d","02515e01535f0154600856601f5a632b555d37575d","02525e01535f02546008566120596327535b3c5b60","01525e01535f0254600755601d596235585e4a6062","01525e01535f0254600755601d596235585e4a6062","01525d01535f01535f09555f1d59612a545b3f595f","01525d01535f01535f09555f1d59612a545b3f595f","02515e00525e01535f07555f19586131595e3e595e","02515e02515e01535e08555e1b586033595f445c5f","02515e02515e01535e08555e1b586033595f445c5f","01505d02515e01525e06545e1d5861415e6134545b","01505d02515e01525e06545e1d5861415e6134545b","01505d02515e02525e06545e335c63405d632f525b","01505d01505d02525e08545d3e606448626532545b","01505d01505d02525e08545d3e606448626532545b","01505c02505d02515e2c575e365d63385d6436545b","01505c02505d02515e2c575e365d63385d6436545b","04515c11545c24585e355c62375e63325b6239565e","07515c14545c1a555c2a595f2c5a60325b623a585e","07515c14545c1a555c2a595f2c5a60325b623a585e","07515a0a525b24565e28585e2c595f305a613a5b60","07515a0a525b24565e28585e2c595f305a613a5b60","1c555c08515910545a3a5d633b5d612f5a603b5b61","16535b064f5a1d555d385c6221565e2e5960405b61","16535b064f5a1d555d385c6221565e2e5960405b61","2d5a5f0b515921565c21565d18555c2c59603e5c61","2d5a5f0b515921565c21565d18555c2c59603e5c61","17545a22555b1f555c28585d15545c2a585e3c5c61","155359125259325a5e22555c15545c2b575e3b5a61","155359125259325a5e22555c15545c2b575e3b5a61","07515909515a19565c27565d17535c28565e3a5a62","07515909515a19565c27565d17535c28565e3a5a62","045059054f5813525b1b545c18545c2a565d385960","024f59014f5a0c515906525a19535c2d565e3b5960","024f59014f5a0c515906525a19535c2d565e3b5960","034f5903505905505a03505a1b525b2d555d39585f","034f5903505905505a03505a1b525b2d555d39585f","18535911515a09515a08505a1d525c29555c37565d","26555a13525a034f590550591d515b29545c35545b","26555a13525a034f590550591d515b29545c35545b","0b5158085059024f59044f5919515a2b545c38555b","0b5158085059024f59044f5919515a2b545c38555b","024f59024f58014e58064f5918515a2d545b39565b","014e59014e58024e580b4e5923535b445c5f4e5f61","014e59014e58024e580b4e5923535b445c5f4e5f61","014e58014d58024d57084f5829545a36555d4a5c5f","014e58014d58024d57084f5829545a36555d4a5c5f","034e56014e58004d572050582f545a3f585e4f6061","034e57014d57024c572352582c555a30535b3a585c","034e57014d57024c572352582c555a30535b3a585c","034e57014d57184e5729535838585c3e595d3d595c","034e57014d57184e5729535838585c3e595d3d595c","034d56044d55194e552251572d545938555a475a5d","185357104d54134e551d4e562451582a515933535b","185357104d54134e551d4e562451582a515933535b","184e56064c55184d541c4f571d4f572a515931535b","184e56064c55184d541c4f571d4f572a515931535b","024b55064b56154e561c4f56194f572a51592e5259","024b55134d55114d550f4c56174e562a51592d5259","024b55134d55114d550f4c56174e562a51592d5259","064b540e4d55044b55084c55194e56285058305159","064b540e4d55044b55084c55194e56285058305159","024b54024a55024b55084c551a4e552850572e5158","014a55014a54024a55054b55124e56264f572d5158","014a55014a54024a55054b55124e56264f572d5158","024953024a54024a54044b54154d56244f562c5157","024953024a54024a54044b54154d56244f562c5157","0b4d54054a52034954034a54114c552a50562e5057"]};
     const N_ = S.c.length, ROWS = 7, R = 1850, SPAN = 1.5, HM = 300, BASE = -40;   // silhueta da foto do pôr do sol, pico com o formato da foto aproximada
     const hAt = i => { const e = Math.min(i / 14, (N_ - i) / 14), t = Math.max(0, Math.min(1, e)), f = t * t * (3 - 2 * t); return BASE + (0.06 + (Math.max(0.06, S.h[i]) - 0.06) * f) * (HM - BASE); };   // pontas descem suaves dos dois lados
+    { let bi = 0; for (let i = 0; i <= N_; i++) if (S.h[i] > S.h[bi]) bi = i; PEAK_A = -Math.PI / 2 - SPAN / 2 + SPAN * bi / N_; window.__peak = { a: PEAK_A, cx, cz, R }; }
     const vtx = (i, j) => { const a = -Math.PI / 2 - SPAN / 2 + SPAN * i / N_, rr = R - j * 45, t = j / ROWS; return [cx + Math.cos(a) * rr, hAt(i) * (1 - t) + BASE * t, cz + Math.sin(a) * rr]; };
     for (let i = 0; i < N_; i++) for (let j = 0; j < ROWS; j++) {
       const hz = 0.2 + 0.3 * Math.pow(j / (ROWS - 1), 2);   // névoa cresce perto da base
@@ -1835,7 +1830,7 @@ function buildProp(B, k, x, z, a, o) {
     const x = cx + (r() - 0.5) * 2400, z = cz + (r() - 0.5) * 2400, y = 160 + r() * 80;
     const T = frame(x, y, z, r() * 0.5), wc = hex('#ffffff'), sc = hex('#e8eef5');
     const k = 2 + Math.floor(r() * 4);
-    for (let j = 0; j < k; j++) { const u = (r() - 0.5) * 40, v = (r() - 0.5) * 20, s = 10 + r() * 16; box(farB, T, u - s, u + s, 0, 5 + r() * 6, v - s * 0.6, v + s * 0.6, wc, sc, F_UNLIT, true); }
+    for (let j = 0; j < k; j++) { const u = (r() - 0.5) * 40, v = (r() - 0.5) * 20, s = 10 + r() * 16; box(farB, T, u - s, u + s, 0, 5 + r() * 6, v - s * 0.6, v + s * 0.6, wc, sc, F_SKY, true); }   // nuvens acompanham a cor do céu
   }
 }
 
@@ -1866,6 +1861,7 @@ varying vec3 vN;varying vec4 vC;varying vec3 vW;varying vec4 vS;
 void main(){vN=aN;vC=aC;vW=aP;vS=uSVP*vec4(aP,1.0);gl_Position=uVP*vec4(aP,1.0);}`;
 const FS = `precision highp float;varying vec3 vN;varying vec4 vC;varying vec3 vW;varying vec4 vS;
 uniform sampler2D uSM;uniform vec3 uL;uniform vec3 uEye;uniform vec3 uFog;uniform vec2 uFogR;uniform float uT;uniform float uLv;uniform float uShadowOn;
+uniform vec3 uSunC;uniform vec3 uAmbC;uniform vec3 uTint;uniform float uNight;uniform vec4 uLamp[8];
 float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float unpack(vec4 c){return dot(c,vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0));}
 float b2(vec2 q){return mod(q.x*2.0+q.y*3.0,4.0);}
@@ -1881,10 +1877,13 @@ void main(){
   if(s.x>0.0&&s.x<1.0&&s.y>0.0&&s.y<1.0&&s.z<1.0){float d=unpack(texture2D(uSM,s.xy));if(s.z-0.0012>d)sh=0.0;}}
  float dif=max(dot(N,uL),0.0)*sh;dif=floor(dif*3.0+0.6)/3.0;
  vec3 amb=mix(vec3(0.40,0.38,0.40),vec3(0.56,0.63,0.78),N.y*0.5+0.5);
- vec3 col=base*(amb*0.9+vec3(1.0,0.94,0.80)*dif*0.72);
+ vec3 col=base*(amb*0.9*uAmbC+uSunC*dif);
+ if(uNight>0.01){vec3 lc=vec3(0.0);for(int k=0;k<8;k++){vec4 Lp=uLamp[k];float d=distance(vW,Lp.xyz);lc+=vec3(1.0,0.83,0.52)*Lp.w*(1.0-smoothstep(4.0,13.5,d));}
+  col+=base*lc*uNight*(0.75+0.25*max(N.y,0.0));}
  float dist=length(vW-uEye);
  float fog=smoothstep(uFogR.x,uFogR.y,dist);
- if(fl<0.04){col=base;fog=0.0;}
+ if(fl<0.03){col=base*uTint;fog=0.0;}
+ else if(fl<0.06){col=base;fog=0.0;}
  else if(fl<0.1){col=base;fog*=0.5;}
  else if(fl<0.3){fog=0.45+0.1*N.y;}
  col=mix(col,uFog,fog);
@@ -1895,7 +1894,7 @@ const SFS = `precision highp float;varying float vD;vec4 pk(float d){vec4 e=frac
 const PM = prog(VS, FS), PS = prog(SVS, SFS);
 const LOC = { aP: gl.getAttribLocation(PM, 'aP'), aN: gl.getAttribLocation(PM, 'aN'), aC: gl.getAttribLocation(PM, 'aC') };
 const SLOC = { aP: gl.getAttribLocation(PS, 'aP') };
-const U = {}; ['uVP', 'uSVP', 'uSM', 'uL', 'uEye', 'uFog', 'uFogR', 'uT', 'uLv', 'uShadowOn'].forEach(k => U[k] = gl.getUniformLocation(PM, k));
+const U = {}; ['uVP', 'uSVP', 'uSM', 'uL', 'uEye', 'uFog', 'uFogR', 'uT', 'uLv', 'uShadowOn', 'uSunC', 'uAmbC', 'uTint', 'uNight', 'uLamp'].forEach(k => U[k] = gl.getUniformLocation(PM, k));
 const SU = { uSVP: gl.getUniformLocation(PS, 'uSVP') };
 
 function upload(B, dyn) {
@@ -1963,6 +1962,51 @@ function xform(m, p) { const x = p[0], y = p[1], z = p[2]; const w = m[3] * x + 
 // ---------------- game state ----------------
 
 const FOG = [0.72, 0.82, 0.90];
+// ---------------- dia e noite ----------------
+const mixv = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t), sstepC = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function skyState() {
+  const c = gameClock(), h = c.h;
+  const f = (h - 6) / 12;                                 // 0 = nascer (06:00), 1 = pôr (18:00)
+  const e = -0.14 + Math.sin(Math.PI * f) * 1.38;          // altura do sol: sai de trás do pico e volta para trás dele
+  const az = PEAK_A + 0.45 * Math.sin(2 * Math.PI * f);
+  const sunDir = [Math.cos(e) * Math.cos(az), Math.sin(e), Math.cos(e) * Math.sin(az)];
+  const g = ((h - 18 + 24) % 24) / 12, me = -0.1 + Math.sin(Math.PI * Math.min(1, g)) * 0.95, maz = PEAK_A + Math.PI + 0.3 * Math.sin(2 * Math.PI * g);
+  const moonDir = [Math.cos(me) * Math.cos(maz), Math.sin(me), Math.cos(me) * Math.sin(maz)];
+  const day = sstepC(-0.12, 0.22, e), gold = (1 - sstepC(0.05, 0.4, e)) * sstepC(-0.16, 0.02, e);   // dia e "hora dourada"
+  const night = 1 - day;
+  const lightDir = day > 0.35 || me < 0.05 ? (e > 0.04 ? sunDir : [sunDir[0], 0.05, sunDir[2]]) : moonDir;
+  const sunC = mixv(mixv([0.72, 0.68, 0.58], [0.72, 0.5, 0.32], gold), [0.17, 0.2, 0.3], night);
+  const ambC = mixv(mixv([1, 1, 1], [1.02, 0.86, 0.8], gold), [0.6, 0.66, 0.92], night);
+  const fog = mixv(mixv(FOG, [0.94, 0.72, 0.56], gold * 0.9), [0.19, 0.23, 0.36], night);
+  const tint = mixv(mixv([1, 1, 1], [0.95, 0.72, 0.62], gold), [0.38, 0.44, 0.62], night);
+  return { h, e, sunDir, moonDir, lightDir, sunC, ambC, fog, tint, night, gold, shadowK: day > 0.35 ? 1 : (me > 0.1 ? 0.6 : 0) };
+}
+function drawSky(B, eye, S) {   // sol, lua, estrelas e luz dos postes
+  const disc = (dir, dist, r, col, segs) => {
+    const c = [eye[0] + dir[0] * dist, eye[1] + dir[1] * dist, eye[2] + dir[2] * dist];
+    let rt = [-dir[2], 0, dir[0]]; const rl = Math.hypot(rt[0], rt[2]) || 1; rt = [rt[0] / rl, 0, rt[2] / rl];
+    const up = [rt[1] * dir[2] - rt[2] * dir[1], rt[2] * dir[0] - rt[0] * dir[2], rt[0] * dir[1] - rt[1] * dir[0]];
+    for (let k = 0; k < segs; k++) {
+      const a0 = k / segs * Math.PI * 2, a1 = (k + 1) / segs * Math.PI * 2;
+      const p = a => [c[0] + (rt[0] * Math.cos(a) + up[0] * Math.sin(a)) * r, c[1] + (rt[1] * Math.cos(a) + up[1] * Math.sin(a)) * r, c[2] + (rt[2] * Math.cos(a) + up[2] * Math.sin(a)) * r];
+      B.tri(c, p(a0), p(a1), [-dir[0], -dir[1], -dir[2]], col, F_GLOW);
+    }
+  };
+  if (S.e > -0.25) disc(S.sunDir, 2250, 62, mixv([255, 246, 205], [255, 170, 80], S.gold).map(Math.round), 12);
+  if (S.night > 0.05) {
+    const mf = S.night;
+    disc(S.moonDir, 2200, 44, [Math.round(150 + 90 * mf), Math.round(155 + 90 * mf), Math.round(170 + 85 * mf)], 10);
+    if (mf > 0.3) { let rs = 7; const rnd = () => (rs = (rs * 16807) % 2147483647) / 2147483647;
+      for (let k = 0; k < 90; k++) { const a = rnd() * Math.PI * 2, el = 0.12 + rnd() * 1.3, d = [Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a)], b = Math.round(120 + 135 * mf * (0.5 + 0.5 * rnd())); disc(d, 2150, 4 + rnd() * 3, [b, b, Math.min(255, b + 10)], 4); } }
+  }
+}
+function lampState(S, cx, cz) {   // os 8 postes de luz mais próximos acendem a rua em volta
+  const out = new Float32Array(32); if (S.night < 0.01) return out;
+  const L = []; for (const p of PROPS) if (p.k === 'luminaria') L.push(p);
+  L.sort((a, b) => Math.hypot(a.x - cx, a.z - cz) - Math.hypot(b.x - cx, b.z - cz));
+  for (let i = 0; i < Math.min(8, L.length); i++) { const p = L[i], T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), q = P(T, 1.75, 6.3, 0); out.set([q[0], q[1], q[2], 1.0], i * 4); }
+  return out;
+}
 const player = { x: W.spawn[0], z: W.spawn[1], a: 0, va: 0, walk: 0, speed: 0, car: false, cv: 0 };
 // face along the road at spawn
 {
@@ -2317,6 +2361,85 @@ function dogsFrame(B, dt, t) {
     buildDog(B, d, t);
   }
 }
+// ---------------- Portela: volta de bicicleta pelo bairro, 2x por dia (07:30 e 16:30 do jogo) ----------------
+const RIDE_TIMES = [7.5, 16.5], RIDE_SPEED = 5.2, RIDE_SAYS = ['Opa! Tô dando minha volta de bicicleta!', 'Bom dia! Já já eu volto pra guarita.', 'Olha a bicicleta passando, hein!', 'Hoje o bairro tá tranquilo, viu?'];
+let ROAD_G = null;
+function roadGraph() {   // grafo das ruas (sem calçadas/trilhas)
+  if (ROAD_G) return ROAD_G;
+  const key = p => Math.round(p[0] * 2) + ',' + Math.round(p[1] * 2), nodes = new Map();
+  const node = p => { const k = key(p); if (!nodes.has(k)) nodes.set(k, { k, x: p[0], z: p[1], e: [] }); return nodes.get(k); };
+  for (const r of W.roads) {
+    if (r.t === 'footway' || r.dirt) continue;
+    for (let i = 0; i < r.pts.length - 1; i++) { const a = node(r.pts[i]), b = node(r.pts[i + 1]); if (a === b) continue; const L = Math.hypot(a.x - b.x, a.z - b.z); a.e.push({ n: b, L }); b.e.push({ n: a, L }); }
+  }
+  return ROAD_G = [...nodes.values()];
+}
+function rideRoute(seed) {   // sai da guarita, passeia ~1 km pelas ruas (mesmo trajeto para todo mundo) e volta pelo caminho mais curto
+  const G = roadGraph(), park = PORTELA_PARK; if (!park || !G.length) return null;
+  let st = G[0], bd = 1e9; for (const n of G) { const d = Math.hypot(n.x - park.x, n.z - park.z); if (d < bd && n.e.length) { bd = d; st = n; } }
+  let rs = seed * 9301 + 49297; const rnd = () => (rs = (rs * 9301 + 49297) % 233280) / 233280;
+  const path = [st], seen = new Set([st.k]); let cur = st, prev = null, len = 0;
+  for (let it = 0; it < 400 && len < 520; it++) {
+    let opts = cur.e.filter(e => e.n !== prev); if (!opts.length) opts = cur.e;
+    const fresh = opts.filter(e => !seen.has(e.n.k)), pick = (fresh.length ? fresh : opts)[Math.floor(rnd() * (fresh.length ? fresh : opts).length)];
+    prev = cur; cur = pick.n; len += pick.L; path.push(cur); seen.add(cur.k);
+  }
+  // volta: Dijkstra simples até o ponto de partida
+  const dist = new Map([[cur.k, 0]]), from = new Map(), todo = new Set([cur]);
+  while (todo.size) {
+    let u = null, du = 1e18; for (const n of todo) { const d = dist.get(n.k); if (d < du) { du = d; u = n; } }
+    todo.delete(u); if (u === st) break;
+    for (const e of u.e) { const nd = du + e.L; if (nd < (dist.has(e.n.k) ? dist.get(e.n.k) : 1e18)) { dist.set(e.n.k, nd); from.set(e.n.k, u); todo.add(e.n); } }
+  }
+  const back = []; for (let n = st; n && n !== cur; n = from.get(n.k)) back.push(n); back.reverse();
+  const nodes = [{ x: park.x, z: park.z }, ...path, ...back.slice(1), { x: park.x, z: park.z }];
+  // pedala pela direita da rua
+  const pts = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const a = nodes[Math.max(0, i - 1)], b = nodes[Math.min(nodes.length - 1, i + 1)], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1;
+    const off = i === 0 || i === nodes.length - 1 ? 0 : 1.6;
+    pts.push([nodes[i].x - dz / l * off, nodes[i].z + dx / l * off]);
+  }
+  const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return { pts, cum, len: cum[cum.length - 1] };
+}
+const RIDES = new Map();
+function portelaUpdate(n) {
+  const c = gameClock(); let ride = null;
+  for (let k = 0; k < RIDE_TIMES.length; k++) {
+    const t0 = c.dayStart + RIDE_TIMES[k] * 60, id = c.day * 2 + k;
+    if (c.sec < t0) continue;
+    if (!RIDES.has(id)) { RIDES.set(id, rideRoute(id)); if (RIDES.size > 6) RIDES.delete(RIDES.keys().next().value); }
+    const R = RIDES.get(id); if (!R) continue;
+    const sd = (c.sec - t0) * RIDE_SPEED; if (sd < R.len) ride = { R, sd };
+  }
+  if (!ride) { if (n.riding) { Object.assign(n, { x: n.home.x, z: n.home.z, y: n.home.y, base: n.home.base, riding: false, says: undefined, near: false }); } return; }
+  const { R, sd } = ride; let i = 1; while (i < R.cum.length - 1 && R.cum[i] < sd) i++;
+  const a = R.pts[i - 1], b = R.pts[i], f = (sd - R.cum[i - 1]) / Math.max(1e-6, R.cum[i] - R.cum[i - 1]);
+  n.x = a[0] + (b[0] - a[0]) * f; n.z = a[1] + (b[1] - a[1]) * f; n.y = surfAt(n.x, n.z);
+  const hd = Math.atan2(b[1] - a[1], b[0] - a[0]); let dh = hd - (n.hd === undefined ? hd : n.hd); while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
+  n.hd = (n.hd === undefined ? hd : n.hd) + dh * 0.15; n.ped = sd / 0.9; n.riding = true; n.says = RIDE_SAYS;
+}
+function buildRider(B, n, t) {   // Portela pedalando, de boné
+  buildProp(B, 'bike', n.x, n.z, n.hd, {});
+  const T = frame(n.x, n.y, n.z, n.hd), ph = n.ped;
+  const hip = P(T, -0.2, 1.02, 0);
+  for (const sv of [-1, 1]) {   // pernas nos pedais
+    const pa = ph + (sv > 0 ? 0 : Math.PI), ped = P(T, -0.05 + Math.cos(pa) * 0.17, 0.33 + Math.sin(pa) * 0.17, sv * 0.13);
+    const h = P(T, -0.2, 1.02, sv * 0.12), mid = [(h[0] + ped[0]) / 2, (h[1] + ped[1]) / 2, (h[2] + ped[2]) / 2], kn = P({ o: mid, ax: T.ax, ay: T.ay, az: T.az }, 0.22, 0.12, 0);
+    beam(B, h, kn, 0.17, P_PANTS); beam(B, kn, ped, 0.15, P_PANTS); box(B, frame(ped[0], ped[1] - 0.05, ped[2], n.hd), -0.08, 0.13, 0, 0.09, -0.06, 0.06, P_SHOE, P_SHOE);
+  }
+  const Tt = { o: hip, ax: T.ax, ay: T.ay, az: T.az };
+  box(B, Tt, -0.14, 0.2, 0.0, 0.6, -0.3, 0.3, P_SHIRT, P_SHIRT);   // tronco inclinado
+  box(B, Tt, -0.15, 0.21, 0.0, 0.08, -0.31, 0.31, hex('#2a2a2a'), hex('#2a2a2a'));
+  for (const sv of [-1, 1]) { const sh = P(Tt, 0.05, 0.55, sv * 0.36), hand = P(T, 0.38, 1.12, sv * 0.27); beam(B, sh, hand, 0.15, P_SHIRT); box(B, frame(hand[0], hand[1] - 0.06, hand[2], n.hd), -0.06, 0.06, 0, 0.11, -0.06, 0.06, P_SKIN, P_SKIN); }
+  const H = { o: P(Tt, 0.04, 0.6, 0), ax: T.ax, ay: T.ay, az: T.az };
+  box(B, H, -0.19, 0.19, 0.02, 0.4, -0.19, 0.19, P_SKIN, P_SKIN);
+  box(B, H, -0.2, -0.05, 0.09, 0.34, -0.2, 0.2, P_HAIR, P_HAIR);
+  box(B, H, 0.19, 0.2, 0.2, 0.25, -0.11, -0.05, hex('#1c1410'), hex('#1c1410')); box(B, H, 0.19, 0.2, 0.2, 0.25, 0.05, 0.11, hex('#1c1410'), hex('#1c1410'));
+  box(B, H, 0.19, 0.205, 0.08, 0.12, -0.08, 0.08, hex('#cfc9bf'), hex('#cfc9bf'));
+  box(B, H, -0.21, 0.21, 0.34, 0.52, -0.21, 0.21, P_CAP, P_CAP); box(B, H, 0.21, 0.45, 0.34, 0.39, -0.17, 0.17, P_CAP, P_CAP);
+}
 function buildNPC(B, n, t) {
   if (n.style === 'caudinho') return buildCaudinho(B, n, t);
   if (n.style === 'note') return;
@@ -2360,7 +2483,8 @@ function updateHUD() {
   const txt = best < 18 ? name : (inPoly(player.x, player.z, (W.areas.find(a => a.t === 'wood') || { pts: [[0, 0]] }).pts) ? 'Mata' : 'Morada da Colina');
   if (txt !== lastStreet) { hudStreet.textContent = txt; lastStreet = txt; }
   const v = player.car ? Math.abs(player.cv) : player.speed;
-  hudMode.textContent = (player.car ? 'CARRO ' : (player.running ? 'CORRENDO ' : 'A PÉ ')) + Math.round(v * 3.6) + ' km/h · alt. ' + Math.round((DEM ? DEM.base : 0) + groundAt(player.x, player.z)) + ' m';
+  const gc = gameClock(), hh = Math.floor(gc.h), mm = Math.floor((gc.h - hh) * 60), isDay = gc.h >= 6 && gc.h < 18;
+  hudMode.textContent = (player.car ? 'CARRO ' : (player.running ? 'CORRENDO ' : 'A PÉ ')) + Math.round(v * 3.6) + ' km/h · alt. ' + Math.round((DEM ? DEM.base : 0) + groundAt(player.x, player.z)) + ' m · ' + (isDay ? '☀ ' : '☾ ') + String(hh).padStart(2, '0') + ':' + String(mm - mm % 10).padStart(2, '0');
 }
 
 // ---------------- modo online (Firebase Realtime Database) ----------------
@@ -2969,17 +3093,28 @@ function frame_() {
     box(dynB, frame(fx, fy, fz, ph), -0.035, 0.035, 0, 0.04, -0.03, 0.03, hex('#101010'), hex('#101010'), F_UNLIT);
   }
   for (const n of NPCS) {
+    if (n.home) {   // Portela
+      portelaUpdate(n);
+      const poi = POIS.find(p => p.n === 'Portela'); if (poi && (poi.x !== n.x || poi.z !== n.z)) { poi.x = n.x; poi.z = n.z; poi.gy = undefined; }
+      if (!n.riding && PORTELA_PARK) buildProp(dynB, 'bike', PORTELA_PARK.x, PORTELA_PARK.z, PORTELA_PARK.a, {});
+    }
     const dx = player.x - n.x, dz = player.z - n.z, dd = Math.hypot(dx, dz);
     let want = 0;
     if (dd < 14) { want = Math.atan2(dz, dx) - n.base; while (want > Math.PI) want -= 2 * Math.PI; while (want < -Math.PI) want += 2 * Math.PI; want = Math.max(-1.3, Math.min(1.3, want)); }
     n.look += (want - n.look) * Math.min(1, dt * 4);
-    buildNPC(dynB, n, t);
+    if (n.riding) buildRider(dynB, n, t); else buildNPC(dynB, n, t);
     // speech bubble
     if (dd < (n.r || 6) && !n.near) { n.near = true; const L = n.says || SAYS; n.line = L[(n.k = ((n.k || 0) + 1)) % L.length]; }
     if (dd > (n.r || 6) + 2) n.near = false;
     n.show = dd < (n.r || 6);
   }
   dogsFrame(dynB, dt, t);
+  { const SKY = window.__sky = skyState();
+    if (SKY.night > 0.05) for (const p of PROPS) if (p.k === 'luminaria' && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
+      const T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), g = Math.round(150 + 105 * SKY.night);
+      box(dynB, T, 1.42, 2.08, 6.52, 6.6, -0.22, 0.22, [g, Math.round(g * 0.93), Math.round(g * 0.7)], [g, Math.round(g * 0.93), Math.round(g * 0.7)], F_GLOW);
+    }
+    drawSky(dynB, [player.x, groundAt(player.x, player.z) + 2, player.z], SKY); }
   for (const c of traffic) carMesh(dynB, groundFrame(c.x, c.z, c.a, 0.0), c.col);
   gl.bindBuffer(gl.ARRAY_BUFFER, dynVBO);
   gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(dynB.buf, 0, dynB.n * 20), gl.DYNAMIC_DRAW);
@@ -3009,7 +3144,8 @@ function frame_() {
   // shadow pass
   const SR = Math.min(170, 70 + cam.dist * 1.2);
   const sc = [player.x - Math.sin(cam.yaw) * SR * 0.35, gy, player.z - Math.cos(cam.yaw) * SR * 0.35];
-  const sEye = [sc[0] + SUN[0] * 400, gy + SUN[1] * 400, sc[2] + SUN[2] * 400];
+  const SKY = window.__sky || skyState(), LD = SKY.lightDir;
+  const sEye = [sc[0] + LD[0] * 400, gy + LD[1] * 400, sc[2] + LD[2] * 400];
   const sProj = ortho(-SR, SR, -SR, SR, 50, 800);
   let SVP = mul(sProj, lookAt(sEye, sc, [0, 1, 0]));
   { // texel snapping to avoid shimmering
@@ -3031,12 +3167,14 @@ function frame_() {
 
   // main pass
   gl.viewport(0, 0, cv.width, cv.height);
-  gl.clearColor(FOG[0], FOG[1], FOG[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clearColor(SKY.fog[0], SKY.fog[1], SKY.fog[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
   gl.useProgram(PM);
   gl.uniformMatrix4fv(U.uVP, false, VP); gl.uniformMatrix4fv(U.uSVP, false, SVP);
-  gl.uniform3fv(U.uL, SUN); gl.uniform3fv(U.uEye, eye); gl.uniform3fv(U.uFog, FOG); gl.uniform2fv(U.uFogR, fogR);
-  gl.uniform1f(U.uT, t); gl.uniform1f(U.uLv, 22); gl.uniform1f(U.uShadowOn, shadowsOn ? 1 : 0);
+  gl.uniform3fv(U.uL, LD); gl.uniform3fv(U.uEye, eye); gl.uniform3fv(U.uFog, SKY.fog); gl.uniform2fv(U.uFogR, fogR);
+  gl.uniform1f(U.uT, t); gl.uniform1f(U.uLv, 22); gl.uniform1f(U.uShadowOn, shadowsOn && SKY.shadowK > 0 ? 1 : 0);
+  gl.uniform3fv(U.uSunC, SKY.sunC); gl.uniform3fv(U.uAmbC, SKY.ambC); gl.uniform3fv(U.uTint, SKY.tint); gl.uniform1f(U.uNight, SKY.night);
+  gl.uniform4fv(U.uLamp, lampState(SKY, tgt[0], tgt[2]));
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, smTex); gl.uniform1i(U.uSM, 0);
   gl.enableVertexAttribArray(LOC.aP); gl.enableVertexAttribArray(LOC.aN); gl.enableVertexAttribArray(LOC.aC);
   bindMain(groundM); gl.drawArrays(gl.TRIANGLES, 0, groundM.n);
@@ -3082,7 +3220,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, PROPDEF, freeAt, groun
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261116175736";
+  const BUILD = "v20261116201213";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
