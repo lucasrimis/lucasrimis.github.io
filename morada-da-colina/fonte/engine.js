@@ -683,12 +683,13 @@ for (const h of W.houses) {
 // ---------------- utility poles with wires (Rua Albert Sabin) ----------------
 {
   const PL = W.poles || [], wire = hex('#1b1b1b');
-  const tops = PL.map(([x, z]) => { const y = surfAt(x, z); const B = chunkB(x, z);
+  const tops = PL.map(([x, z, pa]) => { const y = surfAt(x, z); const B = chunkB(x, z);
     // rua mais próxima: o braço da luminária aponta para ela
     let best = null, bd = 1e9;
     for (const sg of SEGS) { if (sg.t === 'footway') continue; const [d, t] = segDistT(x, z, sg.a[0], sg.a[1], sg.b[0], sg.b[1]); if (d < bd) { bd = d; best = { sg, t }; } }
     let ra = 0;
     if (best) { const { sg, t } = best, qx = sg.a[0] + (sg.b[0] - sg.a[0]) * t, qz = sg.a[1] + (sg.b[1] - sg.a[1]) * t; ra = Math.atan2(qz - z, qx - x); if (bd < 0.3) ra = Math.atan2(sg.b[1] - sg.a[1], sg.b[0] - sg.a[0]) + Math.PI / 2; }
+    if (pa !== undefined) ra = pa;   // a rua de onde o poste foi gerado
     const T = frame(x, y, z, ra);   // u = em direção à rua, v = ao longo da rua
     box(B, T, -0.14, 0.14, -0.3, 9, -0.14, 0.14, hex('#b9b6ad'), hex('#a7a49b'));
     box(B, T, -0.07, 0.07, 8.4, 8.55, -0.9, 0.9, hex('#8a8780'), hex('#8a8780'));   // cruzeta ao longo da rua

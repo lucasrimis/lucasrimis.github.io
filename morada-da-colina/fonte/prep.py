@@ -340,7 +340,7 @@ for r in roads:
                 for a2, b2 in zip(r2['pts'], r2['pts'][1:]):
                     if seg_dist(px_, pz_, a2[0], a2[1], b2[0], b2[1]) < r2['h'] + r2['sw'] + 0.3: ok = False; break
                 if not ok: break
-            if ok: poles.append([round(px_, 1), round(pz_, 1)])
+            if ok: poles.append([round(px_, 1), round(pz_, 1), round(math.atan2(-ux, uz), 3)])   # 3º valor: direção da própria rua (o braço da luz aponta para ela)
             t += 32
         acc = (acc + L) % 32
 landmarks_pre = [{'type': 'weedlot', 'x': round(weed_lot[0], 1), 'z': round(weed_lot[1], 1)},
