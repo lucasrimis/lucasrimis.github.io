@@ -645,6 +645,44 @@ for (const h of W.houses) {
       for (let k = 1; k <= n; k++) { const t = k / n, sag = Math.sin(t * Math.PI) * 0.55; const p = [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t - sag, pa[2] + (pb[2] - pa[2]) * t]; beam(B, prev, p, 0.03, wire, F_UNLIT); prev = p; }
     }
   }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'esquina') { // casa de esquina com jardim (Albert Sabin x Cel. Bruno)
+    const [ux, uz] = lm.u, [vx, vz] = lm.v;
+    const WP2 = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const B = chunkB(...WP2(17, 17));
+    const T0 = { o: [lm.x, 0, lm.z], ax: [ux, 0, uz], ay: [0, 1, 0], az: [vx, 0, vz] };
+    const at2 = (u, v, lift) => { const p = WP2(u, v); return { o: [p[0], groundAt(p[0], p[1]) + (lift || 0), p[1]], ax: T0.ax, ay: T0.ay, az: T0.az }; };
+    // lawn
+    const U0 = 6.2, V0 = 6.2, U1 = 32, V1 = 30, n = 8;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const a0 = U0 + (U1 - U0) * i / n, a1 = U0 + (U1 - U0) * (i + 1) / n, b0 = V0 + (V1 - V0) * j / n, b1 = V0 + (V1 - V0) * (j + 1) / n;
+      const q = [[a0, b0], [a1, b0], [a1, b1], [a0, b1]].map(([u, v]) => { const p = WP2(u, v); return [p[0], groundAt(p[0], p[1]) + 0.04, p[1]]; });
+      B.quad(q[0], q[1], q[2], q[3], UP, (i + j) % 2 ? hex('#6fae4c') : hex('#76b553'), F_TEX);
+    }
+    // house (one storey, hip roof), set back in the lot
+    const hc = at2(20, 19, 0); const [hmin, hmax] = cornersH(frame(hc.o[0], 0, hc.o[2], Math.atan2(uz, ux)), 13, 11);
+    const T = { o: [hc.o[0], hmax + 0.1, hc.o[2]], ax: T0.ax, ay: T0.ay, az: T0.az }, wall = hex('#efe0c8');
+    box(B, T, -6.5, 6.5, hmin - hmax - 0.5, 0.35, -5.5, 5.5, hex('#c9c5bb'), hex('#c9c5bb'));
+    box(B, T, -6.5, 6.5, 0.35, 3.0, -5.5, 5.5, wall, wall);
+    hipRoof(B, T, 13, 11, 3.0, 2.6, 0.7, hex('#b5532f'));
+    for (const u of [-4, -1, 2.5]) wallFeat(B, T, u - 0.7, u + 0.7, 1.0, 2.3, -5.5, -1, hex('#2c3f58'));
+    for (const v of [-3, 0.5, 3.5]) sideFeat(B, T, v - 0.7, v + 0.7, 1.0, 2.3, -6.5, -1, hex('#2c3f58'));
+    wallFeat(B, T, 4.2, 5.4, 0.35, 2.5, -5.5, -1, hex('#7a4b2a'));
+    maskRect(frame(hc.o[0], 0, hc.o[2], Math.atan2(uz, ux)), -6.5, 6.5, -5.5, 5.5);
+    // palms and shrubs in the garden
+    for (const [u, v, k, s2] of [[9, 9.5, 3, 1.15], [11, 22, 3, 1.0], [27, 9, 0, 1.0]]) { const p = WP2(u, v); tree(chunkB(p[0], p[1]), p[0], p[1], k, s2, true); }
+    for (const [u, v] of [[8, 14], [14, 8], [8, 26]]) { const S = at2(u, v, 0); box(B, S, -0.7, 0.7, 0, 0.9, -0.7, 0.7, hex('#3f8c3a'), hex('#357a31')); }
+    // low white wall with gradil on both street sides, behind a grass verge
+    const WL = (u0, v0, u1, v1) => {
+      const L = Math.hypot(u1 - u0, v1 - v0), m = Math.ceil(L / 2);
+      for (let k = 0; k < m; k++) { const a = WP2(u0 + (u1 - u0) * k / m, v0 + (v1 - v0) * k / m), b = WP2(u0 + (u1 - u0) * (k + 1) / m, v0 + (v1 - v0) * (k + 1) / m);
+        const ya = groundAt(a[0], a[1]), yb = groundAt(b[0], b[1]);
+        beam(B, [a[0], ya + 0.45, a[1]], [b[0], yb + 0.45, b[1]], 0.9, hex('#ece9e2'));
+        beam(B, [a[0], ya + 1.55, a[1]], [b[0], yb + 1.55, b[1]], 0.05, hex('#f4f4f4'));
+        for (let q = 0; q < 8; q++) { const t = q / 8, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t, y = ya + (yb - ya) * t; beam(B, [x, y + 0.9, z], [x, y + 1.55, z], 0.035, hex('#f4f4f4')); }
+        mx.beginPath(); mx.lineWidth = 0.4; mx.strokeStyle = '#000'; mx.moveTo(a[0], a[1]); mx.lineTo(b[0], b[1]); mx.stroke(); }
+    };
+    WL(U0, V0 + 3.5, U0, V1); WL(U0 + 3.5, V0, U1, V0);
+  }
   for (const lm of (W.landmarks || [])) if (lm.type === 'weedlot') { // terreno baldio: mato alto
     const r = rngFor(lm.x, lm.z, 5), B = chunkB(lm.x, lm.z);
     for (let k = 0; k < 160; k++) { const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 13, x = lm.x + Math.cos(a) * d, z = lm.z + Math.sin(a) * d;
@@ -1148,7 +1186,7 @@ function carMesh(B, T, col) {
         if (r() < 0.3) {
           const side = r() < 0.5 ? -1 : 1, off = (rd.h - 0.95) * side;
           const x = a[0] + ux * t - uz * off, z = a[1] + uz * t + ux * off;
-          if (x > BX0 && x < BX1 && z > BZ0 && z < BZ1) {
+          if (x > BX0 && x < BX1 && z > BZ0 && z < BZ1 && !SEGS.some(sg => sg.n !== rd.n && segDist(x, z, sg) < sg.h + 4)) {
             const ang = Math.atan2(uz, ux) + (side < 0 ? Math.PI : 0);
             carMesh(chunkB(x, z), groundFrame(x, z, ang, 0.0), jit(pick(CARS, r), r, 0.05));
             maskRect(frame(x, 0, z, ang), -2.1, 2.1, -0.95, 0.95);

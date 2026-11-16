@@ -251,7 +251,11 @@ WALL_IDX = {'amarelo': 1, 'creme': 0, 'pessego': 2, 'rosa': 3, 'verde': 5, 'bran
 weed_lot = proj(-22.48612, -44.47790)
 _b0 = proj(-22.48705, -44.47562); _brg = math.radians(127)
 grass_bank = (_b0[0] + math.sin(_brg) * 13, _b0[1] - math.cos(_brg) * 13)
-EMPTY = [(weed_lot, 16), (grass_bank, 16), (proj(-22.48858, -44.47548), 20), (proj(-22.48822, -44.47708), 20)]
+J = proj(-22.48722, -44.47576)
+_bu, _bv = math.radians(30), math.radians(300)
+UDIR = (math.sin(_bu), -math.cos(_bu)); VDIR = (math.sin(_bv), -math.cos(_bv))
+corner_c = (J[0] + (UDIR[0] + VDIR[0]) * 17, J[1] + (UDIR[1] + VDIR[1]) * 17)
+EMPTY = [(weed_lot, 16), (grass_bank, 16), (corner_c, 17), (proj(-22.48858, -44.47548), 20), (proj(-22.48822, -44.47708), 20)]
 for r in roads:
     if not r.get('real'):
         continue
@@ -300,14 +304,23 @@ for r in roads:
         L = math.hypot(bb[0] - a[0], bb[1] - a[1])
         if L < 0.5: continue
         ux, uz = (bb[0] - a[0]) / L, (bb[1] - a[1]) / L
-        t = 0 if first else (32 - acc) % 32
+        t = 10 if first else (32 - acc) % 32
         first = False
         while t < L:
-            off = r['h'] + 0.5
-            poles.append([round(a[0] + ux * t - uz * off, 1), round(a[1] + uz * t + ux * off, 1)])
+            off = r['h'] + 0.6
+            px_, pz_ = a[0] + ux * t - uz * off, a[1] + uz * t + ux * off
+            ok = True
+            for r2 in roads:
+                if r2 is r: continue
+                for a2, b2 in zip(r2['pts'], r2['pts'][1:]):
+                    if seg_dist(px_, pz_, a2[0], a2[1], b2[0], b2[1]) < r2['h'] + r2['sw'] + 0.3: ok = False; break
+                if not ok: break
+            if ok: poles.append([round(px_, 1), round(pz_, 1)])
             t += 32
         acc = (acc + L) % 32
-landmarks_pre = [{'type': 'weedlot', 'x': round(weed_lot[0], 1), 'z': round(weed_lot[1], 1)}]
+landmarks_pre = [{'type': 'weedlot', 'x': round(weed_lot[0], 1), 'z': round(weed_lot[1], 1)},
+                 {'type': 'weedlot', 'x': round(grass_bank[0], 1), 'z': round(grass_bank[1], 1)},
+                 {'type': 'esquina', 'x': round(J[0], 2), 'z': round(J[1], 2), 'u': [round(UDIR[0], 4), round(UDIR[1], 4)], 'v': [round(VDIR[0], 4), round(VDIR[1], 4)]}]
 # bloquete stretch where Darci, Cel. Bruno and Albert Sabin meet
 pave_zones = [[*[round(v, 1) for v in proj(-22.48680, -44.47525)], 50]]
 
@@ -574,6 +587,7 @@ trees = [t for t in trees if not in_block(t[0], t[1])]
 landmarks.append({'type': 'parque', 'x': SW[0], 'z': SW[1], 'ang': round(pang, 5), 'L': round(L, 2), 'W': round(Wd, 2)})
 print('parque: removed houses', before - len(houses), 'L', round(L, 1), 'W', round(Wd, 1))
 
+trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
     'bounds': [round(BX0, 1), round(BZ0, 1), round(BX1, 1), round(BZ1, 1)],
