@@ -418,6 +418,7 @@ for (const r of W.roads) {
     const pv = r.pave || (r.real && (W.paveZones || []).some(([zx, zz, zr]) => Math.hypot(cx - zx, cz - zz) < zr));
     strip(B, pc, r.h, 0.18, pv ? hex('#8f8c84') : r.dirt ? C.dirt : (r.t === 'secondary' ? C.asphalt : r.real ? hex('#5a5b62') : C.asphalt2), pv ? F_PAVE : F_TEX, 1, null, r.sw > 0 ? 0 : 0.9);
   }
+  if (r.cl && !r.dirt) { const tp = trim(pts, 7, 7); if (tp) { const [cx, cz] = centroid(tp); dashed(chunkB(cx, cz), tp, 0, 0.24, 0.08, 1e9, 0, C.yline); } }
   if (!r.dirt && !r.ring && !r.pave && !r.real) {
     const tp = trim(pts, 7, 7);
     if (tp) {
@@ -586,8 +587,9 @@ for (const h of W.houses) {
     } else box(B, T0, u0, u1, Math.min(ha, hb) - 0.6, Math.max(ha, hb) + mh, mv - 0.12, mv + 0.12, hex('#e2ddd2'), mcol);
     maskRect(T0, u0, u1, mv - 0.15, mv + 0.15);
   };
-  if (real || r() < 0.85) { if (gap0 > mu0) muro(mu0, gap0); if (gap1 < mu1) muro(gap1, mu1); }
-  if (real) {
+  const condo = (hf & 32) !== 0;
+  if (!condo && (real || r() < 0.85)) { if (gap0 > mu0) muro(mu0, gap0); if (gap1 < mu1) muro(gap1, mu1); }
+  if (real && !condo) {
     // gate in the driveway gap (portão)
     const pa = P(T0, gap0, 0, mv), ga = groundAt(pa[0], pa[2]);
     box(B, T0, gap0, gap1, ga, ga + 2.0, mv - 0.05, mv + 0.05, gcol === GRAD[0] ? hex('#c9ccd0') : gcol, gcol);

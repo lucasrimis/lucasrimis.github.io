@@ -34,6 +34,20 @@ for n in root.findall('node'):
 
 # streets already recreated from Street View (Oct 2024)
 REAL_STREETS = {'Rua Albert Sabin', 'Rua Darci de Carvalho', 'Rua Coronel José Fernando Bruno'}
+# per-street style from Street View / satellite (Oct 2024)
+DENSE = {'kind': 'dense', 'dens': 0.93}
+STYLE = {
+    'Rua Doutor Astor R. Ornellas': DENSE, 'Rua João Manoel M. Guedes Maneco': {'kind': 'dense', 'dens': 0.85},
+    'Rua Nove A': DENSE, 'Rua Coronel Aviador Aurélio Machado': DENSE, 'Rua Sebastião Barroso da Silva': DENSE,
+    'Rua Professora Anália Franco': DENSE, 'Rua Agenor Lopes Siqueira': DENSE, 'Rua Antônio Ramos': DENSE,
+    'Rua Wandir de Carvalho': DENSE, 'Rua Vandir de Carvalho': {'kind': 'dense', 'dens': 0.8},
+    'Rua Eurycliders de Jesus Zerbini': DENSE, 'Rua Silvio Mageste da Silva': {'kind': 'dense', 'dens': 0.85, 'cl': True},
+    "Avenida Antenor O' Reilly de Souza Júnior": {'kind': 'dense', 'dens': 0.6},
+    'Rua Maria Candida Vianna Moraes': {'kind': 'sparse', 'dens': 0.45}, 'Rua Doze': {'kind': 'sparse', 'dens': 0.5},
+    'Rua Carlos Ferreira Pinto': {'kind': 'sparse', 'dens': 0.15}, 'Rua Professor Coronel Antônio Esteves': {'kind': 'sparse', 'dens': 0.1},
+    'Via 7': {'kind': 'condo', 'dens': 0.85}, 'Via 8': {'kind': 'condo', 'dens': 0.85}, 'Via 9': {'kind': 'condo', 'dens': 0.85}, 'Via 12': {'kind': 'condo', 'dens': 0.85},
+}
+for _n in ('Rua Albert Sabin', 'Rua Darci de Carvalho', 'Rua Coronel José Fernando Bruno'): STYLE[_n] = DENSE
 ROAD = {  # type: (half width of carriageway, sidewalk width)
     'secondary': (5.0, 2.5), 'secondary_link': (2.6, 0), 'residential': (3.6, 2.0),
     'living_street': (2.8, 1.2), 'service': (2.0, 0), 'unclassified': (2.6, 0),
@@ -53,14 +67,15 @@ for w in root.findall('way'):
         if hw == 'residential' and tags.get('oneway') == 'yes':
             half = 3.2
         pave = False
-        real = tags.get('name') in REAL_STREETS
+        st = STYLE.get(tags.get('name')) or ({'kind': 'condo', 'dens': 0.85} if hw == 'living_street' else {'kind': 'sparse', 'dens': 0.6} if hw == 'residential' and not tags.get('name') else None)
+        real = st is not None
         if tags.get('name') == 'Rua Albert Sabin':   # Street View (out/2024): bloquete, ~6 m, calçadas estreitas
             half, sw, pave = 3.0, 1.5, True
         elif real:                                   # Darci de Carvalho / Cel. José Fernando Bruno: asfalto, ~6.6 m
             half, sw = 3.3, 1.8
         roads.append({'id': w.get('id'), 't': hw, 'h': half, 'sw': sw, 'n': tags.get('name', ''),
                       'ring': tags.get('junction') == 'roundabout',
-                      'dirt': tags.get('surface') == 'unpaved', 'pave': pave, 'real': real,
+                      'dirt': tags.get('surface') == 'unpaved', 'pave': pave, 'real': real, 'st': st,
                       'pts': pts})
         continue
     kind = None
@@ -268,11 +283,14 @@ for r in roads:
         for side in (-1, 1):
             nx, nz = -uz * side, ux * side
             t = random.uniform(1, 3)
+            st = r['st']; condo = st['kind'] == 'condo'
             while t < L - 3:
-                pair = random.random() < 0.18
-                w = 6.5 if pair else random.choice([8, 9, 10, 10, 11, 12])
-                d = random.choice([9, 10, 11, 12])
-                setback = random.uniform(2.2, 4.5)
+                if random.random() > st['dens']:   # empty lot
+                    t += random.uniform(10, 16); continue
+                pair = (not condo) and random.random() < (0.18 if st['kind'] == 'dense' else 0.05)
+                w = 6.5 if pair else random.choice([13, 14, 15, 16, 17]) if condo else random.choice([8, 9, 10, 10, 11, 12])
+                d = random.choice([12, 13, 14, 15]) if condo else random.choice([9, 10, 11, 12])
+                setback = random.uniform(5, 7.5) if condo else random.uniform(2.2, 4.5)
                 off = r['h'] + r['sw'] + setback + d / 2
                 cx = a[0] + ux * t + nx * off; cz = a[1] + uz * t + nz * off
                 if any(math.hypot(cx - p[0], cz - p[1]) < rr for p, rr in EMPTY):
@@ -280,13 +298,20 @@ for r in roads:
                 corners = rect_corners(cx, cz, w, d, ang)
                 if rect_ok(corners, 0.6) and rect_free(rect_corners(cx, cz, w + 0.8, d + 1, ang)):
                     occupy(corners)
-                    floors = 2 if (pair or random.random() < 0.5) else 1
+                    floors = 2 if (pair or random.random() < (0.7 if condo else 0.5 if st['kind'] == 'dense' else 0.3)) else 1
                     col = random.randrange(10)
                     face = math.atan2(-nz, -nx)
-                    flags = (1 if random.random() < 0.3 else 0) | (2 if random.random() < 0.6 else 0) | 4 | \
-                            (8 if floors == 2 and random.random() < 0.6 else 0) | (16 if random.random() < 0.35 else 0)
-                    houses.append([round(cx, 1), round(cz, 1), w, d, round(ang, 3), floors, col, random.choice([0, 0, 0, 1, 2]), 0,
-                                   0, 0, 4, 7, round(face, 3), random.randrange(1000), flags, round(setback - 0.15, 2)])
+                    flags = (1 if random.random() < (0.45 if condo else 0.3) else 0) | (2 if random.random() < 0.6 else 0) | 4 | \
+                            (8 if floors == 2 and random.random() < 0.6 else 0) | (16 if (not condo) and random.random() < 0.35 else 0) | (32 if condo else 0)
+                    pool = 0; ppx = ppz = 0; pw_, pd_ = 4, 7
+                    if random.random() < (0.6 if condo else 0.2):   # piscina no fundo do lote
+                        pw_, pd_ = random.choice([(4, 8), (5, 9), (4, 7)]) if condo else random.choice([(3, 6), (3.5, 6), (4, 7)])
+                        poff = r['h'] + r['sw'] + setback + d + 2.5 + pw_ / 2
+                        ppx, ppz = a[0] + ux * t - (-uz * side) * 0 + nx * poff, a[1] + uz * t + nz * poff
+                        pc = rect_corners(ppx, ppz, pd_, pw_, ang)
+                        if rect_ok(pc, 1) and rect_free(pc): occupy(pc); pool = 1
+                    houses.append([round(cx, 1), round(cz, 1), w, d, round(ang, 3), floors, col, random.choice([2, 2, 3, 0]) if condo else random.choice([0, 0, 0, 1, 2]), pool,
+                                   round(ppx, 1), round(ppz, 1), pw_, pd_, round(face, 3), random.randrange(1000), flags, round(setback - 0.15, 2)])
                     if pair:  # geminada: twin attached on the side, same colour
                         cx2 = cx + ux * w; cz2 = cz + uz * w
                         c2 = rect_corners(cx2, cz2, w, d, ang)
@@ -591,7 +616,7 @@ trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) 
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
     'bounds': [round(BX0, 1), round(BZ0, 1), round(BX1, 1), round(BZ1, 1)],
-    'roads': [{'t': r['t'], 'h': r['h'], 'sw': r['sw'], 'n': r['n'], 'ring': r['ring'], 'dirt': r['dirt'], 'pave': r.get('pave', False), 'real': r.get('real', False), 'pts': R(r['pts'])} for r in roads],
+    'roads': [{'t': r['t'], 'h': r['h'], 'sw': r['sw'], 'n': r['n'], 'ring': r['ring'], 'dirt': r['dirt'], 'pave': r.get('pave', False), 'real': r.get('real', False), 'cl': bool((r.get('st') or {}).get('cl')), 'pts': R(r['pts'])} for r in roads],
     'poles': poles,
     'paveZones': pave_zones,
     'areas': [{'t': a['t'], 'n': a['n'], 'pts': R(a['pts'])} for a in areas],
