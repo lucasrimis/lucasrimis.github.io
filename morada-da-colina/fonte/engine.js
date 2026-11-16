@@ -1653,14 +1653,15 @@ window.__net = (function () {
   const N = { online: false, others: new Map(), uid: null, name: '', look: 0, db: null, offset: 0 };
   const $ = id => document.getElementById(id);
   const lobby = $('lobby'), nameIn = $('lobbyName'), sw = $('lobbySwatches'), msgEl = $('lobbyMsg');
-  const chatBox = $('chatBox'), chatIn = $('chatIn'), chatLog = $('chatLog'), onl = $('online');
+  const chatBox = $('chatBox'), chatIn = $('chatIn'), chatLog = $('chatLog'), onl = $('online'), onlTxt = $('onlineTxt');
   let saved = {}; try { saved = JSON.parse(localStorage.getItem('mdc_profile') || '{}'); } catch (e) {}
   nameIn.value = saved.n || ''; N.look = saved.c || 0;
   LOOK_CSS.forEach((c, i) => { const b = document.createElement('button'); b.className = 'sw' + (i === N.look ? ' on' : ''); b.style.background = c; b.onclick = () => { N.look = i; [...sw.children].forEach((x, k) => x.classList.toggle('on', k === i)); }; sw.appendChild(b); });
   const CFG = window.FIREBASE_CONFIG;
   if (!CFG) { $('btnOnline').disabled = true; msgEl.textContent = 'O modo online ainda não foi configurado.'; }
   const start = () => { MY_LOOK = LOOKS[N.look]; lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
-  $('btnSolo').onclick = () => start();
+  const offPill = () => { onlTxt.textContent = '○ offline'; $('btnLeave').textContent = 'ENTRAR'; $('btnLeave').classList.add('join'); onl.style.display = 'flex'; };
+  $('btnSolo').onclick = () => { start(); if (CFG && !N.online) offPill(); };
   $('btnOnline').onclick = async () => {
     const n = nameIn.value.trim().replace(/\s+/g, ' ').slice(0, 16);
     if (!n) { msgEl.textContent = 'Digite um nome para jogar online.'; nameIn.focus(); return; }
@@ -1672,7 +1673,7 @@ window.__net = (function () {
   async function connect(name) {
     const V = 'https://www.gstatic.com/firebasejs/10.12.2/';
     if (!window.firebase) { await load(V + 'firebase-app-compat.js'); await load(V + 'firebase-auth-compat.js'); await load(V + 'firebase-database-compat.js'); }
-    const app = firebase.initializeApp(CFG);
+    if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(CFG);
     const cred = await firebase.auth().signInAnonymously();
     N.uid = cred.user.uid; N.name = name; N.db = firebase.database();
     N.db.ref('.info/serverTimeOffset').on('value', s => { N.offset = s.val() || 0; });
@@ -1690,16 +1691,34 @@ window.__net = (function () {
     players.on('child_added', upsert); players.on('child_changed', upsert);
     players.on('child_removed', s => { const o = N.others.get(s.key); if (o) { sys(o.n + ' saiu'); o.el.remove(); if (o.bub) o.bub.remove(); N.others.delete(s.key); } });
     const since = Date.now() + N.offset - 2000;
-    N.db.ref('chat').orderByChild('t').startAt(since).on('child_added', s => {
+    N.chatQ = N.db.ref('chat').orderByChild('t').startAt(since); N.players = players; N.me = me;
+    N.chatQ.on('child_added', s => {
       const v = s.val(); if (!v || typeof v.m !== 'string') return;
       const who = v.u === N.uid ? N.name : (N.others.get(v.u) || {}).n || v.n || '?';
       addLog(who, v.m, v.u === N.uid);
       const target = v.u === N.uid ? N.meBub : N.others.get(v.u);
       say(v.u === N.uid ? null : target, v.m, v.u);
     });
-    N.online = true; onl.style.display = 'block'; $('btnChat').style.display = '';
+    N.online = true; onl.style.display = 'flex'; $('btnLeave').textContent = 'SAIR'; $('btnLeave').classList.remove('join'); $('btnChat').style.display = '';
     sys('Você está online. Aperte Enter (ou CHAT) para falar.');
   }
+  // sair do online: volta ao modo sozinho no mesmo lugar
+  N.leave = async () => {
+    if (!N.online) return;
+    N.online = false;
+    try { N.players.off(); N.chatQ.off(); N.me.onDisconnect().cancel(); await N.me.remove(); } catch (e) { console.error(e); }
+    for (const o of N.others.values()) { o.el.remove(); if (o.bub) o.bub.remove(); }
+    N.others.clear();
+    offPill(); $('btnChat').style.display = 'none'; chatBox.style.display = 'none';
+    sys('Você saiu do online. Agora está jogando sozinho.');
+    $('btnOnline').disabled = false; msgEl.textContent = '';
+  };
+  $('btnLeave').onclick = () => {
+    if (!N.online) { lobby.style.display = ''; msgEl.textContent = ''; $('btnOnline').disabled = false; return; }
+    if ($('btnLeave').dataset.sure) { delete $('btnLeave').dataset.sure; $('btnLeave').textContent = 'SAIR'; N.leave(); return; }
+    $('btnLeave').dataset.sure = '1'; $('btnLeave').textContent = 'CONFIRMAR?';
+    setTimeout(() => { if ($('btnLeave').dataset.sure) { delete $('btnLeave').dataset.sure; $('btnLeave').textContent = 'SAIR'; } }, 3000);
+  };
   // chat
   const esc = t => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function addLog(who, m, mine) { const d = document.createElement('div'); d.innerHTML = '<b' + (mine ? ' class="me"' : '') + '>' + esc(who) + ':</b> ' + esc(m); chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 12000); }
@@ -1738,7 +1757,7 @@ window.__net = (function () {
       o.speed += (v - o.speed) * Math.min(1, dt * 6); o.walk += dt * o.speed * 2.3;
       buildPlayer(B, o, o.look);
     }
-    onl.textContent = '● ' + (1 + [...N.others.values()].filter(o => !o.stale).length) + ' online';
+    if (N.online) onlTxt.textContent = '● ' + (1 + [...N.others.values()].filter(o => !o.stale).length) + ' online';
   };
   N.labels = VP => {
     const now = performance.now();

@@ -34,7 +34,11 @@
   .bubble.note{background:#fff4c8;font-style:italic}
   .lbl.big{font-size:16px;color:#ffd84a;padding:4px 10px}
   #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Silkscreen',monospace;font-size:18px;background:#1a1f2e;color:#ffd84a;z-index:10}
-  #online{position:fixed;left:12px;top:132px;font-size:18px;color:#7fe07f;padding:3px 10px;pointer-events:none}
+  #online{position:fixed;left:12px;top:132px;font-size:18px;color:#7fe07f;padding:3px 4px 3px 10px;align-items:center;gap:10px;z-index:5}
+  #btnLeave{font-family:'Silkscreen',monospace;font-size:11px;color:#fff;background:#a8322b;border:2px solid #0d1018;padding:5px 9px;cursor:pointer}
+  #btnLeave:active{transform:scale(.94)}
+  #btnLeave.join{background:#2f8a3a}
+  #online{color:#7fe07f}
   #chatLog{position:fixed;left:12px;bottom:12px;max-width:min(420px,60vw);font-size:19px;line-height:1.1;pointer-events:none;text-shadow:1px 1px 0 #000,-1px 1px 0 #000}
   #chatLog div{background:rgba(22,26,38,.6);padding:2px 8px;margin-top:3px;transition:opacity 1s}
   #chatLog div.old{opacity:0}
@@ -93,7 +97,7 @@
   <div id="joy"><div id="knob"></div></div>
   <div id="tbtns"><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnMap">🗺<span>MAPA</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
 </div>
-<div id="online" class="panel" style="display:none"></div>
+<div id="online" class="panel" style="display:none"><span id="onlineTxt"></span><button id="btnLeave">SAIR</button></div>
 <div id="chatLog"></div>
 <div id="chatBox"><input id="chatIn" maxlength="120" placeholder="Fale algo… (Enter envia)" autocomplete="off"><button class="tbtn" id="chatSend">ENVIAR</button></div>
 <div id="lobby"><div class="panel box">
