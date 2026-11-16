@@ -8,6 +8,13 @@ Jogo 3D em pixel art do bairro Morada da Colina (Resende, RJ), feito a partir de
 - **Computador:** WASD / setas para andar, Shift corre, C entra e sai do carro, arrastar o mouse gira a câmera, roda do mouse dá zoom, M abre o mapa.
 - **Celular:** joystick no lado esquerdo da tela, arrastar no lado direito gira a câmera, dois dedos dão zoom.
 
+## Esconde-esconde
+Na tela inicial, **ESCONDE-ESCONDE** cria uma sala com código de 6 letras (ou entra numa). O dono da sala começa a partida e o pegador é sorteado.
+- Quem se esconde chega perto de um objeto do cenário (lixeira, poste, carro, arbusto, banquinho…) e toca em **VIRAR** para virar uma cópia dele. **TRAVAR** impede de se mexer sem querer; **PROVOCAR** solta um assobio (e é automático a cada 60 s).
+- O pegador fica com a tela preta enquanto os outros se escondem e depois atira mirando com o centro da tela. Errar custa 10 de vida.
+- Computador: Espaço = virar/atirar, T = travar, G = provocar.
+- As regras do Firebase estão em `fonte/firebase_rules.json`.
+
 ## Dados
 - Ruas, áreas verdes e lago: © colaboradores do OpenStreetMap (ODbL).
 - Relevo: SRTM 30 m.

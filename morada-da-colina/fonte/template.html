@@ -51,6 +51,49 @@
   #chatHistList i{font-style:normal;color:#7d8597;font-size:14px;margin-right:4px}
   #chatHistList b{color:#9fd0ff;font-weight:normal} #chatHistList b.me{color:#ffd84a} #chatHistList .sys{color:#bfe3a0;font-style:italic}
   #chatHistBtn{padding:0 12px}
+  .tbtn.big.hunt{background:#8a3fb0}
+  #lobby .hint{font-size:18px;color:#cfd8ea;margin-top:12px;line-height:1.1}
+  #roomIn{text-transform:uppercase;letter-spacing:4px;flex:1}
+  #blind{position:fixed;inset:0;background:#05070c;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:6;color:#fff;text-align:center;padding:20px}
+  #blind .b1{font-family:'Silkscreen',monospace;font-size:22px;color:#ff6b5a}
+  #blind .b2{font-family:'Silkscreen',monospace;font-size:96px;color:#ffd84a;margin:10px 0}
+  #blind .b3{font-size:24px;color:#9fb0cc}
+  #cross{position:fixed;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;display:none;pointer-events:none;z-index:4;
+    background:linear-gradient(#fff,#fff) center/2px 10px no-repeat,linear-gradient(#fff,#fff) center/10px 2px no-repeat;border:2px solid rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000}
+  #huntHud{position:fixed;left:50%;top:10px;transform:translateX(-50%);display:none;text-align:center;z-index:5;padding:6px 16px;min-width:170px;pointer-events:none}
+  #huntHud .h1{font-family:'Silkscreen',monospace;font-size:13px;color:#ffd84a}
+  #huntHud .h2{font-family:'Silkscreen',monospace;font-size:26px;color:#fff;line-height:1.1}
+  #huntHud .h3{font-size:17px;color:#cfd8ea}
+  #huntHud .h4{font-size:15px;color:#ffd84a}
+  @media (pointer:coarse){ #huntHud .h4{display:none} }
+  #hpBar{display:none;height:8px;background:#3a1d1d;border:2px solid #0d1018;margin-top:4px}
+  #hpBar i{display:block;height:100%;width:100%;background:#e0483a}
+  #room{position:fixed;right:12px;top:40px;width:min(300px,62vw);display:none;z-index:6;padding:6px 10px 10px}
+  #room .rh{display:flex;justify-content:space-between;align-items:center;font-family:'Silkscreen',monospace;font-size:13px;color:#ffd84a}
+  #room .rh .tbtn{padding:2px 9px;margin:0}
+  #room .code{display:flex;align-items:center;gap:8px;margin:6px 0}
+  #roomCode{font-family:'Silkscreen',monospace;font-size:26px;letter-spacing:3px;color:#fff;flex:1}
+  #room .code .tbtn{padding:6px 8px;margin:0;font-size:10px}
+  #roomList{max-height:30vh;overflow-y:auto;font-size:19px;color:#e8ecf4}
+  #roomList div{display:flex;align-items:center;gap:6px;padding:2px 0}
+  #roomList .dot{width:12px;height:12px;border:2px solid #0d1018;flex:0 0 auto}
+  #roomList .pts{margin-left:auto;color:#ffd84a}
+  #roomCfg{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+  #roomCfg label{font-family:'Silkscreen',monospace;font-size:9px;color:#9fb0cc}
+  #roomCfg select{font-family:'VT323',monospace;font-size:18px;display:block;margin-top:2px}
+  #roomMsg{font-size:17px;color:#bfe3a0;margin-top:6px;min-height:18px}
+  #room .row{display:flex;gap:6px;margin-top:6px}
+  #room.min #roomBody{display:none}
+  #result{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:none;z-index:7;text-align:center;min-width:min(340px,86vw);padding:14px 18px}
+  #result .r1{font-family:'Silkscreen',monospace;font-size:18px;color:#ffd84a;margin-bottom:8px}
+  #resBody{font-size:20px;color:#e8ecf4;text-align:left}
+  #resBody div{display:flex;gap:8px} #resBody .pts{margin-left:auto;color:#ffd84a}
+  #result .r3{font-size:16px;color:#9fb0cc;margin-top:10px}
+  #toast{position:fixed;left:50%;top:38%;transform:translateX(-50%);display:none;z-index:7;font-family:'Silkscreen',monospace;font-size:20px;color:#fff;background:rgba(13,16,24,.82);padding:8px 16px;border:3px solid #0d1018;text-align:center;pointer-events:none}
+  .tbtn.rb.act{background:rgba(138,63,176,.88)} .tbtn.rb.act.shoot{background:rgba(200,50,40,.9)}
+  .tbtn.rb.on{background:rgba(47,127,74,.9)}
+  .lbl.seeker{border-color:#e0483a!important;color:#ffb0a0}
+
   #chatLog b{color:#9fd0ff;font-weight:normal} #chatLog b.me{color:#ffd84a} #chatLog .sys{color:#bfe3a0;font-style:italic}
   #chatBox{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:none;gap:6px;width:min(520px,92vw);z-index:6}
   #chatBox input{flex:1;font-family:'VT323',monospace;font-size:22px;padding:6px 10px;border:3px solid #0d1018;background:#fffbea}
@@ -82,7 +125,7 @@
   .tbtn.rb.big2.on{background:rgba(47,127,74,.9);box-shadow:inset 0 0 0 3px #ffd84a}
   #joy{width:140px!important;height:140px!important}
   #joy.run{border-color:#ffb347!important;background:rgba(255,160,60,.18)!important}
-  @media (pointer:coarse){ #touch{display:block} #help .kb{display:none} #mini{width:118px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom))} #mini.big{width:min(86vw,60vh)} #hud{min-width:0;transform:scale(.85);transform-origin:0 0} #street{font-size:20px} #fps{display:none} #online{top:112px} #chatLog{bottom:calc(14px + env(safe-area-inset-bottom));max-width:calc(100vw - 160px)} #chatBox{bottom:auto;top:12px} #chatHist{bottom:calc(12px + env(safe-area-inset-bottom));max-height:52vh} }
+  @media (pointer:coarse){ #touch{display:block} #help .kb{display:none} #mini{width:118px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom))} #mini.big{width:min(86vw,60vh)} #hud{min-width:0;transform:scale(.85);transform-origin:0 0} #street{font-size:20px} #fps{display:none} #online{top:112px} #chatLog{bottom:calc(14px + env(safe-area-inset-bottom));max-width:calc(100vw - 160px)} #chatBox{bottom:auto;top:12px} #room{top:8px;width:min(236px,58vw)} #roomList{max-height:22vh;font-size:16px} #roomCode{font-size:20px;letter-spacing:2px} #roomMsg{font-size:15px} body.hunting #hud{display:none} body.inroom #hud{display:none} body.hunting #online,body.inroom #online{top:10px} #room{top:62px} #huntHud{top:4px} #huntHud{top:6px;transform:translateX(-50%) scale(.85);transform-origin:50% 0} #blind .b2{font-size:72px} #chatHist{bottom:calc(12px + env(safe-area-inset-bottom));max-height:52vh} }
   @media (pointer:fine){ #help .tc{display:none} }
 </style>
 </head>
@@ -99,22 +142,49 @@
 <canvas id="mini"></canvas>
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
-  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
   <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)</div>
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnMap">🗺<span>MAPA</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
+  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnMap">🗺<span>MAPA</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
 </div>
 <div id="online" class="panel" style="display:none"><span id="onlineTxt"></span><button id="btnLeave">SAIR</button></div>
 <div id="chatLog"></div>
+<div id="blind"><div class="b1">VOCÊ É O PEGADOR</div><div class="b2" id="blindT">45</div><div class="b3">Os outros estão virando objetos e se escondendo…</div></div>
+<div id="cross"></div>
+<div id="huntHud" class="panel"><div class="h1" id="hhPhase">ESCONDA-SE!</div><div class="h2" id="hhTime">0:45</div><div class="h3" id="hhInfo"></div><div class="h4" id="hhKeys"></div><div id="hpBar"><i></i></div></div>
+<div id="room" class="panel">
+  <div class="rh"><span>SALA</span><button class="tbtn" id="roomMin">–</button></div>
+  <div id="roomBody">
+  <div class="code"><span id="roomCode">------</span><button class="tbtn" id="roomCopy">COPIAR</button></div>
+  <div id="roomList"></div>
+  <div id="roomCfg"><label>ESCONDER <select id="cfgHide"><option value="30">30 s</option><option value="45" selected>45 s</option><option value="60">60 s</option><option value="90">90 s</option></select></label>
+  <label>PROCURAR <select id="cfgSeek"><option value="180">3 min</option><option value="300" selected>5 min</option><option value="480">8 min</option></select></label></div>
+  <div id="roomMsg"></div>
+  <div class="row"><button class="tbtn big hunt" id="roomStart">COMEÇAR</button></div>
+  <div class="row"><button class="tbtn big alt" id="roomLeave">SAIR DA SALA</button></div>
+  </div>
+</div>
+<div id="result" class="panel"><div class="r1" id="resTitle"></div><div id="resBody"></div><div class="r3">Voltando para a sala…</div></div>
+<div id="toast"></div>
 <div id="chatHist" class="panel"><div class="hd"><span>MENSAGENS</span><button class="tbtn" id="chatHistClose">✕</button></div><div id="chatHistList"></div></div>
 <div id="chatBox"><button class="tbtn" id="chatHistBtn" title="Histórico">☰</button><input id="chatIn" maxlength="120" placeholder="Fale algo… (Enter envia)" autocomplete="off"><button class="tbtn" id="chatSend">ENVIAR</button></div>
 <div id="lobby"><div class="panel box">
   <div class="t">MORADA DA COLINA</div><div class="s">RESENDE · RJ · PIXEL 3D</div>
   <label>SEU NOME</label><input id="lobbyName" maxlength="16" placeholder="Ex.: Lucas" autocomplete="off">
   <label>COR DA CAMISA</label><div id="lobbySwatches"></div>
-  <div class="row"><button class="tbtn big" id="btnOnline">JOGAR ONLINE</button><button class="tbtn big alt" id="btnSolo">JOGAR SOZINHO</button></div>
+  <div id="lobbyMain">
+  <div class="row"><button class="tbtn big" id="btnOnline">PASSEAR ONLINE</button><button class="tbtn big alt" id="btnSolo">JOGAR SOZINHO</button></div>
+  <div class="row"><button class="tbtn big hunt" id="btnHunt">🎭 ESCONDE-ESCONDE</button></div>
+  </div>
+  <div id="huntPick" style="display:none">
+  <div class="hint">Quem se esconde vira um objeto do cenário. O pegador é sorteado no começo de cada rodada.</div>
+  <div class="row"><button class="tbtn big hunt" id="btnCreate">CRIAR SALA</button></div>
+  <label>OU ENTRE COM O CÓDIGO</label>
+  <div class="row" style="margin-top:4px"><input id="roomIn" maxlength="6" placeholder="ABCDEF" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="tbtn big" id="btnJoin" style="flex:0 0 96px">ENTRAR</button></div>
+  <div class="row"><button class="tbtn big alt" id="btnBack">VOLTAR</button></div>
+  </div>
   <div id="lobbyMsg"></div>
 </div></div>
 <div id="load">GERANDO O BAIRRO…</div>
