@@ -685,9 +685,11 @@ for (const h of W.houses) {
     };
     WL(U0, V0 + 3.5, U0, V1); WL(U0 + 3.5, V0, U1, V0);
   }
-  for (const lm of (W.landmarks || [])) if (lm.type === 'sobrado9') { // sobrado de esquina Albert Sabin x Rua Nove A (Street View 10/2024)
+  for (const lm of (W.landmarks || [])) if (lm.type === 'sobrado9') { // sobrado de esquina Darci de Carvalho x Cel. José Fernando Bruno (Street View 10/2024)
     const [ux, uz] = lm.u, [vx, vz] = lm.v;
-    const WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const WP0 = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const SH = -3, WP = (u, v) => WP0(u + SH, v);           // tudo deslocado 3 m em direção à esquina
+    const sideU = v => (5.5 - lm.sn[1] * v) / lm.sn[0] - SH;  // linha do muro ao longo da Cel. Bruno (esquina obtusa)
     const B = chunkB(...WP(15, 14));
     const AX = [ux, 0, uz], AZ = [vx, 0, vz];
     const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
@@ -695,11 +697,11 @@ for (const h of W.houses) {
     const GREEN = hex('#cfe6a8'), GREEN2 = hex('#c6df9c'), STONEC = hex('#cdbfa9'), STONED = hex('#b3a58f'), CAP = hex('#e6e0cf'), TILE = hex('#c45a3a'), TILE2 = hex('#b44f33');
     const BROWN = hex('#5b3326'), BROWN2 = hex('#4a2a1f'), CREAM = hex('#f6efd8'), CREAM2 = hex('#e8ecc8'), BRICK = hex('#9c4a36'), WHITE = hex('#f3f1ea');
     // garden lawn + patio inside the lot
-    const U0 = 5.6, U1 = 24.5, V0 = 4.85, V1 = 24.5;
+    const U1 = 24.5, V0 = 4.85, V1 = 24.5, LU = (s, v) => sideU(v) + (U1 - sideU(v)) * s;
     for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
-      const a0 = U0 + (U1 - U0) * i / 6, a1 = U0 + (U1 - U0) * (i + 1) / 6, b0 = V0 + (V1 - V0) * j / 6, b1 = V0 + (V1 - V0) * (j + 1) / 6;
-      const q = [[a0, b0], [a1, b0], [a1, b1], [a0, b1]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.05, p[1]]; });
-      const patio = a0 >= 10 && b1 <= 9.5;
+      const s0 = i / 6, s1 = (i + 1) / 6, b0 = V0 + (V1 - V0) * j / 6, b1 = V0 + (V1 - V0) * (j + 1) / 6;
+      const q = [[s0, b0], [s1, b0], [s1, b1], [s0, b1]].map(([s, v]) => { const p = WP(LU(s, v), v); return [p[0], groundAt(p[0], p[1]) + 0.05, p[1]]; });
+      const patio = LU(s0, b0) >= 10 && b1 <= 9.5;
       B.quad(q[0], q[1], q[2], q[3], UP, patio ? hex('#cfc6b4') : (i + j) % 2 ? hex('#6aa64a') : hex('#72ae50'), F_TEX);
     }
     // ---- muro: painéis verde-claro entre pilares revestidos de pedra ----
@@ -718,9 +720,9 @@ for (const h of W.houses) {
       }
     };
     const MV = 5.0, H = 2.15;
-    panel(5.7, 24.5, 5.7, 6.7, H);            // lado da Rua Nove A
-    panel(5.7, 6.7, 7.4, MV, H);             // canto chanfrado
-    panel(7.4, MV, 11.0, MV, H);             // frente, à esquerda do portão
+    panel(sideU(24.5), 24.5, sideU(6.6), 6.6, H);   // lado da Cel. Bruno
+    panel(sideU(6.6), 6.6, sideU(MV) + 1.2, MV, H);  // canto chanfrado
+    panel(sideU(MV) + 1.2, MV, 11.0, MV, H);         // frente, à esquerda do portão
     panel(18.3, MV, 24.5, MV, H);            // frente, à direita da portaria
     // ---- portaria: pilares de pedra, portão de garagem marrom, portinha e telhadinho de barro ----
     const g0 = gy(14.5, MV), G = at(0, 0, g0);
@@ -780,8 +782,8 @@ for (const h of W.houses) {
     maskRect(at(0, 0, 0), hu0, hu1, hv0, hv1);
     // coqueiro no canto do jardim, árvore escura ao fundo, plantas junto ao muro
     { const p = WP(8.4, 7.6); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.25, true); }
-    { const p = WP(7.2, 23); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 1.1, true); }
-    for (const [pu, pv] of [[19.5, 6.0], [22.5, 6.2], [7.2, 12], [7.2, 16]]) box(B, at(pu, pv), -0.5, 0.5, 0, 0.8, -0.5, 0.5, hex('#4c8f3d'), hex('#3f7c33'), F_TEX);
+    { const p = WP(sideU(22) + 2.5, 22); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 1.1, true); }
+    for (const [pu, pv] of [[19.5, 6.0], [22.5, 6.2], [sideU(12) + 1.2, 12], [sideU(16) + 1.2, 16]]) box(B, at(pu, pv), -0.5, 0.5, 0, 0.8, -0.5, 0.5, hex('#4c8f3d'), hex('#3f7c33'), F_TEX);
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'weedlot') { // terreno baldio: mato alto
     const r = rngFor(lm.x, lm.z, 5), B = chunkB(lm.x, lm.z);
