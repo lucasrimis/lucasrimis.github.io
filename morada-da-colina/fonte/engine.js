@@ -1145,7 +1145,7 @@ for (const lm of (W.landmarks || [])) {
   { const Bw = yawChild(T, 0.05, 0, d / 2 + 0.55, 0); box(B, Bw, -0.13, 0.13, 0, 0.1, -0.13, 0.13, hex('#2f6fd6'), hex('#2559b0')); box(B, Bw, -0.09, 0.09, 0.1, 0.105, -0.09, 0.09, hex('#5aa8e6'), hex('#5aa8e6'), F_WATER); }
   // bicicleta do Portela: desenhada a cada quadro (some quando ele sai para a volta no bairro)
   { const K = yawChild(T, 0.85, 0, d / 2 + 1.05, Math.PI / 2 + 0.12), p = P(K, 0, 0, 0);
-    PORTELA_PARK = { x: p[0], z: p[2], a: angOf(K) };
+    PORTELA_PARK = { x: p[0], z: p[2], y: p[1], a: angOf(K) };   // y = piso da guarita (não o chão em volta)
     maskRect(K, -0.9, 0.9, -0.2, 0.2); PROPS.push({ k: 'bike', x: p[0], z: p[2], a: angOf(K) }); }
   // the two trees framing the booth (tall one on the left, mangueira on the right)
   { const a = P(T, -4.6, 0, 0.6); tree(chunkB(a[0], a[2]), a[0], a[2], 0, 1.55, true); const b = P(T, 4.7, 0, 0.9); tree(chunkB(b[0], b[2]), b[0], b[2], 2, 1.35, true); }
@@ -1507,7 +1507,7 @@ const PROPDEF = {
 };
 function buildProp(B, k, x, z, a, o) {
   o = o || {};
-  const y = surfAt(x, z), T = frame(x, y, z, a);
+  const y = o.y !== undefined ? o.y : surfAt(x, z), T = frame(x, y, z, a);
   if (k === 'carro') { carMesh(B, groundFrame(x, z, a, 0.0), o.col || hex('#d63b2f')); return; }
   if (k === 'lixeira') {
     box(B, T, -0.03, 0.03, 0, 1.1, -0.03, 0.03, hex('#55595f'), hex('#55595f'));
@@ -2906,7 +2906,7 @@ function frame_() {
     if (n.home) {   // Portela
       portelaUpdate(n);
       const poi = POIS.find(p => p.n === 'Portela'); if (poi && (poi.x !== n.x || poi.z !== n.z)) { poi.x = n.x; poi.z = n.z; poi.gy = undefined; }
-      if (!n.riding && PORTELA_PARK) buildProp(dynB, 'bike', PORTELA_PARK.x, PORTELA_PARK.z, PORTELA_PARK.a, {});
+      if (!n.riding && PORTELA_PARK) buildProp(dynB, 'bike', PORTELA_PARK.x, PORTELA_PARK.z, PORTELA_PARK.a, { y: PORTELA_PARK.y });
     }
     const dx = player.x - n.x, dz = player.z - n.z, dd = Math.hypot(dx, dz);
     let want = 0;
