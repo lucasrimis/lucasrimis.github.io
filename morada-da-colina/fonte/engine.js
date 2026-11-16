@@ -1731,9 +1731,17 @@ function buildPlayer(B, p, look) {
   box(B, Tb, -0.18, 0.18, 0.8, 1.45, -0.3, 0.3, SHIRT_, SHIRT_);
   box(B, Tb, 0.181, 0.19, 1.05, 1.3, -0.12, 0.12, SHIRT2, SHIRT2);
   for (const [v, ph] of [[-0.39, -sw], [0.39, sw]]) {
-    const A = swing(Tb, 0, 1.42, v, ph * 0.9);
+    const armed = p.gun !== undefined && v > 0;   // pegador: braço direito aponta para a mira com a arma
+    const A = swing(Tb, 0, 1.42, v, armed ? Math.PI / 2 + p.gun : ph * 0.9);
     box(B, A, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, SHIRT_, SHIRT_);
     box(B, A, -0.08, 0.08, -0.62, -0.3, -0.08, 0.08, SKIN, SKIN);
+    if (armed) {
+      const G = hex('#26282c'), G2 = hex('#3a3d42');
+      box(B, A, -0.06, 0.06, -0.98, -0.58, -0.045, 0.045, G, G2);      // cano/ferrolho
+      box(B, A, -0.24, -0.04, -0.72, -0.6, -0.04, 0.04, G2, G);        // cabo
+      box(B, A, -0.1, -0.05, -0.8, -0.74, -0.015, 0.015, G, G);        // gatilho
+      box(B, A, 0.06, 0.08, -0.95, -0.9, -0.012, 0.012, hex('#e8e4d6'), hex('#e8e4d6')); // mira
+    }
   }
   box(B, Tb, -0.2, 0.2, 1.47, 1.87, -0.2, 0.2, SKIN, SKIN);
   box(B, Tb, -0.23, 0.17, 1.8, 1.95, -0.22, 0.22, HAIR, HAIR);
@@ -1882,6 +1890,9 @@ window.__net = (function () {
       let o = N.others.get(s.key);
       if (!o) { o = { x: v.x, z: v.z, a: v.a || 0, walk: 0, speed: 0, car: false, el: document.createElement('div') }; o.el.className = 'lbl player'; lblLayer.appendChild(o.el); N.others.set(s.key, o); if (N.online) sys((v.n || '?') + (N.base ? ' entrou na sala' : ' entrou no bairro')); }
       if (o.tt !== undefined && v.tt && v.tt !== o.tt) H.onTaunt(s.key, o);
+      o.ap = typeof v.ap === 'number' ? v.ap : 0;
+      if (o.sh !== undefined && v.sh && v.sh !== o.sh) H.onShot(s.key, o, v.sh);
+      o.sh = v.sh || '';
       o.pr = v.pr || ''; o.pa = typeof v.pa === 'number' ? v.pa : 0; o.pc = typeof v.pc === 'string' && v.pc ? v.pc.split(',').map(Number) : null; o.ps = v.ps || 1; o.hp = typeof v.hp === 'number' ? v.hp : undefined; o.tt = v.tt || 0;
       o.tx = v.x; o.tz = v.z; o.ta = v.a || 0; o.car = !!v.car; o.n = String(v.n || '?').slice(0, 16); o.look = LOOKS[(v.c | 0) % LOOKS.length] || LOOKS[0]; o.t = v.t || 0;
       o.el.textContent = o.n; o.el.style.borderColor = LOOK_CSS[(v.c | 0) % LOOK_CSS.length];
@@ -1975,6 +1986,7 @@ window.__net = (function () {
       const v = Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
       o.speed += (v - o.speed) * Math.min(1, dt * 6); o.walk += dt * o.speed * 2.3;
       const vis = H.vis(uid, o);
+      o.gun = H.code && H.role(uid) === 'seeker' && H.phase() === 'seek' ? o.ap : undefined;
       if (vis === 'prop') buildProp(B, o.pr, o.x, o.z, o.pa, { col: o.pc, s: o.ps });
       else if (vis === 'person') buildPlayer(B, o, o.look);
     }
@@ -2015,7 +2027,7 @@ window.__net = (function () {
     if (uid === m.seeker) return 'seeker';
     return H.caught[uid] ? 'out' : 'hider';
   };
-  H.fields = () => H.code ? { pr: H.myProp ? H.myProp.k : '', pa: H.myProp ? +(player.a + H.myProp.off).toFixed(3) : 0, pc: H.myProp && H.myProp.col ? H.myProp.col.join(',') : '', ps: H.myProp && H.myProp.s || 1, hp: H.hp, tt: H.tt } : {};
+  H.fields = () => H.code ? { pr: H.myProp ? H.myProp.k : '', pa: H.myProp ? +(player.a + H.myProp.off).toFixed(3) : 0, pc: H.myProp && H.myProp.col ? H.myProp.col.join(',') : '', ps: H.myProp && H.myProp.s || 1, hp: H.hp, tt: H.tt, ap: +(player.gun || 0).toFixed(2), sh: H.shot || '' } : {};
   H.vis = (uid, o) => {
     if (!H.code) return 'person';
     const ph = H.phase(); if (ph === 'lobby' || ph === 'end') return 'person';
@@ -2037,8 +2049,23 @@ window.__net = (function () {
     if (H.code && H.myProp && H.role(N.uid) === 'hider' && (H.phase() === 'hide' || H.phase() === 'seek')) { buildProp(B, H.myProp.k, player.x, player.z, player.a + H.myProp.off, H.myProp); return true; }
     return false;
   };
+  H.tracers = [];
+  const muzzle = (p, a, ap) => { const c = Math.cos(a), s_ = Math.sin(a), y = surfAt(p.x, p.z) + 0.02 + 1.42, sx = p.x - s_ * 0.39, sz = p.z + c * 0.39, f = Math.cos(ap) * 1.0; return [sx + c * f, y + Math.sin(ap) * 1.0, sz + s_ * f]; };
   H.draw = B => {
-    if (H.tracer && performance.now() < H.tracer.until) { beam(B, H.tracer.a, H.tracer.b, 0.05, hex('#ffe066'), F_UNLIT); box(B, frame(H.tracer.b[0], H.tracer.b[1] - 0.15, H.tracer.b[2], 0), -0.15, 0.15, 0, 0.3, -0.15, 0.15, hex('#fff2a8'), hex('#ffb347'), F_UNLIT); }
+    const now = performance.now();
+    H.tracers = H.tracers.filter(t => now < t.until);
+    for (const t of H.tracers) {
+      const k = Math.min(1, (t.until - now) / 260);
+      beam(B, t.a, t.b, 0.035 + 0.04 * k, hex('#ffe066'), F_UNLIT);
+      if (k > 0.55) box(B, frame(t.a[0], t.a[1] - 0.1, t.a[2], 0), -0.12, 0.12, 0, 0.2, -0.12, 0.12, hex('#fff6c8'), hex('#ffb347'), F_UNLIT);   // clarão no cano
+      box(B, frame(t.b[0], t.b[1] - 0.12, t.b[2], now * 0.02), -0.12, 0.12, 0, 0.24, -0.12, 0.12, t.hit ? hex('#ff5a3c') : hex('#d8d2c0'), t.hit ? hex('#ffb347') : hex('#a8a294'), F_UNLIT);   // impacto
+    }
+  };
+  H.onShot = (uid, o, sh) => {
+    const q = sh.split(',').map(Number); if (q.length < 5 || q.some(isNaN)) return;
+    H.tracers.push({ a: muzzle(o, o.a, o.ap || 0), b: [q[1], q[2], q[3]], hit: !!q[4], until: performance.now() + (window.__trLife || 260) });
+    const d = Math.hypot(o.x - player.x, o.z - player.z); const v = Math.max(0, 1 - d / 120);
+    tone(220, 60, 0.14, 0.25 * v, 'square'); tone(1600, 400, 0.05, 0.12 * v, 'sawtooth');
   };
   N.setCam = (eye, tgt) => { H.eye = eye; H.tgt = tgt; };
   // ---- som (WebAudio) ----
@@ -2133,7 +2160,8 @@ window.__net = (function () {
       for (const t of [tc - half, tc, tc + half]) { if (t < 0 || t > ht) continue; const y = oy + dy * t; if (y >= base - 0.25 && y <= base + def.h + 0.25) { hit = uid; ht = t; break; } }
     }
     const end = hit ? [ox + dx * ht, oy + dy * ht, oz + dz * ht] : (() => { let t = 0.5; while (t < 40) { const x = ox + dx * t, y = oy + dy * t, z = oz + dz * t; if (y < groundAt(x, z) || !freeAt(x, z, 0.05)) break; t += 0.5; } return [ox + dx * t, oy + dy * t, oz + dz * t]; })();
-    H.tracer = { a: [player.x + Math.cos(player.a) * 0.3, surfAt(player.x, player.z) + 1.3, player.z + Math.sin(player.a) * 0.3], b: end, until: now + 160 };
+    H.tracers.push({ a: muzzle(player, player.a, player.gun || 0), b: end, hit: !!hit, until: now + (window.__trLife || 260) });
+    H.nShot = (H.nShot || 0) + 1; H.shot = [H.nShot, ...end.map(v => +v.toFixed(2)), hit ? 1 : 0].join(','); N.force = true;
     sndShot();
     if (hit) { sndHit(); N.db.ref(N.base + 'caught/' + hit).set(TS()); toast('🎯 ACERTOU! Era ' + nameOf(hit) + '!'); }
     else { H.hp = Math.max(0, H.hp - 10); N.force = true; toast(H.hp > 0 ? 'Errou! −10 de vida' : 'Sua vida acabou!', 1400); }
@@ -2195,7 +2223,9 @@ window.__net = (function () {
     H.caught = c;
   }
   H.tick = dt => {
+    player.gun = undefined;
     if (!H.code) return;
+    if (window.__hunt.shoulder() && H.eye) { const dx = H.tgt[0] - H.eye[0], dy = H.tgt[1] - H.eye[1], dz = H.tgt[2] - H.eye[2]; player.gun = Math.max(-1.2, Math.min(1.0, Math.atan2(dy, Math.hypot(dx, dz)))); }
     const now = performance.now();
     if (now - H.uiT > 200) { H.uiT = now; hudUI(); roomUI(); }
     const m = H.meta; if (!m) return;
@@ -2335,6 +2365,7 @@ function step(dt) {
       }
       player.walk += dt * player.speed * 2.3;
     }
+    if (window.__hunt && window.__hunt.shoulder()) player.a = Math.atan2(-Math.cos(cam.yaw), -Math.sin(cam.yaw));   // pegador olha para a mira
   } else {
     const thr = joy.id !== null ? Math.max(-1, Math.min(1, iy)) : Math.sign(iy);
     const acc = thr > 0.05 ? 9 * Math.min(1, thr / 0.6) : thr < -0.05 ? (player.cv > 0.5 ? -16 : -6) * Math.min(1, -thr / 0.6) : -Math.sign(player.cv) * 3;
