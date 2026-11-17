@@ -1062,6 +1062,68 @@ for (const [x, z, a] of W.lamps) {
   maskCircle(x, z, 0.2); PROPS.push({ k: 'luminaria', x, z, a });
 }
 
+// ---------------- carrinhos de rolimã + marcas de drift (rua que desce para o norte em frente à rotatória) ----------------
+function rolima(B, T) {   // T: ax = comprimento da prancha (traseira -> bico), ay = espessura, az = largura
+  const WOOD = hex('#9a4b33'), WOOD2 = hex('#86402b'), AXLE = hex('#b97d48'), MET = hex('#a7adb3'), DARK = hex('#2f2f31');
+  box(B, T, 0, 0.62, 0, 0.025, -0.18, 0.18, WOOD, WOOD2);                         // prancha (parte larga)
+  for (let k = 0; k < 4; k++) { const u0 = 0.62 + k * 0.08, w = 0.18 - (k + 1) * 0.035; box(B, T, u0, u0 + 0.08, 0, 0.025, -w, w, WOOD, WOOD2); }   // bico afinando
+  box(B, T, 0.86, 0.94, -0.065, -0.005, -0.32, 0.32, AXLE, AXLE);                  // eixo dianteiro de madeira
+  for (const v of [-0.34, 0.34]) box(B, T, 0.86, 0.94, -0.075, 0.005, v - 0.03, v + 0.03, MET, DARK);   // rolamentos da frente
+  for (const v of [-0.15, 0.15]) box(B, T, 0.03, 0.11, -0.07, 0.0, v - 0.025, v + 0.025, MET, DARK);    // rolamentos de trás
+  for (const v of [-1, 1]) { box(B, T, 0.12, 0.17, 0.025, 0.06, v * 0.12 - 0.02, v * 0.12 + 0.02, WOOD2, WOOD2); box(B, T, 0.12, 0.17, 0.045, 0.065, v * 0.12, v * 0.27, WOOD2, WOOD2); }   // apoios dos pés
+  box(B, T, 0.9, 0.92, 0.025, 0.035, -0.012, 0.012, DARK, DARK);                   // parafuso do eixo
+}
+{
+  const st = W.roads.find(r => !r.n && r.t === 'residential' && r.pts.length === 2 && Math.abs(r.pts[0][0] + 6.8) < 1 && Math.abs(r.pts[0][1] - 107.1) < 1);
+  if (st) {
+    const [A, Bp] = st.pts, L = Math.hypot(Bp[0] - A[0], Bp[1] - A[1]), d = [(Bp[0] - A[0]) / L, (Bp[1] - A[1]) / L], n = [-d[1], d[0]];
+    const at = (u, v) => [A[0] + d[0] * u + n[0] * v, A[1] + d[1] * u + n[1] * v];
+    // dois carrinhos em pé, encostados no muro da casa da esquina (lado oeste, de quem desce)
+    const vw = -(st.h + st.sw) - 0.32, ang = Math.atan2(d[1], d[0]);
+    { // trecho de muro baixo da casa da esquina (onde os carrinhos se apoiam)
+      const p0 = at(2.5, vw - 0.25), Tw = frame(p0[0], 0, p0[1], ang), g = groundAt(p0[0], p0[1]);
+      box(chunkB(p0[0], p0[1]), Tw, 0, 9, g - 0.5, g + 1.25, -0.12, 0.12, hex('#d9d6cc'), hex('#cbc7bc'));
+      box(chunkB(p0[0], p0[1]), Tw, -0.05, 9.05, g + 1.25, g + 1.33, -0.15, 0.15, hex('#bdb9ae'), hex('#bdb9ae'));
+      maskRect(Tw, 0, 9, -0.15, 0.15);
+    }
+    for (const [u, tilt] of [[4.6, 0.32], [5.6, 0.26]]) {
+      const p = at(u, vw + 0.05), g = groundAt(p[0], p[1]);
+      // eixo da prancha quase em pé, inclinado contra o muro (muro fica em -n)
+      const up = [-n[0] * Math.sin(tilt), Math.cos(tilt), -n[1] * Math.sin(tilt)];
+      const out = [n[0] * Math.cos(tilt), Math.sin(tilt), n[1] * Math.cos(tilt)];   // face de cima da prancha para a rua
+      const T = { o: [p[0] + n[0] * 0.22, g + 0.02, p[1] + n[1] * 0.22], ax: up, ay: out, az: [d[0], 0, d[1]] };
+      rolima(chunkB(p[0], p[1]), T);
+      maskCircle(p[0] + n[0] * 0.15, p[1] + n[1] * 0.15, 0.25);
+    }
+    // marcas pretas dos rolamentos: descem a rua e no fim fazem a curva do "drift"
+    const MARK = [30, 30, 33];
+    const track = (vOff, spread, side, seed) => {
+      let rs = seed; const rnd = () => (rs = (rs * 16807) % 2147483647) / 2147483647;
+      const pts = [], u0 = 12 + rnd() * 6, uT = L - 6.5 - rnd() * 1.5;
+      for (let u = u0; u <= uT; u += 0.8) pts.push(at(u, vOff + Math.sin(u * 0.17 + seed) * 0.12));
+      // arco do drift: vira para o lado e escorrega
+      const R = 4.2 + rnd() * 1.2, end = pts[pts.length - 1], TH = 1.0 + rnd() * 0.25;
+      for (let k = 1; k <= 14; k++) {
+        const th = k / 14 * TH, du = Math.sin(th) * R, dv = (1 - Math.cos(th)) * R * side + side * spread * k / 14;
+        pts.push([end[0] + d[0] * du + n[0] * dv, end[1] + d[1] * du + n[1] * dv]);
+      }
+      return pts;
+    };
+    let sd = 11;
+    for (const [base, side] of [[-0.9, 1], [0.8, -1]]) {   // dois carrinhos, cada um com a trilha das rodas da frente e de trás
+      for (const [off, spread] of [[-0.34, 0], [0.34, 0], [-0.15, 0.9], [0.15, 0.9]]) {
+        const pts = track(base + off, spread, side, sd++);
+        const [cx, cz] = centroid(pts);
+        const Bm = chunkB(cx, cz);
+        for (let i = 0; i < pts.length - 1; i++) {   // faixa contínua seguindo o asfalto
+          const p = pts[i], q = pts[i + 1], dx = q[0] - p[0], dz = q[1] - p[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l * 0.045, nz = dx / l * 0.045;
+          const V = (x, z) => [x, roadY(x, z) + 0.23, z];
+          Bm.quad(V(p[0] + nx, p[1] + nz), V(q[0] + nx, q[1] + nz), V(q[0] - nx, q[1] - nz), V(p[0] - nx, p[1] - nz), UP, MARK, F_PLAIN);
+        }
+      }
+    }
+  }
+}
 // ---------------- landmark: guarita "SEGURANÇA" + Portela ----------------
 function beam(B, a, b, t, col, fl) { // box between two 3D points
   const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz) || 1;
