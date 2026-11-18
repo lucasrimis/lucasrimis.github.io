@@ -63,6 +63,9 @@
   #btnVhs .k{opacity:.6}
   #btnPet{position:fixed;left:50%;bottom:calc(205px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#7a4a2a;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018}
   #btnPet .k{opacity:.6}
+  #btnSit{position:fixed;left:50%;bottom:calc(205px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#86592f;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018}
+  #btnSit .k{opacity:.6}
+  @media (pointer:coarse){ #btnSit .k{display:none} }
   @media (pointer:coarse){ #btnPet .k{display:none} }
   @media (pointer:coarse){ #btnVhs .k{display:none} }
   #vhsOv{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.86)}
@@ -165,7 +168,7 @@
 <canvas id="mini"></canvas>
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
-  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle · <b>X</b> sentar no banco<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
   <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)<br>Botão <b>👁</b> primeira/terceira pessoa</div>
 </div>
 <div id="touch">
@@ -191,6 +194,7 @@
 </div>
 <div id="result" class="panel"><div class="r1" id="resTitle"></div><div id="resBody"></div><div class="r3">Voltando para a sala…</div></div>
 <div id="toast"></div>
+<button id="btnSit" class="tbtn" style="display:none">🪑 SENTAR <span class="k">(X)</span></button>
 <button id="btnPet" class="tbtn" style="display:none">🐾 COÇAR O BUMBUM <span class="k">(C)</span></button>
 <button id="btnVhs" class="tbtn" style="display:none">📼 ASSISTIR <span class="k">(F)</span></button>
 <div id="vhsOv"><div id="vhsFrame"><div id="vhsTv"></div><canvas id="vhsNoise" width="160" height="90"></canvas><div id="vhsLbl">● PLAY ▶ &nbsp; SP 0:00:00</div><button id="vhsClose" class="tbtn">✕</button></div></div>
@@ -1293,7 +1297,25 @@ function tree(B, x, z, kind, s, castMask) {
   if (castMask) maskCircle(x, z, 0.35 * s);
 }
 for (const t of W.trees) tree(chunkB(t[0], t[1]), t[0], t[1], t[2], t[3], true);
-for (const a of W.areas) if (a.t === 'island') { const [cx, cz] = centroid(a.pts); tree(chunkB(cx, cz), cx, cz, 4, 1.2, true); }
+// praça do alto do bairro (ilha da rotatória): no lugar da árvore, um banco de madeira de dois lados com encosto no meio
+let BENCH = null;
+for (const a of W.areas) if (a.t === 'island') {
+  const [cx, cz] = centroid(a.pts), ba = 0.35, gy = groundAt(cx, cz), T = frame(cx, gy, cz, ba), B = chunkB(cx, cz);
+  const WD = hex('#9a6a3e'), WD2 = hex('#86592f'), WD3 = hex('#7a4f2a'), IR = hex('#3a3a3c'), L = 1.15, SY = 0.46;
+  for (const u of [-L + 0.15, 0, L - 0.15]) {   // pés de ferro (em A, um de cada lado) + travessa
+    box(B, T, u - 0.05, u + 0.05, -0.2, SY - 0.06, -0.5, -0.42, IR, IR); box(B, T, u - 0.05, u + 0.05, -0.2, SY - 0.06, 0.42, 0.5, IR, IR);
+    box(B, T, u - 0.05, u + 0.05, SY - 0.1, SY - 0.05, -0.55, 0.55, IR, IR);
+    box(B, T, u - 0.04, u + 0.04, SY - 0.05, 0.98, -0.04, 0.04, IR, IR);   // poste do encosto
+  }
+  for (const sg of [-1, 1]) for (let k = 0; k < 3; k++) { const v0 = 0.1 + k * 0.155, c = k % 2 ? WD2 : WD;   // assento: 3 ripas de cada lado
+    box(B, T, -L, L, SY - 0.05, SY, Math.min(sg * v0, sg * (v0 + 0.13)), Math.max(sg * v0, sg * (v0 + 0.13)), c, WD3); }
+  for (const [y0, c] of [[0.56, WD], [0.72, WD2], [0.88, WD]]) box(B, T, -L, L, y0, y0 + 0.11, -0.045, 0.045, c, WD3);   // encosto no meio, serve dos dois lados
+  maskRect(T, -L, L, -0.55, 0.55);
+  const spot = (u, v) => P(T, u, 0, v);
+  BENCH = { T, a: ba, seatY: gy + SY, spots: [], tape: null };
+  for (const u of [-0.55, 0.55]) for (const sg of [-1, 1]) { const p = spot(u, sg * 0.2), st = spot(u, sg * 1.05); BENCH.spots.push({ x: p[0], z: p[2], a: ba + sg * Math.PI / 2, sx: st[0], sz: st[2] }); }
+  const tp = spot(L + 1.4, 0); BENCH.tape = [tp[0], tp[2], ba];   // fita ao lado do banco
+}
 
 // ---------------- lamps ----------------
 for (const [x, z, a] of W.lamps) {
@@ -2188,6 +2210,7 @@ addEventListener('keydown', e => {
   if (typeof VHS !== 'undefined' && VHS.open) return;
   if (e.code === 'KeyF' && typeof VHS !== 'undefined' && VHS.near) { vhsOpen(VHS.cur); return; }
   if (e.code === 'KeyC' && typeof BEAGLE !== 'undefined' && BEAGLE.near) { beaglePet(); return; }
+  if (e.code === 'KeyX' && BENCH && BENCH.near) { benchSit(); return; }
   if (e.code === 'Enter' && window.__net && window.__net.online) { e.preventDefault(); window.__net.openChat(); return; }
   if (!e.repeat && window.__hunt && window.__hunt.key(e.code)) { e.preventDefault(); return; }
   keys[e.code] = true;
@@ -2334,11 +2357,17 @@ function buildPlayer(B, p, look) {
   const SHIRT_ = look.shirt, CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
   const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#6a4129') : SKIN;
-  const T = frame(p.x, surfAt(p.x, p.z) + 0.02, p.z, p.a);
-  const sw = Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
+  const T = frame(p.x, p.sit ? p.sit.y - 0.75 : surfAt(p.x, p.z) + 0.02, p.z, p.a);
+  const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
   const bob = Math.abs(Math.cos(p.walk)) * 0.06 * Math.min(1, p.speed / 3);
   const Tb = { o: [T.o[0], T.o[1] + bob, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
   // legs
+  if (p.sit) for (const v of [-0.17, 0.17]) {   // sentado: coxa para a frente, canela para baixo
+    box(B, Tb, -0.12, 0.42, 0.75, 0.97, v - 0.11, v + 0.11, SHORTS, SHORTS);
+    box(B, Tb, 0.26, 0.48, 0.38, 0.86, v - 0.11, v + 0.11, SHORTS, SHORTS);
+    box(B, Tb, 0.255, 0.485, 0.38, 0.46, v - 0.115, v + 0.115, hex('#1f3a6e'), hex('#1f3a6e'));
+    box(B, Tb, 0.25, 0.6, 0.28, 0.4, v - 0.12, v + 0.12, SHOE, SHOE);
+  } else
   for (const [v, ph] of [[-0.17, sw], [0.17, -sw]]) {
     const L = swing(Tb, 0, 0.85, v, ph);
     box(B, L, -0.12, 0.12, -0.78, 0.02, -0.11, 0.11, SHORTS, SHORTS);      // calça até o tornozelo
@@ -2576,8 +2605,9 @@ function dogRun(d, dt, spd) {   // segue d.path; devolve true ao terminar
 const VHS = { open: false, near: false, vis: false, cur: null, tapes: [
   { video: 'm_XQgDBdaG8', u: 19, v: 3.3 },     // calçada em frente ao terreno vazio (muro liso com as mangueiras)
   { video: 'IQjjz3oMf1w', u: 22.6, v: 27.6 },  // dentro do quintal, canto do fundo à esquerda (olhando da rua)
+  { video: 'FfL2Yv2F4mo', pos: BENCH && BENCH.tape },   // ao lado do banco da praça da rotatória
   { video: '437DR4XdGjU', more: ['YVNCtyXO51Q', '4gY35lBxOII'], u: 9, v: 28.15 },   // lista: toca um depois do outro    // no muro do fundo, do lado de dentro, junto da hera
-].map(o => Object.assign(o, { pos: null, sx: -1e4, sy: -1e4, vis: false, near: false })) };
+].map(o => Object.assign(o, { pos: o.pos || null, sx: -1e4, sy: -1e4, vis: false, near: false })) };
 function vhsPos(o = VHS.tapes[0]) {
   if (o.pos) return o.pos;
   const L = (W.landmarks || []).find(l => l.type === 'casa127'); if (!L) return null;
@@ -2729,6 +2759,15 @@ function beagleFrame(B, dt, t) {
     box(B, Th, -s_ * 0.9, s_ * 0.9, -s_ * 1.0, 0.02, -0.005, 0.005, c, c, F_GLOW); box(B, Th, -s_ * 0.4, s_ * 0.4, -s_ * 1.5, -s_ * 0.9, -0.005, 0.005, c, c, F_GLOW);
   }
 }
+function benchFrame() {
+  const btn = document.getElementById('btnSit'); if (!BENCH || !btn) return;
+  let best = null, bd = 2.2;
+  if (!player.sit && !player.car) for (const s_ of BENCH.spots) { const d = Math.hypot(player.x - s_.x, player.z - s_.z); if (d < bd) { bd = d; best = s_; } }
+  BENCH.near = best; btn.style.display = best ? '' : 'none';
+}
+function benchSit() { const s_ = BENCH && BENCH.near; if (!s_) return; player.sit = { x: s_.x, z: s_.z, a: s_.a, sx: s_.sx, sz: s_.sz, y: BENCH.seatY }; player.speed = 0; BENCH.near = null; }
+document.getElementById('btnSit').addEventListener('click', e => { e.stopPropagation(); benchSit(); });
+document.getElementById('btnSit').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
 function beaglePet() { if (BEAGLE.near && BEAGLE.scratch <= 0) { BEAGLE.scratch = 3.5; const d = BEAGLE.d; d.a = Math.atan2(d.z - player.z, d.x - player.x); } }
 document.getElementById('btnPet').addEventListener('click', e => { e.stopPropagation(); beaglePet(); });
 document.getElementById('btnPet').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
@@ -3429,6 +3468,10 @@ function step(dt) {
   const jl = joy.id !== null ? Math.min(1, Math.hypot(joy.dx, joy.dy)) : 0;
   const run = keys.ShiftLeft || keys.ShiftRight || jl > 0.82;
   player.running = run && (jl > 0.05 || ix || iy);
+  if (player.sit) {   // sentado no banco: mexer levanta
+    if (ix || iy || jl > 0.3 || player.car) { player.x = player.sit.sx; player.z = player.sit.sz; player.sit = null; }
+    else { player.x = player.sit.x; player.z = player.sit.z; player.a = player.sit.a; player.speed = 0; ix = iy = 0; }
+  }
   if (!player.car) {
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     let mx_ = fx * iy + rx * ix, mz_ = fz * iy + rz * ix;
@@ -3523,6 +3566,7 @@ function frame_() {
   gateFrame(dynB, dt);
   vhsFrame(dynB, t);
   beagleFrame(dynB, dt, t);
+  benchFrame();
   dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
     if (SKY.night > 0.05) for (const p of PROPS) if ((p.k === 'luminaria' || p.k === 'poste') && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
@@ -3629,7 +3673,7 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, bench: () => BENCH, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
 
 },30);
@@ -3637,7 +3681,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261118221941";
+  const BUILD = "v20261118223536";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
