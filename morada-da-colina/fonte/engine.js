@@ -887,6 +887,23 @@ for (const h of W.houses) {
     };
     // Street View 10/2024: muro de pedra do quadro de luz até 3 painéis ao norte; ao sul vai até ~2 m depois da portinha, depois muro liso
     wallRun(-6, 3.5); wallRun(11.6, 14.2); wallRun(14.2, 24, true, true);
+    // hera cobrindo todo o muro por dentro do terreno: camada verde + tufos de folhas saltados + cachos caindo por cima
+    const IVY = [hex('#2f6b2a'), hex('#3d7f31'), hex('#4f9139'), hex('#28592a'), hex('#5c9e3f')];
+    const ivy = (Tw, u0, u1, y0, y1, v, sg) => {   // face em v, lado de dentro em sg
+      box(B, Tw, u0, u1, y0, y1, v, v + sg * 0.03, IVY[0], IVY[3]);
+      for (let y = y0; y < y1 - 0.1; y += 0.26) for (let u = u0 + r() * 0.2; u < u1 - 0.12; u += 0.3 + r() * 0.15) {
+        const w = 0.18 + r() * 0.22, h = 0.16 + r() * 0.2, d = 0.04 + r() * 0.07, c = IVY[Math.floor(r() * 5)];
+        const a = Math.min(u1, u + w), b = Math.min(y1 + 0.08, y + h), vv = v + sg * 0.03;
+        box(B, Tw, u, a, y, b, Math.min(vv, vv + sg * d), Math.max(vv, vv + sg * d), c, c);
+      }
+      for (let u = u0; u < u1 - 0.2; u += 0.35 + r() * 0.3) { const c = IVY[Math.floor(r() * 5)], a = Math.min(u1, u + 0.25 + r() * 0.25);   // cachos passando por cima do topo
+        box(B, Tw, u, a, y1 - 0.05, y1 + 0.07 + r() * 0.08, Math.min(v - sg * 0.12, v + sg * 0.06), Math.max(v - sg * 0.12, v + sg * 0.06), c, c); }
+    };
+    for (const [u0, u1, top] of [[-6, 3.5, HW + 0.45], [11.6, 14.2, HW + 0.45], [14.2, 24, HW + 0.08]]) {
+      const n = Math.max(1, Math.round((u1 - u0) / 3.6));
+      for (let k = 0; k < n; k++) { const a = u0 + (u1 - u0) * k / n, b = u0 + (u1 - u0) * (k + 1) / n, gy = Math.min(g0(a, MV), g0(b, MV));
+        ivy(at(0, 0, gy), a + (a === -6 ? 0.1 : 0), b, Math.max(g0(a, MV), g0(b, MV)) - gy - 0.05, top, MV + 0.19, 1); }
+    }
     // entrada recuada e coberta em trapézio (Street View 10/2024): abertura larga na rua, fundo estreito = só o portão de correr;
     // à esquerda (sul) a parede branca com o 116 em diagonal, à direita (norte) a parede de pedra em diagonal
     { const gy = g0(7.5, MV), T = at(0, 0, gy), D = 2.6, BV = MV + D, HC = 2.6, TOP = 3.2;
@@ -957,6 +974,8 @@ for (const h of W.houses) {
       for (let k = 0; k < n; k++) { const a = [u0 + (u1 - u0) * k / n, v0 + (v1 - v0) * k / n], b = [u0 + (u1 - u0) * (k + 1) / n, v0 + (v1 - v0) * (k + 1) / n];
         const pa = WP(...a), pb = WP(...b), ya = groundAt(pa[0], pa[1]), yb = groundAt(pb[0], pb[1]), Tw = frame(pa[0], 0, pa[1], Math.atan2(pb[1] - pa[1], pb[0] - pa[0])), l = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
         box(B, Tw, 0, l, Math.min(ya, yb) - 0.5, Math.max(ya, yb) + 2.0, -0.1, 0.1, PL2, PL2);
+        { const cc = WP(9, 17), sg = Math.sign((cc[0] - pa[0]) * Tw.az[0] + (cc[1] - pa[1]) * Tw.az[2]) || 1;   // hera do lado de dentro
+          ivy(Tw, 0.1, l - 0.1, Math.max(ya, yb) - 0.05, Math.max(ya, yb) + 2.0, sg * 0.1, sg); }
         mx.beginPath(); mx.lineWidth = 0.4; mx.moveTo(pa[0], pa[1]); mx.lineTo(pb[0], pb[1]); mx.stroke(); }
     }
     // ---- sobrado: branco encardido, telhado de barro com beiral largo, varanda no andar de cima ----
