@@ -21,6 +21,8 @@ export async function onRequest({ request: req, env }) {
     if (owner) return J({ ok: true, msg: 'TG_CHAT já está configurado.' });
     const u = await api('getUpdates', { limit: 100 }), chats = {};
     for (const x of u.result || []) { const m = x.message; if (m && m.chat) chats[m.chat.id] = chats[m.chat.id] || [m.from && m.from.first_name, m.from && m.from.username && '@' + m.from.username].filter(Boolean).join(' '); }
+    if (!u.ok) return J({ ok: false, telegram: u.description || 'sem resposta do Telegram' });
+    if (!Object.keys(chats).length) return J({ ok: true, msg: 'O token funciona, mas ninguém mandou mensagem para o bot ainda. Mande um oi para ele e recarregue.' });
     return J({ ok: true, msg: 'Copie o número do seu nome e crie a variável TG_CHAT com ele.', chats });
   }
 
