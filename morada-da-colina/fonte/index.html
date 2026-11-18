@@ -2605,7 +2605,7 @@ function dogRun(d, dt, spd) {   // segue d.path; devolve true ao terminar
 const VHS = { open: false, near: false, vis: false, cur: null, tapes: [
   { video: 'm_XQgDBdaG8', u: 19, v: 3.3 },     // calçada em frente ao terreno vazio (muro liso com as mangueiras)
   { video: 'IQjjz3oMf1w', u: 22.6, v: 27.6 },  // dentro do quintal, canto do fundo à esquerda (olhando da rua)
-  { video: 'FfL2Yv2F4mo', pos: BENCH && BENCH.tape },   // ao lado do banco da praça da rotatória
+  { video: 'FfL2Yv2F4mo', start: 60, pos: BENCH && BENCH.tape },   // ao lado do banco da praça da rotatória
   { video: '437DR4XdGjU', more: ['YVNCtyXO51Q', '4gY35lBxOII'], u: 9, v: 28.15 },   // lista: toca um depois do outro    // no muro do fundo, do lado de dentro, junto da hera
 ].map(o => Object.assign(o, { pos: o.pos || null, sx: -1e4, sy: -1e4, vis: false, near: false })) };
 function vhsPos(o = VHS.tapes[0]) {
@@ -2667,7 +2667,7 @@ function vhsOpen(o) {
   const tick = () => { if (!VHS.open || n++ > 18) { noise.style.display = 'none'; return; } for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; } nc.putImageData(img, 0, 0); requestAnimationFrame(tick); };
   tick();
   setTimeout(() => { if (!VHS.open) return; const f = document.createElement('iframe');
-    f.src = 'https://www.youtube-nocookie.com/embed/' + o.video + '?autoplay=1&rel=0&playsinline=1' + (o.more ? '&playlist=' + [o.video, ...o.more].join(',') : '');
+    f.src = 'https://www.youtube-nocookie.com/embed/' + o.video + '?autoplay=1&rel=0&playsinline=1' + (o.start ? '&start=' + o.start : '') + (o.more ? '&playlist=' + [o.video, ...o.more].join(',') : '');
     f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture'; f.allowFullscreen = true; f.title = 'Fita VHS';
     box_.appendChild(f); }, 550);
 }
@@ -3681,7 +3681,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261118223536";
+  const BUILD = "v20261118224815";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
