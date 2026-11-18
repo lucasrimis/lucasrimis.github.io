@@ -1945,6 +1945,7 @@ addEventListener('keydown', e => {
   if (document.getElementById('lobby').style.display !== 'none') return;
   if (typeof VHS !== 'undefined' && VHS.open) return;
   if (e.code === 'KeyF' && typeof VHS !== 'undefined' && VHS.near) { vhsOpen(); return; }
+  if (e.code === 'KeyC' && typeof BEAGLE !== 'undefined' && BEAGLE.near) { beaglePet(); return; }
   if (e.code === 'Enter' && window.__net && window.__net.online) { e.preventDefault(); window.__net.openChat(); return; }
   if (!e.repeat && window.__hunt && window.__hunt.key(e.code)) { e.preventDefault(); return; }
   keys[e.code] = true;
@@ -2177,6 +2178,7 @@ const DOGDEF = {
   bull:        { L: 0.74, W: 0.3, lh: 0.33, bh: 0.28, s: 1.0, body: '#f1ece4', dark: '#e2dbd0', spd: 1.4 },
   yorkie:      { L: 0.44, W: 0.2, lh: 0.14, bh: 0.19, s: 1.0, body: '#1f1c1e', dark: '#141214', spd: 1.9 },
   yorkieRoupa: { L: 0.44, W: 0.21, lh: 0.14, bh: 0.2, s: 1.0, body: '#cfe6f0', dark: '#b9d6e2', spd: 1.7 },
+  beagle:      { L: 0.62, W: 0.27, lh: 0.24, bh: 0.26, s: 1.0, body: '#f3eee6', dark: '#e4ddd1', spd: 1.1 },
 };
 function buildDog(B, d, t) {
   const D = DOGDEF[d.kind], y0 = surfAt(d.x, d.z) + 0.02, T = frame(d.x, y0, d.z, d.a);
@@ -2184,9 +2186,9 @@ function buildDog(B, d, t) {
   const walk = Math.min(1, d.spd / 0.6), sw = Math.sin(d.ph) * 0.55 * walk;
   const TAN = hex('#b5702c'), TAN2 = hex('#a3612a'), WHITE = hex('#f3efe8'), PINK = hex('#e8a2a8'), NOSE = hex('#151313'), EYE = hex('#1a1414');
   // pernas (balançam ao andar)
-  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : d.kind === 'bull' ? [BODY, BODY] : [TAN, TAN];
+  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : (d.kind === 'bull' || d.kind === 'beagle') ? [BODY, BODY] : [TAN, TAN];
   for (const [lu, lv, ph] of [[L * 0.36, -W * 0.3, sw], [L * 0.36, W * 0.3, -sw], [-L * 0.36, -W * 0.3, -sw], [-L * 0.36, W * 0.3, sw]]) {
-    const A = swing(T, lu, lh, lv, ph), lw = W * 0.17, [c1, c2] = legC(lu > 0);
+    const thump = d.thump && lu < 0 && lv > 0, A = swing(T, lu, lh, lv, thump ? -0.5 + Math.sin(t * 32) * 0.55 : ph), lw = W * 0.17, [c1, c2] = legC(lu > 0);   // beagle: pata de trás batendo no chão
     box(B, A, -lw, lw, -lh, 0, -lw, lw, c1, c1);
     box(B, A, -lw * 1.1, lw * 1.3, -lh, -lh * 0.72, -lw * 1.1, lw * 1.1, c2, c2);   // pata
   }
@@ -2196,6 +2198,11 @@ function buildDog(B, d, t) {
   if (d.kind === 'pitbull') { box(B, T, L * 0.1, L / 2 + 0.01, yb - 0.01, yb + bh * 0.75, -W * 0.3, W * 0.3, WHITE, WHITE); box(B, T, -L * 0.2, L * 0.2, yb - 0.012, yb + 0.03, -W * 0.35, W * 0.35, WHITE, WHITE); }
   if (d.kind === 'bull') for (const [pu, pv, py] of [[0.1, W / 2, 0.15], [-0.18, -W / 2, 0.1], [0.22, W / 2, 0.06]]) box(B, T, pu - 0.04, pu + 0.03, yb + py, yb + py + 0.05, pv - 0.005, pv + 0.005, PINK, PINK);
   if (d.kind === 'yorkie') { box(B, T, -L / 2, L / 2, yb - 0.07, yb + 0.02, -W / 2 - 0.02, W / 2 + 0.02, DARK, DARK); box(B, T, L * 0.25, L / 2 + 0.02, yb - 0.04, yb + bh * 0.8, -W / 2 - 0.01, W / 2 + 0.01, TAN, TAN); }   // pelo comprido e peito caramelo
+  if (d.kind === 'beagle') {   // manta marrom nas costas e lados, barriga e peito brancos
+    const BR = hex('#7a4a2a'), BR2 = hex('#6b3f23');
+    box(B, T, -L * 0.42, L * 0.3, yb + bh * 0.35, yb + bh + 0.012, -W / 2 - 0.01, W / 2 + 0.01, BR, BR2);
+    box(B, T, -L * 0.5 - 0.005, -L * 0.3, yb + bh * 0.4, yb + bh * 0.9, -W / 2 + 0.03, W / 2 - 0.03, hex('#b9773d'), hex('#a8692f'));   // traseiro caramelo
+  }
   if (d.kind === 'yorkieRoupa') { // roupinha azul com estampas rosa e cinza; pernas e rabo marrons
     for (const [pu, pv, c] of [[0.1, W / 2, '#e2a6c4'], [-0.1, W / 2, '#9a9aa4'], [0.05, -W / 2, '#9a9aa4'], [-0.14, -W / 2, '#e2a6c4']]) box(B, T, pu - 0.04, pu + 0.04, yb + 0.07, yb + 0.14, pv - 0.006, pv + 0.006, hex(c), hex(c));
     box(B, T, -L * 0.2, L * 0.1, yb + bh, yb + bh + 0.006, -0.04, 0.04, hex('#e2a6c4'), hex('#e2a6c4'));
@@ -2203,12 +2210,24 @@ function buildDog(B, d, t) {
   // rabo (abana)
   { const wg = Math.sin(t * 14 + d.ph) * 0.6 * d.wag, up = d.kind === 'pitbull' || d.kind === 'bull' ? 0.5 : 1.1;
     const Tt = { o: P(T, -L / 2, yb + bh * 0.8, 0), ax: N(T, -Math.cos(up) * Math.cos(wg), Math.sin(up), -Math.cos(up) * Math.sin(wg)), ay: T.ay, az: T.az };
-    const tl = d.kind.startsWith('yorkie') ? 0.13 : 0.24, tw = d.kind.startsWith('yorkie') ? 0.035 : 0.025, tc = d.kind === 'yorkie' ? BODY : d.kind === 'yorkieRoupa' ? TAN2 : BODY;
-    beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl, Tt.o[1] + Tt.ax[1] * tl, Tt.o[2] + Tt.ax[2] * tl], tw, tc); }
+    const tl = d.kind.startsWith('yorkie') ? 0.13 : 0.24, tw = d.kind.startsWith('yorkie') ? 0.035 : 0.025, tc = d.kind === 'yorkie' ? BODY : d.kind === 'yorkieRoupa' ? TAN2 : d.kind === 'beagle' ? hex('#7a4a2a') : BODY;
+    beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl, Tt.o[1] + Tt.ax[1] * tl, Tt.o[2] + Tt.ax[2] * tl], tw, tc);
+    if (d.kind === 'beagle') beam(B, [Tt.o[0] + Tt.ax[0] * tl * 0.75, Tt.o[1] + Tt.ax[1] * tl * 0.75, Tt.o[2] + Tt.ax[2] * tl * 0.75], [Tt.o[0] + Tt.ax[0] * tl * 1.05, Tt.o[1] + Tt.ax[1] * tl * 1.05, Tt.o[2] + Tt.ax[2] * tl * 1.05], tw * 1.2, WHITE); }
   // cabeça (vira um pouco para quem olha)
-  const H = { o: P(T, L / 2 - 0.02, yb + bh * 0.55, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
+  const sn = d.sniff ? 0.2 + Math.sin(t * 9) * 0.025 : 0;   // cheirando: cabeça baixa, focinho mexendo
+  const H = { o: P(T, L / 2 - 0.02 + sn * 0.3, yb + bh * 0.55 - sn, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
   { const ha = d.a + (d.look || 0); H.ax = [Math.cos(ha), 0, Math.sin(ha)]; H.az = [-Math.sin(ha), 0, Math.cos(ha)]; }
-  if (d.kind === 'pitbull') {
+  if (d.kind === 'beagle') {
+    const CAR = hex('#c98a4a'), CAR2 = hex('#b47a3e');
+    box(B, H, -0.01, 0.17, 0.02, 0.22, -0.1, 0.1, CAR, CAR2);                      // cabeça caramelo
+    box(B, H, 0.17, 0.3, 0.02, 0.12, -0.065, 0.065, WHITE, WHITE);                 // focinho branco
+    box(B, H, 0.12, 0.172, 0.1, 0.22, -0.022, 0.022, WHITE, WHITE);                // listra branca na testa
+    box(B, H, 0.29, 0.315, 0.08, 0.125, -0.03, 0.03, NOSE, NOSE);
+    for (const sv of [-1, 1]) {
+      box(B, H, 0.165, 0.172, 0.13, 0.16, sv * 0.05 - 0.016, sv * 0.05 + 0.016, EYE, EYE);
+      box(B, H, -0.02, 0.09, -0.12, 0.19, sv * 0.1 - 0.008 + sv * 0.012, sv * 0.1 + 0.022 + sv * 0.012, hex('#8a5229'), hex('#7a4824'));   // orelhas compridas caídas
+    }
+  } else if (d.kind === 'pitbull') {
     box(B, H, 0, 0.26, 0.02, 0.3, -0.15, 0.15, BODY, BODY);                       // cabeça larga
     box(B, H, 0.24, 0.38, 0.03, 0.17, -0.11, 0.11, WHITE, WHITE);                 // focinho branco
     box(B, H, 0.1, 0.262, 0.17, 0.3, -0.04, 0.04, WHITE, WHITE);                  // faixa branca na testa
@@ -2378,6 +2397,84 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && VHS.open) vhsClose(
     if (VHS.vis && Math.hypot(cx - VHS.sx, cy - VHS.sy) < 55) vhsOpen();
   }, true);
 }
+// ---------------- beagle passeando em volta do quarteirão (Albert Sabin / Darci / Carlos F. Pinto / Cel. Bruno) ----------------
+const BEAGLE = { d: null, path: null, cum: null, len: 0, s: 0, stop: 0, sniffs: [], nextSniff: 0, hearts: [], scratch: 0, after: 0 };
+function beagleRoute() {
+  const nodes = new Map(), key = p => Math.round(p[0] * 2) + ',' + Math.round(p[1] * 2);
+  const node = p => { const k = key(p); if (!nodes.has(k)) nodes.set(k, { k, x: p[0], z: p[1], e: [] }); return nodes.get(k); };
+  for (const r of W.roads) { if (r.t === 'footway' || r.dirt) continue; for (let i = 0; i < r.pts.length - 1; i++) { const a = node(r.pts[i]), b = node(r.pts[i + 1]); if (a === b) continue; const L = Math.hypot(a.x - b.x, a.z - b.z); a.e.push({ n: b, L, nm: r.n }); b.e.push({ n: a, L, nm: r.n }); } }
+  const want = ['Rua Albert Sabin', 'Rua Darci de Carvalho', 'Rua Coronel José Fernando Bruno'];
+  for (const A of nodes.values()) for (const e0 of A.e) {
+    if (e0.nm !== 'Rua Albert Sabin') continue;
+    const path = [A], names = new Set([e0.nm]); let prev = A, cur = e0.n, len = e0.L, ok = false;
+    for (let it = 0; it < 200 && len < 2500; it++) {
+      path.push(cur);
+      const ain = Math.atan2(cur.z - prev.z, cur.x - prev.x); let best = null;
+      for (const e of cur.e) { if (e.n === prev && cur.e.length > 1) continue; let tr = Math.atan2(e.n.z - cur.z, e.n.x - cur.x) - ain; while (tr > Math.PI) tr -= 2 * Math.PI; while (tr <= -Math.PI) tr += 2 * Math.PI; if (!best || tr > best.tr) best = { e, tr }; }
+      if (!best) break; prev = cur; cur = best.e.n; len += best.e.L; names.add(best.e.nm);
+      if (prev === A && cur === e0.n) { ok = true; break; }
+    }
+    if (!ok || names.size !== 3 || !want.every(w => names.has(w)) || len > 900) continue;
+    path.pop();   // A repetido no fim
+    let cx = 0, cz = 0; for (const p of path) { cx += p.x; cz += p.z; } cx /= path.length; cz /= path.length;
+    let votes = 0; const segs = [];
+    for (let i = 0; i < path.length; i++) { const a = path[i], b = path[(i + 1) % path.length], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1; votes += Math.sign((-dz / l) * (cx - (a.x + b.x) / 2) + (dx / l) * (cz - (a.z + b.z) / 2)); }
+    const sg = votes >= 0 ? 1 : -1, pts = [];
+    for (let i = 0; i <= path.length; i++) {   // calçada do lado de dentro do quarteirão
+      const a = path[(i - 1 + path.length) % path.length], c = path[i % path.length], b = path[(i + 1) % path.length];
+      const d1 = [c.x - a.x, c.z - a.z], d2 = [b.x - c.x, b.z - c.z], l1 = Math.hypot(...d1) || 1, l2 = Math.hypot(...d2) || 1;
+      const nx = (-d1[1] / l1 - d2[1] / l2) / 2, nz = (d1[0] / l1 + d2[0] / l2) / 2, nl = Math.hypot(nx, nz) || 1;
+      pts.push([c.x + nx / nl * 4.2 * sg, c.z + nz / nl * 4.2 * sg]);
+    }
+    const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    return { pts, cum, len: cum[cum.length - 1] };
+  }
+  return null;
+}
+function beagleAt(s) { const R = BEAGLE; s = ((s % R.len) + R.len) % R.len; let i = 1; while (i < R.cum.length - 1 && R.cum[i] < s) i++; const a = R.path[i - 1], b = R.path[i], f = (s - R.cum[i - 1]) / Math.max(1e-6, R.cum[i] - R.cum[i - 1]); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, Math.atan2(b[1] - a[1], b[0] - a[0])]; }
+function beagleFrame(B, dt, t) {
+  const R = BEAGLE;
+  if (!R.path) { const r = beagleRoute(); if (!r) { R.path = []; return; } R.path = r.pts; R.cum = r.cum; R.len = r.len;
+    // lixeiras e árvores perto do caminho: lugares para cheirar
+    const cand = PROPS.filter(p => p.k === 'lixeira').map(p => [p.x, p.z]).concat(W.trees.map(q => [q[0], q[1]]));
+    for (let s = 0; s < R.len; s += 2) { const [x, z] = beagleAt(s); for (const c of cand) if (Math.hypot(c[0] - x, c[1] - z) < 2.6 && !R.sniffs.some(q => Math.abs(q.s - s) < 12)) R.sniffs.push({ s, x: c[0], z: c[1] }); }
+    R.s = R.len * 0.3; const [x, z, a] = beagleAt(R.s);
+    R.d = { kind: 'beagle', x, z, a, ph: 0, wag: 0.5, spd: 0, look: 0 };
+  }
+  if (!R.path.length) return;
+  const d = R.d, pd = Math.hypot(player.x - d.x, player.z - d.z);
+  // coçar o bumbum
+  const btn = document.getElementById('btnPet'); R.near = pd < 2.4 && !player.car;
+  if (btn) btn.style.display = R.near && R.scratch <= 0 ? '' : 'none';
+  if (R.scratch > 0) {
+    R.scratch -= dt; d.thump = true; d.sniff = false; d.wag = 1; d.spd = 0; d.sit = false;
+    if (Math.random() < dt * 5) R.hearts.push({ x: d.x + (Math.random() - 0.5) * 0.25, z: d.z + (Math.random() - 0.5) * 0.25, y: surfAt(d.x, d.z) + 0.75, life: 0 });
+    if (R.scratch <= 0) { d.thump = false; R.after = 2.5; }
+  } else if (R.stop > 0 || R.after > 0 || pd < 2.4) {   // parado cheirando, ou esperando a pessoa
+    if (R.stop > 0) R.stop -= dt; else { d.sniff = false; }
+    if (R.after > 0) R.after -= dt;
+    d.spd = 0; d.wag = pd < 4 ? 1 : 0.4;
+    if (R.stop <= 0) d.sniff = false;
+  } else {
+    R.s += 1.1 * dt; const [x, z, a] = beagleAt(R.s);
+    let da = a - d.a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    d.x = x; d.z = z; d.a += da * Math.min(1, dt * 6); d.spd = 1.1; d.ph += dt * 13; d.wag = 0.5; d.sniff = false;
+    const sm = ((R.s % R.len) + R.len) % R.len;
+    for (const q of R.sniffs) if (sm > q.s && sm - q.s < 0.5 && R.nextSniff !== q) { R.nextSniff = q; if (Math.random() < 0.6) { R.stop = 2.5 + Math.random() * 3; d.sniff = true; d.a = Math.atan2(q.z - d.z, q.x - d.x); } }
+  }
+  d.look = d.look || 0;
+  if (Math.abs(d.x - player.x) < 160 && Math.abs(d.z - player.z) < 160) buildDog(B, d, t);
+  // coraçõezinhos subindo
+  R.hearts = R.hearts.filter(h => (h.life += dt) < 1.6);
+  for (const h of R.hearts) {
+    const y = h.y + h.life * 0.5, s_ = 0.05 * (1 - h.life / 1.6 * 0.4), c = [235, 60, 90], Th = frame(h.x + Math.sin(h.life * 6) * 0.05, y, h.z, cam.yaw);
+    box(B, Th, -s_ * 1.4, -s_ * 0.1, 0, s_ * 1.6, -0.005, 0.005, c, c, F_GLOW); box(B, Th, s_ * 0.1, s_ * 1.4, 0, s_ * 1.6, -0.005, 0.005, c, c, F_GLOW);
+    box(B, Th, -s_ * 0.9, s_ * 0.9, -s_ * 1.0, 0.02, -0.005, 0.005, c, c, F_GLOW); box(B, Th, -s_ * 0.4, s_ * 0.4, -s_ * 1.5, -s_ * 0.9, -0.005, 0.005, c, c, F_GLOW);
+  }
+}
+function beaglePet() { if (BEAGLE.near && BEAGLE.scratch <= 0) { BEAGLE.scratch = 3.5; const d = BEAGLE.d; d.a = Math.atan2(d.z - player.z, d.x - player.x); } }
+document.getElementById('btnPet').addEventListener('click', e => { e.stopPropagation(); beaglePet(); });
+document.getElementById('btnPet').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
 function dogsFrame(B, dt, t) {
   for (const d of DOGS) {
     const Y = d.yard, D = DOGDEF[d.kind];
@@ -3168,6 +3265,7 @@ function frame_() {
   }
   gateFrame(dynB, dt);
   vhsFrame(dynB, t);
+  beagleFrame(dynB, dt, t);
   dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
     if (SKY.night > 0.05) for (const p of PROPS) if ((p.k === 'luminaria' || p.k === 'poste') && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
@@ -3274,5 +3372,5 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.sx, sy: VHS.sy, open: VHS.open }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.sx, sy: VHS.sy, open: VHS.open }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
