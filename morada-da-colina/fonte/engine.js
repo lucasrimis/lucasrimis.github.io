@@ -1943,6 +1943,8 @@ function placeCar(c) {
 addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (document.getElementById('lobby').style.display !== 'none') return;
+  if (typeof VHS !== 'undefined' && VHS.open) return;
+  if (e.code === 'KeyF' && typeof VHS !== 'undefined' && VHS.near) { vhsOpen(); return; }
   if (e.code === 'Enter' && window.__net && window.__net.online) { e.preventDefault(); window.__net.openChat(); return; }
   if (!e.repeat && window.__hunt && window.__hunt.key(e.code)) { e.preventDefault(); return; }
   keys[e.code] = true;
@@ -2290,6 +2292,72 @@ function dogRun(d, dt, spd) {   // segue d.path; devolve true ao terminar
   const st = Math.min(dist, spd * dt * (Math.abs(ta) > 1.2 ? 0.4 : 1));
   d.x += Math.cos(d.a) * st; d.z += Math.sin(d.a) * st; d.spd = spd; d.ph += dt * spd * 22; d.wag = 1;
   return false;
+}
+// ---------------- fita VHS flutuando na calçada do terreno vazio ao lado da casa 116 ----------------
+const VHS = { video: 'm_XQgDBdaG8', pos: null, sx: -1e4, sy: -1e4, vis: false, near: false, open: false };
+function vhsPos() {
+  if (VHS.pos) return VHS.pos;
+  const L = (W.landmarks || []).find(l => l.type === 'casa127'); if (!L) return null;
+  const u = 19, v = 3.3;   // calçada em frente ao terreno vazio (muro liso com as mangueiras)
+  return VHS.pos = [L.x + L.u[0] * u + L.v[0] * v, L.z + L.u[1] * u + L.v[1] * v, Math.atan2(L.u[1], L.u[0])];
+}
+function vhsFrame(B, t) {
+  const p = vhsPos(); if (!p) return;
+  const [x, z] = p, g = surfAt(x, z), y = g + 1.25 + Math.sin(t * 2) * 0.1, a = t * 0.9;
+  if (Math.abs(x - player.x) > 200 || Math.abs(z - player.z) > 200) return;
+  const T = frame(x, y, z, a), BLK = hex('#1b1b1e'), BLK2 = hex('#2a2a2e'), WIN = hex('#5a5f66'), SC = 1.45;
+  for (const k of ['ax', 'ay', 'az']) T[k] = T[k].map(v => v * SC);
+  box(B, T, -0.235, 0.235, -0.032, 0.032, -0.13, 0.13, BLK2, BLK);                     // corpo da fita (2,5x o tamanho real)
+  box(B, T, -0.2, 0.2, 0.032, 0.036, -0.1, 0.02, hex('#f1ede2'), hex('#f1ede2'));        // etiqueta branca
+  box(B, T, -0.18, 0.18, 0.036, 0.04, -0.085, -0.06, hex('#d6402f'), hex('#d6402f'));   // faixa vermelha da etiqueta
+  for (const u of [-0.11, 0.11]) box(B, T, u - 0.045, u + 0.045, 0.032, 0.036, 0.04, 0.115, WIN, WIN);   // janelinhas dos carretéis
+  box(B, T, -0.07, 0.07, 0.032, 0.035, 0.06, 0.1, hex('#3a2a22'), hex('#3a2a22'));      // fita marrom aparecendo
+  box(B, T, -0.235, 0.235, -0.03, 0.03, 0.125, 0.135, hex('#111113'), hex('#111113')); // tampa da frente
+  // brilho no chão pulsando, para chamar atenção (aparece de dia e de noite)
+  const k = 0.55 + 0.45 * Math.sin(t * 3), c = [Math.round(90 + 80 * k), Math.round(170 + 70 * k), 255];
+  const R0 = 0.7 + 0.08 * k, gy = g + 0.04;
+  for (let i = 0; i < 16; i++) {
+    const a0 = i / 16 * Math.PI * 2, a1 = (i + 1) / 16 * Math.PI * 2;
+    const P0 = (r, aa) => [x + Math.cos(aa) * r, gy, z + Math.sin(aa) * r];
+    B.quad(P0(R0, a0), P0(R0, a1), P0(R0 - 0.07, a1), P0(R0 - 0.07, a0), UP, c, F_GLOW);
+  }
+  box(B, T, -0.25, 0.25, -0.004, 0.004, -0.145, 0.145, c, c, F_GLOW);   // contorno brilhante
+  VHS.near = Math.hypot(player.x - x, player.z - z) < 2.8;
+  const btn = document.getElementById('btnVhs'); if (btn) btn.style.display = VHS.near && !VHS.open ? '' : 'none';
+}
+window.__vhsProj = VP => {   // posição da fita na tela, para o clique/toque
+  const p = vhsPos(); if (!p) return;
+  const q = xform(VP, [p[0], surfAt(p[0], p[1]) + 1.25, p[1]]);
+  VHS.vis = q[3] > 0 && Math.abs(q[0]) < 1.1 && Math.abs(q[1]) < 1.1 && Math.hypot(p[0] - player.x, p[1] - player.z) < 25;
+  VHS.sx = (q[0] * 0.5 + 0.5) * innerWidth; VHS.sy = (-q[1] * 0.5 + 0.5) * innerHeight;
+};
+function vhsOpen() {
+  if (VHS.open) return;
+  if (document.pointerLockElement) document.exitPointerLock();
+  VHS.open = true; for (const k in keys) keys[k] = false;
+  const ov = document.getElementById('vhsOv'), box_ = document.getElementById('vhsTv'), noise = document.getElementById('vhsNoise');
+  ov.style.display = 'flex'; box_.innerHTML = ''; noise.style.display = 'block';
+  // chiado de TV antiga por meio segundo, depois o vídeo
+  const nc = noise.getContext('2d'), img = nc.createImageData(160, 90); let n = 0;
+  const tick = () => { if (!VHS.open || n++ > 18) { noise.style.display = 'none'; return; } for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; } nc.putImageData(img, 0, 0); requestAnimationFrame(tick); };
+  tick();
+  setTimeout(() => { if (!VHS.open) return; const f = document.createElement('iframe');
+    f.src = 'https://www.youtube-nocookie.com/embed/' + VHS.video + '?autoplay=1&rel=0&playsinline=1';
+    f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture'; f.allowFullscreen = true; f.title = 'Fita VHS';
+    box_.appendChild(f); }, 550);
+}
+function vhsClose() { VHS.open = false; document.getElementById('vhsOv').style.display = 'none'; document.getElementById('vhsTv').innerHTML = ''; }
+document.getElementById('vhsClose').addEventListener('click', vhsClose);
+document.getElementById('btnVhs').addEventListener('click', e => { e.stopPropagation(); vhsOpen(); });
+document.getElementById('btnVhs').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+addEventListener('keydown', e => { if (e.key === 'Escape' && VHS.open) vhsClose(); });
+{ let down = null;   // clique/toque em cima da fita
+  cv.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; }, true);
+  cv.addEventListener('pointerup', e => {
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 8) return;
+    const cx = document.pointerLockElement === cv ? innerWidth / 2 : e.clientX, cy = document.pointerLockElement === cv ? innerHeight / 2 : e.clientY;
+    if (VHS.vis && Math.hypot(cx - VHS.sx, cy - VHS.sy) < 55) vhsOpen();
+  }, true);
 }
 function dogsFrame(B, dt, t) {
   for (const d of DOGS) {
@@ -3080,6 +3148,7 @@ function frame_() {
     n.show = dd < (n.r || 6);
   }
   gateFrame(dynB, dt);
+  vhsFrame(dynB, t);
   dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
     if (SKY.night > 0.05) for (const p of PROPS) if ((p.k === 'luminaria' || p.k === 'poste') && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
@@ -3112,6 +3181,7 @@ function frame_() {
   if (window.__net && window.__net.setCam) window.__net.setCam(eye, tgt);
   const proj = persp(cam.fp ? 0.95 : cam.dist > 60 ? 0.6 : 0.75, cv.width / cv.height, cam.fp ? 0.3 : 1.0, 2600);
   const VP = mul(proj, lookAt(eye, tgt, [0, 1, 0]));
+  if (window.__vhsProj) window.__vhsProj(VP);
   const fogR = cam.fp ? [220, 760] : [Math.max(220, cam.dist * 3), Math.max(760, cam.dist * 6)];
 
   // shadow pass
@@ -3185,5 +3255,5 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.sx, sy: VHS.sy, open: VHS.open }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
