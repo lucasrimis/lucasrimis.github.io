@@ -2576,6 +2576,7 @@ function dogRun(d, dt, spd) {   // segue d.path; devolve true ao terminar
 const VHS = { open: false, near: false, vis: false, cur: null, tapes: [
   { video: 'm_XQgDBdaG8', u: 19, v: 3.3 },     // calçada em frente ao terreno vazio (muro liso com as mangueiras)
   { video: 'IQjjz3oMf1w', u: 22.6, v: 27.6 },  // dentro do quintal, canto do fundo à esquerda (olhando da rua)
+  { video: '437DR4XdGjU', u: 9, v: 28.15 },    // no muro do fundo, do lado de dentro, junto da hera
 ].map(o => Object.assign(o, { pos: null, sx: -1e4, sy: -1e4, vis: false, near: false })) };
 function vhsPos(o = VHS.tapes[0]) {
   if (o.pos) return o.pos;
@@ -3636,7 +3637,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261118213149";
+  const BUILD = "v20261118220920";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
