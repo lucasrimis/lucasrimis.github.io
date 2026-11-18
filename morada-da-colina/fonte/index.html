@@ -2542,6 +2542,8 @@ function vhsFrame(B, t) {
   const [x, z] = p, g = surfAt(x, z), y = g + 1.25 + Math.sin(t * 2) * 0.1, a = t * 0.9;
   if (Math.abs(x - player.x) > 200 || Math.abs(z - player.z) > 200) return;
   const T = frame(x, y, z, a), BLK = hex('#1b1b1e'), BLK2 = hex('#2a2a2e'), WIN = hex('#5a5f66'), SC = 1.45;
+  // em pé, deitada na horizontal: comprimento na horizontal, a etiqueta virada para os lados, girando em volta do eixo vertical
+  T.ay = [Math.sin(a), 0, -Math.cos(a)]; T.az = [0, 1, 0];
   for (const k of ['ax', 'ay', 'az']) T[k] = T[k].map(v => v * SC);
   box(B, T, -0.235, 0.235, -0.032, 0.032, -0.13, 0.13, BLK2, BLK);                     // corpo da fita (2,5x o tamanho real)
   box(B, T, -0.2, 0.2, 0.032, 0.036, -0.1, 0.02, hex('#f1ede2'), hex('#f1ede2'));        // etiqueta branca
@@ -2549,6 +2551,7 @@ function vhsFrame(B, t) {
   for (const u of [-0.11, 0.11]) box(B, T, u - 0.045, u + 0.045, 0.032, 0.036, 0.04, 0.115, WIN, WIN);   // janelinhas dos carretéis
   box(B, T, -0.07, 0.07, 0.032, 0.035, 0.06, 0.1, hex('#3a2a22'), hex('#3a2a22'));      // fita marrom aparecendo
   box(B, T, -0.235, 0.235, -0.03, 0.03, 0.125, 0.135, hex('#111113'), hex('#111113')); // tampa da frente
+  box(B, T, -0.2, 0.2, -0.036, -0.032, -0.1, 0.02, hex('#f1ede2'), hex('#f1ede2')); box(B, T, -0.18, 0.18, -0.04, -0.036, -0.085, -0.06, hex('#d6402f'), hex('#d6402f'));   // etiqueta do outro lado
   // brilho no chão pulsando, para chamar atenção (aparece de dia e de noite)
   const k = 0.55 + 0.45 * Math.sin(t * 3), c = [Math.round(90 + 80 * k), Math.round(170 + 70 * k), 255];
   const R0 = 0.7 + 0.08 * k, gy = g + 0.04;
@@ -2557,7 +2560,6 @@ function vhsFrame(B, t) {
     const P0 = (r, aa) => [x + Math.cos(aa) * r, gy, z + Math.sin(aa) * r];
     B.quad(P0(R0, a0), P0(R0, a1), P0(R0 - 0.07, a1), P0(R0 - 0.07, a0), UP, c, F_GLOW);
   }
-  box(B, T, -0.25, 0.25, -0.004, 0.004, -0.145, 0.145, c, c, F_GLOW);   // contorno brilhante
   VHS.near = Math.hypot(player.x - x, player.z - z) < 2.8;
   const btn = document.getElementById('btnVhs'); if (btn) btn.style.display = VHS.near && !VHS.open ? '' : 'none';
 }
@@ -3499,7 +3501,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, v
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261118181816";
+  const BUILD = "v20261118182154";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
