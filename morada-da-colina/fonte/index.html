@@ -2300,10 +2300,16 @@ for (const p of POIS) { p.el = document.createElement('div'); p.el.className = '
 
 // ---------------- player mesh ----------------
 const SKIN = hex('#c98d62'), HAIR = hex('#2a1d14'), SHIRT = hex('#f2c230'), SHIRT2 = hex('#1f8a4c'), SHORTS = hex('#2a4d8f'), SHOE = hex('#f4f4f4'), PCAR = hex('#e04a2b');
+// skins especiais pelo nome do jogador (primeiro nome, sem diferenciar maiúscula/acento)
+function skinOf(name) {
+  const f = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().split(/\s+/)[0];
+  return ['carlos', 'kiko', 'miguel', 'manoel'].includes(f) ? f : null;
+}
 function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   const SHIRT_ = look.shirt, CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
+  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#6a4129') : SKIN;
   const T = frame(p.x, surfAt(p.x, p.z) + 0.02, p.z, p.a);
   const sw = Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
   const bob = Math.abs(Math.cos(p.walk)) * 0.06 * Math.min(1, p.speed / 3);
@@ -2321,7 +2327,7 @@ function buildPlayer(B, p, look) {
     const armed = p.gun !== undefined && v > 0;   // pegador: braço direito aponta para a mira com a arma
     const A = swing(Tb, 0, 1.42, v, armed ? Math.PI / 2 + p.gun : ph * 0.9);
     box(B, A, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, SHIRT_, SHIRT_);
-    box(B, A, -0.08, 0.08, -0.62, -0.3, -0.08, 0.08, SKIN, SKIN);
+    box(B, A, -0.08, 0.08, -0.62, -0.3, -0.08, 0.08, SKN, SKN);
     if (armed) {
       const G = hex('#26282c'), G2 = hex('#3a3d42');
       box(B, A, -0.06, 0.06, -0.98, -0.58, -0.045, 0.045, G, G2);      // cano/ferrolho
@@ -2330,11 +2336,22 @@ function buildPlayer(B, p, look) {
       box(B, A, 0.06, 0.08, -0.95, -0.9, -0.012, 0.012, hex('#e8e4d6'), hex('#e8e4d6')); // mira
     }
   }
-  box(B, Tb, -0.2, 0.2, 1.47, 1.87, -0.2, 0.2, SKIN, SKIN);
-  box(B, Tb, -0.23, 0.17, 1.8, 1.95, -0.22, 0.22, HAIR, HAIR);
-  box(B, Tb, -0.23, -0.1, 1.55, 1.85, -0.22, 0.22, HAIR, HAIR);
-  box(B, Tb, 0.2, 0.21, 1.66, 1.72, -0.12, -0.05, HAIR, HAIR); // eyes
-  box(B, Tb, 0.2, 0.21, 1.66, 1.72, 0.05, 0.12, HAIR, HAIR);
+  // cabeça (medidas a partir do pescoço, y = 1.47)
+  const hs = sk === 'carlos' ? 2 : 1, Th = { o: P(Tb, 0, 1.47, 0), ax: Tb.ax.map(v => v * hs), ay: Tb.ay.map(v => v * hs), az: Tb.az.map(v => v * hs) };
+  const fh = sk === 'kiko' ? 0.26 : 0;   // Kiko: testa grande
+  box(B, Th, -0.2, 0.2, 0, 0.4 + fh, -0.2, 0.2, SKN, SKN);
+  box(B, Th, -0.23, 0.17 - fh * 0.6, 0.33 + fh, 0.48 + fh, -0.22, 0.22, HAIR, HAIR);
+  box(B, Th, -0.23, -0.1, 0.08, 0.38 + fh, -0.22, 0.22, HAIR, HAIR);
+  box(B, Th, 0.2, 0.21, 0.19, 0.25, -0.12, -0.05, HAIR, HAIR); // olhos
+  if (sk === 'miguel') { box(B, Th, 0.2, 0.21, 0.135, 0.18, 0.05, 0.12, HAIR, HAIR); box(B, Th, 0.2, 0.212, 0.18, 0.205, 0.04, 0.13, SKN, hex('#5a3622')); }   // olho direito caído, com pálpebra pesada
+  else box(B, Th, 0.2, 0.21, 0.19, 0.25, 0.05, 0.12, HAIR, HAIR);
+  if (sk === 'kiko') box(B, Th, 0.2, 0.205, 0.33, 0.36, -0.14, 0.14, hex('#c99a74'), hex('#c99a74'));   // ruguinha da testa
+  if (sk === 'manoel') {   // cogumelo saindo da calça
+    box(B, Tb, 0.11, 0.25, 0.79, 0.85, -0.035, 0.035, hex('#efe6d2'), hex('#ded3bb'));            // talo
+    box(B, Tb, 0.23, 0.33, 0.73, 0.91, -0.1, 0.1, hex('#d23a2e'), hex('#b52f25'));                 // chapéu vermelho
+    box(B, Tb, 0.25, 0.31, 0.76, 0.88, -0.11, 0.11, hex('#d23a2e'), hex('#b52f25'));
+    for (const [y, v] of [[0.86, -0.05], [0.78, 0.04], [0.83, 0.07], [0.76, -0.07]]) box(B, Tb, 0.332, 0.336, y - 0.02, y + 0.02, v - 0.02, v + 0.02, hex('#ffffff'), hex('#ffffff'));   // bolinhas brancas
+  }
 }
 
 const P_SKIN = hex('#a8754f'), P_SHIRT = hex('#5f6d80'), P_PANTS = hex('#30343c'), P_CAP = hex('#24365e'), P_HAIR = hex('#b9b4ac'), P_SHOE = hex('#2a2420');
@@ -2763,7 +2780,7 @@ window.__net = (function () {
   LOOK_CSS.forEach((c, i) => { const b = document.createElement('button'); b.className = 'sw' + (i === N.look ? ' on' : ''); b.style.background = c; b.onclick = () => { N.look = i; [...sw.children].forEach((x, k) => x.classList.toggle('on', k === i)); }; sw.appendChild(b); });
   const CFG = window.FIREBASE_CONFIG;
   if (!CFG) { $('btnOnline').disabled = true; msgEl.textContent = 'O modo online ainda não foi configurado.'; }
-  const start = () => { MY_LOOK = LOOKS[N.look]; lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
+  const start = () => { MY_LOOK = LOOKS[N.look]; player.n = nameIn.value.trim(); lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
   const offPill = () => { onlTxt.textContent = '○ offline'; $('btnLeave').textContent = 'ENTRAR'; $('btnLeave').classList.add('join'); onl.style.display = 'flex'; };
   $('btnSolo').onclick = () => { start(); if (CFG && !N.online) offPill(); };
   $('btnOnline').onclick = async () => {
@@ -3482,7 +3499,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, v
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261118181233";
+  const BUILD = "v20261118181816";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
