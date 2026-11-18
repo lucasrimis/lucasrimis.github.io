@@ -2729,12 +2729,13 @@ window.__net = (function () {
   LOOK_CSS.forEach((c, i) => { const b = document.createElement('button'); b.className = 'sw' + (i === N.look ? ' on' : ''); b.style.background = c; b.onclick = () => { N.look = i; [...sw.children].forEach((x, k) => x.classList.toggle('on', k === i)); }; sw.appendChild(b); });
   const CFG = window.FIREBASE_CONFIG;
   if (!CFG) { $('btnOnline').disabled = true; msgEl.textContent = 'O modo online ainda não foi configurado.'; }
-  const start = () => { MY_LOOK = LOOKS[N.look]; player.n = nameIn.value.trim(); lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
+  const start = () => { N.crStart(); MY_LOOK = LOOKS[N.look]; player.n = nameIn.value.trim(); lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
   const offPill = () => { onlTxt.textContent = '○ offline'; $('btnLeave').textContent = 'ENTRAR'; $('btnLeave').classList.add('join'); onl.style.display = 'flex'; };
-  $('btnSolo').onclick = () => { start(); if (CFG && !N.online) offPill(); };
+  $('btnSolo').onclick = () => { N.tg({ t: 'join', n: nameIn.value.trim().slice(0, 16) || '(sem nome)', mode: 'sozinho' }); start(); if (CFG && !N.online) offPill(); };
   $('btnOnline').onclick = async () => {
     const n = nameIn.value.trim().replace(/\s+/g, ' ').slice(0, 16);
     if (!n) { msgEl.textContent = 'Digite um nome para jogar online.'; nameIn.focus(); return; }
+    if (N.badName(n)) { msgEl.textContent = 'Esse nome é reservado. Escolha outro.'; nameIn.focus(); return; }
     msgEl.textContent = 'Conectando…'; $('btnOnline').disabled = true;
     try { await connect(n); start(); }
     catch (e) { console.error(e); msgEl.textContent = 'Não consegui conectar (' + (e.code || e.message || e) + '). Tente de novo ou jogue sozinho.'; $('btnOnline').disabled = false; }
@@ -2749,7 +2750,9 @@ window.__net = (function () {
   };
   async function connect(name, base) {
     await N.ready();
+    if (N.badName(name)) throw { message: 'Esse nome é reservado. Escolha outro.' };
     N.name = name; N.base = base || '';
+    N.tg({ t: 'join', n: name, mode: base ? 'sala' : 'online', r: base ? base.split('/')[1] : '' });
     const me = N.db.ref(N.base + 'players/' + N.uid);
     N.full = () => Object.assign({ n: N.name, c: N.look, x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0, t: firebase.database.ServerValue.TIMESTAMP }, H.fields());
     me.onDisconnect().remove();
@@ -2820,7 +2823,7 @@ window.__net = (function () {
   // histórico de mensagens (toque nas mensagens, ou no ☰ da caixa de chat, para abrir)
   const HIST = [], histEl = $('chatHist'), histList = $('chatHistList');
   const hhmm = t => { const d = new Date(t || Date.now()); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
-  const histRow = h => '<div' + (h.sys ? ' class="sys"' : '') + '><i>' + hhmm(h.t) + '</i> ' + (h.sys ? esc(h.m) : '<b' + (h.mine ? ' class="me"' : '') + '>' + esc(h.who) + ':</b> ' + esc(h.m)) + '</div>';
+  const histRow = h => '<div' + (h.sys ? ' class="sys"' : '') + '><i>' + hhmm(h.t) + '</i> ' + (h.sys ? esc(h.m) : '<b' + (h.cr ? ' class="cr"' : h.mine ? ' class="me"' : '') + '>' + esc(h.who) + ':</b> ' + esc(h.m)) + '</div>';
   const renderHist = () => { histList.innerHTML = HIST.length ? HIST.map(histRow).join('') : '<div class="sys">Nenhuma mensagem ainda.</div>'; histList.scrollTop = histList.scrollHeight; };
   const pushHist = h => { HIST.push(h); if (HIST.length > 300) HIST.shift(); if (histEl.style.display === 'flex') { const atEnd = histList.scrollHeight - histList.scrollTop - histList.clientHeight < 40; histList.insertAdjacentHTML('beforeend', histRow(h)); if (atEnd) histList.scrollTop = histList.scrollHeight; } };
   N.openHist = () => { renderHist(); histEl.style.display = 'flex'; chatLog.style.visibility = 'hidden'; histList.scrollTop = histList.scrollHeight; };
@@ -2830,6 +2833,27 @@ window.__net = (function () {
   addEventListener('keydown', e => { if (e.key === 'Escape' && histEl.style.display === 'flex') N.closeHist(); });
   function addLog(who, m, mine, t) { pushHist({ who, m, mine, t: t || Date.now() }); const d = document.createElement('div'); d.innerHTML = '<b' + (mine ? ' class="me"' : '') + '>' + esc(who) + ':</b> ' + esc(m); chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 12000); }
   function sys(m) { pushHist({ sys: true, m, t: Date.now() }); const d = document.createElement('div'); d.className = 'sys'; d.textContent = m; chatLog.appendChild(d); while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 8000); }
+  // ---- Telegram: avisos para o criador (quem entrou + chat) e mensagens do CRIADOR no céu ----
+  const TG = 'https://morada-da-colina.pages.dev/mdc-tg/';
+  N.tg = o => { try { fetch(TG + 'notify', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(o), keepalive: true }).catch(() => {}); } catch (e) {} };
+  N.badName = n => /^\s*criador\s*$/i.test(String(n).normalize('NFD').replace(/[̀-ͯ]/g, ''));
+  function creatorMsg(m) {
+    pushHist({ who: 'CRIADOR', m, cr: true, t: Date.now() });
+    const d = document.createElement('div'); d.className = 'cr'; d.innerHTML = '<b class="cr">CRIADOR:</b> ' + esc(m); chatLog.appendChild(d);
+    while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 20000);
+    const sky = $('skyMsg'); sky.querySelector('.t').textContent = m; sky.classList.remove('on'); void sky.offsetWidth; sky.classList.add('on');
+    clearTimeout(N.skyT); N.skyT = setTimeout(() => sky.classList.remove('on'), 14000);
+  }
+  N.creatorMsg = creatorMsg;
+  const crSeen = new Set(); let crFirst = true;
+  async function crPoll() {
+    try {
+      const r = await fetch(TG + 'criador', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json();
+      for (const x of j.msgs || []) { if (crSeen.has(x.id)) continue; crSeen.add(x.id); if (crFirst && j.now - x.d > 90) continue; creatorMsg(String(x.m).slice(0, 200)); }
+      crFirst = false;
+    } catch (e) {}
+  }
+  N.crStart = () => { if (N.crOn) return; N.crOn = true; crPoll(); setInterval(() => { if (!document.hidden) crPoll(); }, 10000); };
   const myBubble = document.createElement('div'); myBubble.className = 'bubble'; lblLayer.appendChild(myBubble);
   function say(o, m, uid) {
     if (uid === N.uid) { myBubble.textContent = m; myBubble.style.display = 'block'; clearTimeout(N.myT); N.myT = setTimeout(() => myBubble.style.display = 'none', 6000); return; }
@@ -2839,7 +2863,7 @@ window.__net = (function () {
   N.openChat = () => { if (!N.online) return; if (document.pointerLockElement) document.exitPointerLock(); chatBox.style.display = 'flex'; chatIn.value = ''; chatIn.focus(); for (const k in keys) keys[k] = false; };
   const send = () => {
     const m = chatIn.value.trim().slice(0, 120); chatBox.style.display = 'none'; chatIn.blur();
-    if (m && N.db) N.db.ref(N.base + 'chat').push({ u: N.uid, n: N.name, m, t: firebase.database.ServerValue.TIMESTAMP });
+    if (m && N.db) { N.db.ref(N.base + 'chat').push({ u: N.uid, n: N.name, m, t: firebase.database.ServerValue.TIMESTAMP }); N.tg({ t: 'chat', n: N.name, m, r: N.base ? N.base.split('/')[1] : '' }); }
   };
   chatIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); send(); } if (e.key === 'Escape') { chatBox.style.display = 'none'; chatIn.blur(); } });
   $('chatSend').onclick = send;

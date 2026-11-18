@@ -120,7 +120,11 @@
   body.fp.aim #cross{width:26px;height:26px;margin:-13px 0 0 -13px;background:linear-gradient(#fff,#fff) center/2px 10px no-repeat,linear-gradient(#fff,#fff) center/10px 2px no-repeat;border:2px solid rgba(255,255,255,.85);box-shadow:0 0 0 1px #000,inset 0 0 0 1px #000}
   .lbl.seeker{border-color:#e0483a!important;color:#ffb0a0}
 
-  #chatLog b{color:#9fd0ff;font-weight:normal} #chatLog b.me{color:#ffd84a} #chatLog .sys{color:#bfe3a0;font-style:italic}
+  #chatLog b{color:#9fd0ff;font-weight:normal} #chatLog b.me{color:#ffd84a} #chatLog b.cr,#chatHist b.cr{color:#ff9d2e;font-weight:bold} #chatLog div.cr{background:rgba(60,30,8,.75);border-left:3px solid #ff9d2e}
+  #skyMsg{position:fixed;left:50%;top:17vh;transform:translateX(-50%) scale(.9);z-index:5;pointer-events:none;text-align:center;opacity:0;transition:opacity 1.2s,transform 1.2s;max-width:88vw}
+  #skyMsg.on{opacity:1;transform:translateX(-50%) scale(1)}
+  #skyMsg .w{font-size:14px;letter-spacing:6px;color:#ffcf7a;text-shadow:0 0 8px #ff8a1e,2px 2px 0 #000}
+  #skyMsg .t{font-size:clamp(26px,5vw,54px);line-height:1.05;color:#fff;text-shadow:0 0 14px #ffb347,0 0 30px #ff8a1e,3px 3px 0 #3a1c05;word-wrap:break-word} #chatLog .sys{color:#bfe3a0;font-style:italic}
   #chatBox{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:none;gap:6px;width:min(520px,92vw);z-index:6}
   #chatBox input{flex:1;font-family:'VT323',monospace;font-size:22px;padding:6px 10px;border:3px solid #0d1018;background:#fffbea}
   #lobby{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,14,24,.55);z-index:8}
@@ -194,6 +198,7 @@
 </div>
 <div id="result" class="panel"><div class="r1" id="resTitle"></div><div id="resBody"></div><div class="r3">Voltando para a sala…</div></div>
 <div id="toast"></div>
+<div id="skyMsg"><div class="w">✦ CRIADOR ✦</div><div class="t"></div></div>
 <button id="btnSit" class="tbtn" style="display:none">🪑 SENTAR <span class="k">(X)</span></button>
 <button id="btnPet" class="tbtn" style="display:none">🐾 COÇAR O BUMBUM <span class="k">(C)</span></button>
 <button id="btnVhs" class="tbtn" style="display:none">📼 ASSISTIR <span class="k">(F)</span></button>
