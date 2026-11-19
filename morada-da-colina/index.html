@@ -2973,8 +2973,23 @@ function buildPlayerVox(B, p, look, sk, SKN) {
   const style = sk === 'carlos' || sk === 'kiko' ? 0 : vxHash(p === player ? player.n : p.n) % 3, F = sk === 'kiko' ? 4 : 0, kS = SKN.join('.') + '|' + SH.join('.');
   const pelvis = vxPart('pel' + (sk === 'manoel' ? 'M' : ''), (b, put) => { b(-3, 3, 0, 1, -1, 1, JE); b(-3, 3, 2, 2, -1, 1, x => x === 0 ? hex('#c9b46a') : hex('#3b2a1e'));
     if (sk === 'manoel') { b(0, 0, 0, 0, 2, 3, hex('#efe6d2')); b(-1, 1, -1, 1, 4, 4, hex('#d23a2e')); b(-1, 1, 0, 0, 5, 5, hex('#d23a2e')); put(-1, 1, 5, WH); put(1, -1, 5, WH); put(0, 0, 5, WH); } });
-  const torso = vxPart('tor' + kS, (b, put) => { b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? SH2 : SH); b(-1, 1, 6, 6, 1, 1, SKN); put(0, 5, 1, SKN); b(-1, 1, 7, 7, -1, 1, SKN); });
-  const head = sk === 'miguel' ? vxPart('hdMiguel', (b, put) => {   // Miguel: rosto largo, barba rala, sobrancelhas grossas, olhos claros com o esquerdo (da foto) caído, cabelo curto degradê
+  const torso = sk === 'manoel' ? vxPart('torManoel' + SKN.join('.'), (b, put) => { const BK = hex('#1c1c1f'), BK2 = hex('#141416'), LF = hex('#3fae3a'), LF2 = hex('#2f8a2c');
+    b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? BK2 : BK); b(-1, 1, 6, 6, 1, 1, SKN); put(0, 5, 1, SKN); b(-1, 1, 7, 7, -1, 1, SKN);
+    const leaf = ['...X...', 'X.XXX.X', '.XXXXX.', '..XXX..', '...X...'];   // folha estampada no peito
+    leaf.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === 'X') put(j - 3, 5 - i, 1, i === 4 ? LF2 : LF); }));
+  }) : vxPart('tor' + kS, (b, put) => { b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? SH2 : SH); b(-1, 1, 6, 6, 1, 1, SKN); put(0, 5, 1, SKN); b(-1, 1, 7, 7, -1, 1, SKN); });
+  const head = sk === 'manoel' ? vxPart('hdManoel', (b, put) => {   // Manoel: rosto largo, olhos apertados de sorriso, sorrisão com dentes, barba rala, cabelo curto penteado para trás
+    const MS = hex('#d8ab92'), MS2 = hex('#c39479'), BEARD = hex('#8a6e5e'), HB = hex('#2b211b'), HB2 = hex('#3d3027');
+    b(-3, 3, 0, 7, -3, 3, MS); b(-4, -4, 0, 5, -2, 2, MS); b(4, 4, 0, 5, -2, 2, MS);    // rosto largo
+    b(-3, 3, -1, -1, -2, 2, MS); b(-5, -5, 2, 4, -1, 0, MS2); b(5, 5, 2, 4, -1, 0, MS2);
+    b(-3, 3, -1, -1, 1, 3, BEARD); b(-4, -4, -1, 1, 0, 2, BEARD); b(4, 4, -1, 1, 0, 2, BEARD); b(-2, 2, 0, 0, 3, 3, BEARD); put(-1, 2, 3, BEARD); put(1, 2, 3, BEARD);   // barba rala
+    for (const ex of [-2, 1]) { b(ex, ex + 1, 4, 4, 3, 3, hex('#3a2a22')); b(ex, ex + 1, 3, 3, 3, 3, MS2); b(ex - (ex < 0 ? 1 : 0), ex + 1 + (ex > 0 ? 1 : 0), 5, 5, 3, 3, HB); }   // olhos apertados + sobrancelhas grossas
+    b(-1, 1, 3, 3, 4, 4, MS); put(0, 4, 4, MS); b(-1, 1, 2, 2, 4, 4, MS2);               // nariz largo
+    b(-2, 2, 1, 1, 3, 3, hex('#f0ebe0')); put(-3, 1, 3, hex('#b77a6d')); put(3, 2, 3, hex('#b77a6d')); b(-2, 2, 2, 2, 3, 3, hex('#b77a6d'));   // sorrisão com dentes (um canto mais alto)
+    // cabelo curto penteado para trás, entradas nas têmporas
+    b(-3, 3, 8, 8, -3, 3, HB); b(-2, 2, 9, 9, -3, 2, HB2); b(-1, 3, 7, 7, 3, 3, HB); b(-2, 3, 8, 8, 4, 4, HB);
+    b(-4, -4, 5, 8, -3, 0, HB); b(4, 4, 5, 8, -3, 0, HB); b(-3, 3, 3, 8, -4, -4, HB);
+  }) : sk === 'miguel' ? vxPart('hdMiguel', (b, put) => {   // Miguel: rosto largo, barba rala, sobrancelhas grossas, olhos claros com o esquerdo (da foto) caído, cabelo curto degradê
     const MS = hex('#c99878'), MS2 = hex('#b48467'), BEARD = hex('#8f6d58'), HB = hex('#2a201a'), HB2 = hex('#4a3a30'), EY = hex('#2a1a12');
     b(-3, 3, 0, 7, -3, 3, MS); b(-4, -4, 1, 4, -2, 2, MS); b(4, 4, 1, 4, -2, 2, MS);    // rosto largo, bochechas cheias
     b(-3, 3, -1, -1, -2, 2, MS); b(-5, -5, 2, 4, -1, 0, MS2); b(5, 5, 2, 4, -1, 0, MS2);   // queixo largo + orelhas
@@ -3032,7 +3047,7 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     if (style === 1) { const CP = hex('#c23a2a'); b(-4, 4, 6, 8, -4, 3, CP); b(-3, 3, 6, 6, 4, 6, CP); b(-4, -4, 3, 5, -3, 1, HR); b(4, 4, 3, 5, -3, 1, HR); put(0, 8, -1, WH); }
     if (style === 2) for (let x = -4; x <= 4; x++) for (let z = -4; z <= 3; z++) for (let yy = 5; yy <= 9; yy++) { const d = x * x / 20 + (z + 0.5) * (z + 0.5) / 16 + (yy - 6) * (yy - 6) / 10; if (d < 1.15 && !(z === 3 && yy < 6) && ((x * 7 + yy * 3 + z * 5) % 4 !== 0 || d < 0.8)) put(x, yy, z, (x + yy + z) % 3 ? HR : shade(HR, 1.25)); }
   });
-  const uArm = vxPart('ua' + kS, b => { b(-1, 0, -2, 0, -1, 1, SH2); b(-1, 0, -4, -3, -1, 1, SKN); });
+  const uArm = vxPart('ua' + (sk === 'manoel' ? 'M' : '') + kS, b => { b(-1, 0, -2, 0, -1, 1, sk === 'manoel' ? hex('#141416') : SH2); b(-1, 0, -4, -3, -1, 1, SKN); });
   const fArm = vxPart('fa' + SKN.join('.'), b => { b(-1, 0, -4, -1, -1, 0, SKN); b(-1, 0, -5, -5, -1, 0, SK2); });
   const fArmGun = vxPart('fg' + SKN.join('.'), b => { b(-1, 0, -4, -1, -1, 0, SKN); b(-1, 0, -5, -5, -1, 0, SK2); b(-1, 0, -11, -6, 0, 0, hex('#26282c')); b(-1, 0, -7, -6, 1, 2, hex('#3a3d42')); b(-1, 0, -11, -11, -1, -1, hex('#e8e4d6')); });
   const fArmBib = vxPart('fb' + SKN.join('.'), (b, put) => { b(-1, 0, -4, -1, -1, 0, SKN); b(-1, 0, -5, -5, -1, 0, SK2);
@@ -3074,7 +3089,7 @@ function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   const SHIRT_ = look.shirt, CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
-  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : SKIN;
+  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
@@ -4611,7 +4626,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119205658";
+  const BUILD = "v20261119210510";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
