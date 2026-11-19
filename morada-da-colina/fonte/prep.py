@@ -763,6 +763,15 @@ trees = [t for t in trees if not _inpc(t[0], t[1], 2)]
 areas = [a_ for a_ in areas if not (a_['t'] == 'building' and all(_inpc(p[0], p[1], 3) for p in a_['pts']))]
 landmarks.append({'type': 'padoca', 'x': _c[0], 'z': _c[1], 'u': list(_d), 'v': list(_vn)})
 print('padoca removed houses', _nb - len(houses))
+# casa amarela na R. Wandir, em frente ao terreno vazio ao lado da Padóca (Street View)
+def _inwd(x, z, m=0):
+    dx, dz = x - _c[0], z - _c[1]; uu = dx * _d[0] + dz * _d[1]; vv = dx * _vn[0] + dz * _vn[1]
+    return 32.0 - m < uu < 47.0 + m and -21 - m < vv < -4.5 + m
+_nb = len(houses)
+houses = [h for h in houses if not _inwd(h[0], h[1], 0)]
+trees = [t for t in trees if not _inwd(t[0], t[1], 1)]
+landmarks.append({'type': 'wandir1', 'x': _c[0], 'z': _c[1], 'u': [-_d[0], -_d[1]], 'v': [-_vn[0], -_vn[1]]})
+print('wandir1 removed houses', _nb - len(houses))
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {

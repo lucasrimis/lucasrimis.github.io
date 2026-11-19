@@ -1053,6 +1053,46 @@ for (const h of W.houses) {
       { const p = WP(-6.9, 6.5); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.3, true); }   // palmeira do vizinho à esquerda
     }
   }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'wandir1') {   // casa amarela da R. Wandir de Carvalho (Street View): grade branca sobre mureta cinza, varanda à esquerda, óculo redondo
+    const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz], U = a => -32.5 - a;   // a = metros da esquerda para a direita de quem olha da rua
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const B = chunkB(...WP(U(7), 12)), T0 = at(0, 0, 0);
+    const gp = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
+    const gs = [gp(U(0), 5), gp(U(14), 5), gp(U(0), 19), gp(U(14), 19)], g = Math.max(...gs), LB = Math.min(...gs) - g - 0.6, T = at(0, 0, g);
+    const YL = hex('#ece0a2'), YL2 = hex('#ddd192'), WH = hex('#f1f2ef'), WH2 = hex('#dfe0dd'), GT = hex('#6f7884'), GT2 = hex('#626a75'), TILE = hex('#b9573a'), DK = hex('#2a2c2f');
+    const MV = 5.15;
+    const bx = (a0, a1, y0, y1, v0, v1, c, c2) => box(B, T, U(a1), U(a0), y0, y1, v0, v1, c, c2 || c);
+    const wf = (a0, a1, y0, y1, v, c) => wallFeat(B, T, U(a1), U(a0), y0, y1, v, -1, c);
+    // muro: pilares brancos, mureta de pastilha cinza-azulada, grade branca com arabescos
+    for (const [a0, a1, h] of [[0, 0.3, 2.0], [3.5, 3.75, 2.0], [5.0, 5.25, 2.0], [13.6, 14.0, 2.35]]) { bx(a0, a1, LB, h, MV - 0.15, MV + 0.15, WH, WH2); maskRect(T0, U(a1), U(a0), MV - 0.2, MV + 0.2); }
+    bx(5.25, 13.6, LB, 0.95, MV - 0.12, MV + 0.12, GT, GT2); maskRect(T0, U(13.6), U(5.25), MV - 0.17, MV + 0.17);
+    for (let y = 0.12; y < 0.95; y += 0.12) wf(5.25, 13.6, y, y + 0.012, MV - 0.12, hex('#58606a'));
+    bx(5.25, 13.6, 0.95, 1.0, MV - 0.14, MV + 0.14, WH, WH2);
+    const grade = (a0, a1, y0, y1) => { for (let a = a0 + 0.06; a < a1; a += 0.13) { bx(a, a + 0.03, y0, y1, MV - 0.015, MV + 0.015, WH, WH2); bx(a - 0.015, a + 0.045, y1, y1 + 0.1, MV - 0.02, MV + 0.02, WH, WH2); }
+      for (const y of [y0 + 0.02, y1 - 0.05]) bx(a0, a1, y, y + 0.04, MV - 0.02, MV + 0.02, WH, WH2);
+      for (let a = a0 + 0.1; a < a1 - 0.2; a += 0.26) bx(a, a + 0.18, y0 + 0.12, y0 + 0.2, MV - 0.02, MV + 0.02, WH, WH2); };   // faixa de arabescos
+    grade(5.25, 13.6, 1.0, 1.85);
+    grade(0.3, 3.5, 0.05, 1.85); maskRect(T0, U(3.5), U(0.3), MV - 0.05, MV + 0.05);   // portão da garagem
+    grade(3.75, 5.0, 0.05, 1.85); maskRect(T0, U(5.0), U(3.75), MV - 0.05, MV + 0.05); // portãozinho
+    // casa térrea amarela
+    const v0 = 9.0, vP = 12.0, v1 = 19.0, H = 2.9;
+    bx(4.5, 12.5, LB, H, v0, v1, YL, YL2); bx(1.0, 4.5, LB, H, vP, v1, YL, YL2); maskRect(T0, U(12.5), U(1.0), vP, v1); maskRect(T0, U(12.5), U(4.5), v0, vP);
+    bx(0.6, 12.9, LB, 0.15, v0 - 0.3, v1, hex('#b5b0a5'), hex('#a7a297'));
+    hipRoof(B, at(U(6.75), 13.9, g), 12.3, 10.6, H + 0.05, 1.9, 0.6, TILE);
+    bx(4.35, 4.6, 0.15, H, v0 + 0.1, v0 + 0.35, YL, YL2); { const p = P(T, U(4.47), 0, v0 + 0.22); maskCircle(p[0], p[2], 0.2); }   // pilar da varanda
+    bx(0.6, 4.5, H - 0.25, H, v0 - 0.3, v0 + 0.1, YL, YL2);
+    wf(1.8, 3.2, 1.4, 2.0, vP, hex('#d9d2a8')); for (let a = 1.85; a < 3.2; a += 0.14) wf(a, a + 0.07, 1.42, 1.98, vP - 0.01, hex('#9a9478'));   // cobogó
+    // óculo redondo com grade
+    { const cA = 5.9, cy = 1.75, R = 0.38; for (let k = 0; k < 10; k++) { const y = cy - R + (k + 0.5) * 2 * R / 10, w = Math.sqrt(Math.max(0, R * R - (y - cy) ** 2)); wf(cA - w, cA + w, y - R / 10, y + R / 10, v0, hex('#2f343a')); }
+      for (const d of [-0.2, 0, 0.2]) wf(cA + d - 0.02, cA + d + 0.02, cy - 0.35, cy + 0.35, v0 - 0.01, WH); wf(cA - 0.36, cA + 0.36, cy - 0.02, cy + 0.02, v0 - 0.01, WH); }
+    wf(7.2, 8.0, 0.15, 2.25, v0, WH); for (let y = 0.5; y < 2.2; y += 0.28) wf(7.3, 7.9, y, y + 0.16, v0 - 0.01, hex('#c9ccc9'));   // porta branca
+    wf(8.8, 11.0, 0.9, 2.2, v0, hex('#2f343a')); for (let a = 8.85; a < 11.0; a += 0.18) wf(a, a + 0.05, 0.9, 2.2, v0 - 0.01, WH);   // janelão com grade branca
+    for (const y of [0.92, 1.55, 2.15]) wf(8.8, 11.0, y, y + 0.05, v0 - 0.01, WH);
+    // cadeiras de plástico brancas na varanda
+    for (const a of [2.2, 3.0]) { const c = U(a); box(B, T, c - 0.22, c + 0.22, 0.15, 0.6, 10.6, 11.0, WH, WH2); box(B, T, c - 0.22, c + 0.22, 0.6, 1.05, 11.0, 11.06, WH, WH2); }
+    wallFeat(B, T, U(13.9), U(13.65), 1.3, 1.7, MV - 0.15, -1, hex('#c9c9c4'));
+  }
   for (const lm of (W.landmarks || [])) if (lm.type === 'padoca') {   // Padóca: esquina da Av. Antenor O'Reilly com a R. Wandir de Carvalho (Street View 2024)
     const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
     const AX = [ux, 0, uz], AZ = [vx, 0, vz];
