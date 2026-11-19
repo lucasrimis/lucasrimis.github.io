@@ -940,8 +940,16 @@ for (const h of W.houses) {
     box(B, T, 2.45, 2.95, 7.66, 7.8, -0.17, 0.17, hex('#d8dad5'), hex('#bfc2bd'));     // tampa arredondada
     box(B, T, 2.42, 2.98, 7.52, 7.58, -0.18, 0.18, hex('#e9e4d0'), hex('#e9e4d0'));   // difusor (acende à noite)
     maskCircle(x, z, 0.2); PROPS.push({ k: 'poste', x, z, a: ra }); return [x, y, z]; });
-  for (let i = 0; i < tops.length - 1; i++) {
-    const a = tops[i], b = tops[i + 1]; if (Math.hypot(b[0] - a[0], b[2] - a[2]) > 45) continue;
+  // liga cada poste ao vizinho mais próximo para cada lado da sua rua (antes só ligava postes seguidos na lista e alguns ficavam sem fio)
+  const links = new Set(), pairs = [];
+  PL.forEach(([x, z, pa], i) => {
+    const sa = (pa !== undefined ? pa : 0) + Math.PI / 2, sx = Math.cos(sa), sz = Math.sin(sa);
+    for (const dir of [1, -1]) { let best = -1, bd = 62;
+      PL.forEach(([x2, z2], j) => { if (j === i) return; const dx = x2 - x, dz = z2 - z, d = Math.hypot(dx, dz); if (d < 4 || d >= bd) return; const c = (dx * sx + dz * sz) * dir / d; if (c > 0.82) { bd = d; best = j; } });
+      if (best >= 0) { const k = Math.min(i, best) + ',' + Math.max(i, best); if (!links.has(k)) { links.add(k); pairs.push([i, best]); } } }
+  });
+  for (const [ia, ib] of pairs) {
+    const a = tops[ia], b = tops[ib];
     const B = chunkB((a[0] + b[0]) / 2, (a[2] + b[2]) / 2);
     for (const [h, off] of [[8.55, -0.8], [8.55, 0.8], [8.55, 0], [6.7, 0]]) {
       const dx = b[0] - a[0], dz = b[2] - a[2], l = Math.hypot(dx, dz), ox = -dz / l * off * 0.0 + (off ? (dz / l) * 0 : 0);
@@ -4382,7 +4390,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119120215";
+  const BUILD = "v20261119120908";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
