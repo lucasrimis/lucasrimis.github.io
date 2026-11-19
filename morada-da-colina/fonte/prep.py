@@ -752,6 +752,17 @@ houses = [h for h in houses if not (_inpd(h[0], h[1], 0) and abs(((h[0] - _q[0])
 trees = [t for t in trees if not _inpd(t[0], t[1], 1)]
 landmarks.append({'type': 'padaria', 'x': round(_q[0], 2), 'z': round(_q[1], 2), 'u': [round(_d[0], 4), round(_d[1], 4)], 'v': [round(_vn[0], 4), round(_vn[1], 4)], 'vf': round(_ag['h'] + _ag['sw'], 2)})
 print('padaria', [round(c, 1) for c in _q], 'removed houses', _nb - len(houses))
+# ---- Padóca: esquina da Av. Antenor O'Reilly com a R. Wandir de Carvalho (Colinas Padaria e Restaurante no Google) ----
+_c = (288.7, -432.3); _d = (0.349, 0.937); _vn = (-0.937, 0.349)    # u: pela R. Wandir para o norte, v: para dentro do lote (oeste)
+def _inpc(x, z, m=0):
+    dx, dz = x - _c[0], z - _c[1]; uu = dx * _d[0] + dz * _d[1]; vv = dx * _vn[0] + dz * _vn[1]
+    return 4.5 - m < uu < 34 + m and 4.5 - m < vv < 19 + m
+_nb = len(houses)
+houses = [h for h in houses if not any(_inpc(x, z, 0.5) for x, z in _hcorners(h))]
+trees = [t for t in trees if not _inpc(t[0], t[1], 2)]
+areas = [a_ for a_ in areas if not (a_['t'] == 'building' and all(_inpc(p[0], p[1], 3) for p in a_['pts']))]
+landmarks.append({'type': 'padoca', 'x': _c[0], 'z': _c[1], 'u': list(_d), 'v': list(_vn)})
+print('padoca removed houses', _nb - len(houses))
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {

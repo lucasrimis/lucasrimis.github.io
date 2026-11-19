@@ -1053,6 +1053,84 @@ for (const h of W.houses) {
       { const p = WP(-6.9, 6.5); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.3, true); }   // palmeira do vizinho à esquerda
     }
   }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'padoca') {   // Padóca: esquina da Av. Antenor O'Reilly com a R. Wandir de Carvalho (Street View 2024)
+    const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz];
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const B = chunkB(...WP(20, 12)), T0 = at(0, 0, 0), r = rngFor(lm.x, lm.z, 77);
+    const gp = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
+    const gs = [gp(5.3, 5.3), gp(33, 5.3), gp(5.3, 19), gp(33, 19), gp(13, 9), gp(20, 5.3)], g = Math.max(...gs), LB = Math.min(...gs) - g - 0.6, T = at(0, 0, g);
+    const CR = hex('#e9dcbf'), CR2 = hex('#dccfb1'), STN = hex('#8e9093'), STN2 = hex('#7d7f82'), BRN = hex('#7a5038'), TILE = hex('#c2643f'), BLK = hex('#232426'), WHT = hex('#eeefec'), WHT2 = hex('#dcdedb');
+    const stone = (Tt, u0, u1, y0, y1, v, sg) => { wallFeat(B, Tt, u0, u1, y0, y1, v, sg, STN); for (let y = y0 + 0.2; y < y1; y += 0.2) wallFeat(B, Tt, u0, u1, y, y + 0.02, v + sg * 0.005, sg, STN2); for (let y = y0; y < y1; y += 0.2) for (let u = u0 + ((y - y0) / 0.2 % 2 ? 0.2 : 0); u < u1; u += 0.4) wallFeat(B, Tt, u, u + 0.02, y, Math.min(y1, y + 0.2), v + sg * 0.005, sg, STN2); };
+    const awning = (Tt, u0, u1, y, v, sg) => { for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI / 2, b = (k + 1) / 5 * Math.PI / 2; const q = [P(Tt, u0, y + Math.sin(a) * 0.45, v + sg * Math.cos(a) * 0.6), P(Tt, u1, y + Math.sin(a) * 0.45, v + sg * Math.cos(a) * 0.6), P(Tt, u1, y + Math.sin(b) * 0.45, v + sg * Math.cos(b) * 0.6), P(Tt, u0, y + Math.sin(b) * 0.45, v + sg * Math.cos(b) * 0.6)]; B.quad(q[0], q[1], q[2], q[3], faceN(q[0], q[1], q[2], true), k % 2 ? hex('#8c5a44') : hex('#9b6a52'), F_PLAIN); } };
+    const winB = (Tt, u0, u1, y0, y1, v, sg) => { stone(Tt, u0 - 0.35, u1 + 0.35, y0 - 0.3, y1 + 0.25, v, sg); wallFeat(B, Tt, u0, u1, y0, y1, v + sg * 0.01, sg, BRN); for (let k = 0; k < 3; k++) for (let j = 0; j < 2; j++) { const a = u0 + 0.08 + k * (u1 - u0 - 0.16) / 3, b = a + (u1 - u0 - 0.16) / 3 - 0.06, c = y0 + 0.08 + j * (y1 - y0 - 0.16) / 2, d = c + (y1 - y0 - 0.16) / 2 - 0.06; wallFeat(B, Tt, a, b, c, d, v + sg * 0.02, sg, hex('#2f3a44')); } awning(Tt, u0 - 0.25, u1 + 0.25, y1 + 0.1, v, sg); };
+    // texto em blocos de pixel num quadro: Tt.ax = direção da leitura, -Tt.az = lado de quem lê
+    const signText = (Tt, u0, u1, y0, y1, v, lines, cols) => {
+      const Wc = 96, Hc = 22, c2 = document.createElement('canvas'); c2.width = Wc; c2.height = Hc; const gx = c2.getContext('2d'); gx.textAlign = 'center'; gx.textBaseline = 'middle';
+      lines.forEach((l, k) => { gx.font = "bold " + (lines.length > 1 ? 11 : 19) + "px 'VT323', monospace"; gx.fillStyle = cols[k]; gx.fillText(l, Wc / 2, lines.length > 1 ? 6 + k * 11 : 12); });
+      const d = gx.getImageData(0, 0, Wc, Hc).data, px = (u1 - u0) / Wc, py = (y1 - y0) / Hc, nn = [-Tt.az[0], 0, -Tt.az[2]];
+      for (let y = 0; y < Hc; y++) { let x0 = -1, col = null; for (let x = 0; x <= Wc; x++) { const i = (y * Wc + x) * 4, on = x < Wc && d[i + 3] > 120, c = on ? [d[i], d[i + 1], d[i + 2]] : null, same = on && col && Math.abs(c[0] - col[0]) + Math.abs(c[1] - col[1]) < 60;
+        if (x0 >= 0 && !same) { const a = u1 - x * px, b = u1 - x0 * px, yy = y1 - y * py; const q = [P(Tt, a, yy, v), P(Tt, b, yy, v), P(Tt, b, yy - py, v), P(Tt, a, yy - py, v)]; B.quad(q[0], q[1], q[2], q[3], nn, col, F_GLOW); x0 = -1; col = null; }
+        if (on && x0 < 0) { x0 = x; col = c; } } } };
+    // sobrado creme: 20 m ao longo da R. Wandir, 2 andares, telhado de 4 águas
+    const u0 = 13, u1 = 33, v0 = 9, v1 = 19, H1 = 3.1, H2 = 6.1;
+    box(B, T, u0, u1, LB, H2, v0, v1, CR, CR2); maskRect(T0, u0, u1, v0, v1);
+    hipRoof(B, at((u0 + u1) / 2, (v0 + v1) / 2, g), u1 - u0, v1 - v0, H2, 2.0, 0.6, TILE);
+    stone(T, u0, u1, H1 - 0.35, H1 + 0.3, v0, -1);                                               // faixa de pedra entre os andares
+    for (const [a, b] of [[14.2, 16.6], [17.8, 20.2], [26.0, 28.0], [29.4, 31.4]]) winB(T, a, b, H1 + 0.8, H1 + 2.1, v0, -1);
+    stone(T, 21.6, 24.2, H1 + 0.3, H2, v0, -1);                                                  // coluna de pedra com duas janelinhas em arco
+    for (const a of [22.15, 23.15]) { wallFeat(B, T, a, a + 0.35, H1 + 0.9, H1 + 2.2, v0 - 0.02, -1, BRN); wallFeat(B, T, a + 0.06, a + 0.29, H1 + 0.95, H1 + 2.15, v0 - 0.03, -1, hex('#2f3a44')); wallFeat(B, T, a + 0.08, a + 0.27, H1 + 2.2, H1 + 2.32, v0 - 0.02, -1, BRN); }
+    stone(T, 21.6, 24.2, 0, H1 - 0.35, v0, -1);
+    for (const [a, b] of [[14.0, 16.4], [17.2, 19.8], [25.0, 27.4], [28.2, 30.4]]) { wallFeat(B, T, a, b, 0, 2.5, v0, -1, hex('#2b2b2d')); for (let u = a + 0.12; u < b; u += 0.18) wallFeat(B, T, u, u + 0.05, 0.1, 2.4, v0 - 0.01, -1, hex('#7d7f82')); }   // portas de grade de enrolar
+    wallFeat(B, T, 30.8, 32.8, 0, 2.4, v0, -1, hex('#3a3633'));                                    // garagem
+    // fim do sobrado virado para a avenida e o terraço: janelas com toldo
+    { const Ts = { o: P(T, u0, 0, 0), ax: [-AZ[0], 0, -AZ[2]], ay: [0, 1, 0], az: AX };   // ax = -v, normal = -u (para a avenida)
+      for (const c of [-11.5, -15.8]) winB(Ts, c, c + 1.8, H1 + 0.8, H1 + 2.0, 0, -1);
+      wallFeat(B, Ts, -12.0, -10.4, 0, 2.4, 0, -1, hex('#4a2f22')); wallFeat(B, Ts, -16.8, -15.3, 0, 2.4, 0, -1, hex('#4a2f22'));
+      wallFeat(B, Ts, -18.9, -9.1, 0, 0.9, 0, -1, hex('#5a3a2c')); wallFeat(B, Ts, -14.6, -13.0, 1.0, 2.2, 0, -1, hex('#2f3a44')); }
+    // terraço coberto na esquina: piso de cerâmica, toldo metálico em pilares pretos
+    { const tu0 = 5.4, tu1 = 20.5, tv0 = 5.3, tv1 = 19;
+      box(B, T, tu0, tu1, LB, 0.1, tv0, tv1, hex('#9aa3ad'), hex('#8c949d'));
+      for (let u = tu0; u < tu1; u += 0.6) for (let v = tv0; v < tv1; v += 0.6) if ((((u - tu0) / 0.6 | 0) + ((v - tv0) / 0.6 | 0)) % 2 && (u < u0 || v < v0)) { const q = [[u, v], [Math.min(tu1, u + 0.6), v], [Math.min(tu1, u + 0.6), Math.min(tv1, v + 0.6)], [u, Math.min(tv1, v + 0.6)]].map(([a, b]) => P(T, a, 0.105, b)); B.quad(q[0], q[1], q[2], q[3], UP, hex('#adb5be'), F_PLAIN); }
+      const roofY = u => 3.35 - (u - tu0) * 0.0;   // telhado quase reto, caindo para as ruas
+      const sheet = (a0, a1, b0, b1) => { const q = [P(T, a0, 3.1, b0), P(T, a1, 3.1, b0), P(T, a1, 3.4, b1), P(T, a0, 3.4, b1)]; B.quad(q[0], q[1], q[2], q[3], UP, hex('#d6d9dc'), F_PLAIN); box(B, T, a0, a1, 2.95, 3.1, b0 - 0.05, b0 + 0.1, BLK, BLK); for (let a = a0; a < a1; a += 0.35) box(B, T, a, a + 0.06, 3.1, 3.18, b0 - 0.05, b0 + 0.05, hex('#f2f3f4'), hex('#f2f3f4')); };
+      sheet(tu0, u0, tv0, tv1); sheet(u0, tu1, tv0, v0);
+      box(B, T, tu0, tu0 + 0.12, 2.95, 3.12, tv0, tv1, BLK, BLK);
+      for (const [pu, pv] of [[tu0 + 0.1, tv0 + 0.1], [tu0 + 0.1, 12], [tu0 + 0.1, tv1 - 0.2], [9.5, tv0 + 0.1], [tu1 - 0.1, tv0 + 0.1], [15.5, tv0 + 0.1]]) { box(B, T, pu - 0.06, pu + 0.06, 0.1, 3.05, pv - 0.06, pv + 0.06, BLK, BLK); const p = P(T, pu, 0, pv); maskCircle(p[0], p[2], 0.12); }
+      for (let u = tu0 + 0.8; u < u0; u += 1.6) box(B, T, u - 0.04, u + 0.04, 2.9, 3.05, tv0, tv1, BLK, BLK);   // vigas
+      // mesas de madeira com cadeiras pretas dobráveis
+      const mesa = (mu, mv) => { const Tm = at(0, 0, g + 0.1); box(B, Tm, mu - 0.45, mu + 0.45, 0.72, 0.77, mv - 0.45, mv + 0.45, hex('#6b4a33'), hex('#5a3d29')); for (const [a, b] of [[-0.38, -0.38], [0.38, -0.38], [-0.38, 0.38], [0.38, 0.38]]) box(B, Tm, mu + a - 0.03, mu + a + 0.03, 0, 0.72, mv + b - 0.03, mv + b + 0.03, BLK, BLK);
+        for (const [du, dv, k] of [[0, -0.75, 0], [0, 0.75, 1], [-0.75, 0, 2], [0.75, 0, 3]]) { if (r() < 0.2) continue; const cu = mu + du, cv = mv + dv; box(B, Tm, cu - 0.2, cu + 0.2, 0.44, 0.48, cv - 0.2, cv + 0.2, BLK, BLK); for (const [a, b] of [[-0.17, -0.17], [0.17, 0.17], [-0.17, 0.17], [0.17, -0.17]]) box(B, Tm, cu + a - 0.02, cu + a + 0.02, 0, 0.44, cv + b - 0.02, cv + b + 0.02, BLK, BLK);
+          if (k < 2) box(B, Tm, cu - 0.2, cu + 0.2, 0.48, 0.9, cv + (k ? 0.2 : -0.2) - 0.02, cv + (k ? 0.2 : -0.2) + 0.02, BLK, BLK); else box(B, Tm, cu + (k === 3 ? 0.2 : -0.2) - 0.02, cu + (k === 3 ? 0.2 : -0.2) + 0.02, 0.48, 0.9, cv - 0.2, cv + 0.2, BLK, BLK); }
+        if (r() < 0.5) box(B, Tm, mu - 0.08, mu + 0.08, 0.77, 0.86, mv - 0.08, mv + 0.08, hex('#c23a2a'), hex('#a92f22'));   // porta-guardanapo vermelho
+        const p = P(Tm, mu, 0, mv); maskCircle(p[0], p[2], 0.55); };
+      for (const [mu, mv] of [[7.3, 7.6], [10.3, 7.6], [7.3, 11.2], [10.6, 11.0], [7.6, 15.0], [10.8, 15.4], [14.6, 7.2], [17.8, 7.2]]) mesa(mu, mv);
+      { const Tl = at(0, 0, g + 0.1), p = P(Tl, 12.2, 0, 6.2); box(B, Tl, 12.0, 12.4, 0, 0.7, 6.0, 6.4, hex('#f2f2ee'), hex('#e6e6e2')); box(B, Tl, 11.98, 12.42, 0.25, 0.42, 5.98, 6.42, hex('#e7b928'), hex('#e7b928')); maskCircle(p[0], p[2], 0.25); }   // lixeira
+      { const Tl = at(0, 0, g + 0.1); for (let k = 0; k < 4; k++) { const vv = 6.0 + k * 0.45; box(B, Tl, 5.6, 5.64, 0, 0.5, vv - 0.18, vv + 0.18, hex('#b7bbbf'), hex('#b7bbbf')); } }   // paraciclo
+      // faixa da Padóca: virada para a avenida e para a R. Wandir
+      { const Ts = { o: P(T, tu0 - 0.05, 0, 0), ax: [-AZ[0], 0, -AZ[2]], ay: [0, 1, 0], az: AX };
+        box(B, Ts, -16.5, -7.5, 3.15, 4.35, -0.06, 0, hex('#1d1712'), hex('#1d1712')); for (const vv of [-16.3, -7.7]) box(B, Ts, vv - 0.04, vv + 0.04, 3.0, 3.2, -0.04, 0.02, BLK, BLK);
+        signText(Ts, -16.3, -7.7, 3.25, 4.25, -0.08, ['Padóca'], ['#f0a64a']); }
+      { box(B, T, 13.4, 20.2, 3.35, 4.45, tv0 - 0.06, tv0, hex('#1d1712'), hex('#1d1712'));
+        signText(T, 13.6, 20.0, 3.45, 4.35, tv0 - 0.08, ['Padóca'], ['#f0a64a']); } }
+    // frente na R. Wandir depois do terraço: toldo com treliça branca, grade branca alta e portão de garagem
+    { const fu0 = 20.5, fu1 = 29, Tf = at(0, 0, g);
+      box(B, Tf, fu0, 32.8, LB, 0.1, 5.3, v0, hex('#b9b6ad'), hex('#aaa79f'));
+      for (let u = fu0; u < fu1; u += 0.14) box(B, Tf, u, u + 0.04, 0.1, 2.3, 5.3, 5.36, WHT, WHT2);
+      for (const y of [0.25, 1.0, 2.2]) box(B, Tf, fu0, fu1, y, y + 0.05, 5.28, 5.38, WHT, WHT2);
+      for (let u = fu0; u <= fu1 + 0.01; u += 1.42) box(B, Tf, u - 0.05, u + 0.05, 0.1, 2.4, 5.26, 5.4, WHT, WHT2);
+      maskRect(T0, fu0, fu1, 5.25, 5.45);
+      box(B, Tf, fu0, 31.5, 3.0, 3.06, 5.6, v0, hex('#e5e7e9'), hex('#d4d6d8'));                 // telha de fibrocimento
+      box(B, Tf, fu0, 31.5, 2.65, 2.7, 5.6, 5.66, WHT, WHT); box(B, Tf, fu0, 31.5, 2.95, 3.0, 5.6, 5.66, WHT, WHT);
+      for (let u = fu0; u < 31.4; u += 0.6) { const p0 = P(Tf, u, 2.68, 5.63), p1 = P(Tf, u + 0.3, 2.97, 5.63), p2 = P(Tf, u + 0.6, 2.68, 5.63); beam(B, p0, p1, 0.04, WHT); beam(B, p1, p2, 0.04, WHT); }   // treliça
+      for (const u of [fu0 + 0.05, 25, 31.4]) box(B, Tf, u - 0.05, u + 0.05, 0.1, 2.7, 5.6, 5.7, WHT, WHT2);
+      box(B, Tf, 29.0, 29.35, LB, 2.3, 5.2, 5.5, hex('#d8d2c4'), hex('#ccc6b8')); box(B, Tf, 32.8, 33.15, LB, 2.3, 5.2, 5.5, hex('#d8d2c4'), hex('#ccc6b8'));
+      box(B, Tf, 29.35, 32.8, 0.05, 2.1, 5.3, 5.36, hex('#e3e4e2'), hex('#d3d4d2')); maskRect(T0, 29, 33.15, 5.2, 5.5);   // portão branco
+      for (const [a, b] of [[29.4, 31.05], [31.1, 32.75]]) { const q = P(Tf, a, 0.1, 5.29), q2 = P(Tf, b, 2.0, 5.29); beam(B, q, q2, 0.03, hex('#c4c6c4')); beam(B, P(Tf, a, 2.0, 5.29), P(Tf, b, 0.1, 5.29), 0.03, hex('#c4c6c4')); }
+      box(B, Tf, 31.6, 32.0, 1.2, 1.55, 5.26, 5.29, hex('#e8e8e8'), hex('#e8e8e8')); box(B, Tf, 31.65, 31.95, 1.3, 1.45, 5.25, 5.26, hex('#c8322a'), hex('#c8322a'));   // placa "garagem"
+      { const p0 = P(Tf, 31.5, 0.1, 6.3), p1 = P(Tf, 30.4, 3.0, 8.6); for (let k = 0; k < 6; k++) beam(B, [p0[0] + AZ[0] * k * 0.12, p0[1], p0[2] + AZ[2] * k * 0.12].map((x, i) => i === 1 ? x : x + AX[i] * k * 0.12), [p1[0] + AX[0] * k * 0.12, p1[1], p1[2] + AX[2] * k * 0.12], 0.06, hex('#cfd3d6')); } }   // telha de alumínio encostada
+    LATE_NOTES.push({ name: '', style: 'note', x: WP(9, 11)[0], z: WP(9, 11)[1], y: g + 1.4, base: 0, look: 0, t: 0, r: 3, says: ['Padóca'] });
+  }
   for (const lm of (W.landmarks || [])) if (lm.type === 'padaria') {   // Padaria do Jorge (no lugar da Padaria Colina da R. Agenor Lopes Siqueira)
     const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
     const AX = [ux, 0, uz], AZ = [vx, 0, vz], VF = lm.vf;
