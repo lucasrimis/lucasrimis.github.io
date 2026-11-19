@@ -1113,6 +1113,32 @@ for (const h of W.houses) {
         for (let j = 0; j < 3; j++) wallFeat(B, T, u + r() * 3.5, u + 0.3 + r() * 3.7, y1 - 0.3 - r() * 1.0, y1 - 0.15 - r() * 0.5, v0, -1, RED2);   // marcas da escavadeira
       }
       maskRect(at(0, 0, 0), u, u + 4, VS + 0.1, V1); }
+    // rampinhas de tábua (lado esquerdo de quem olha da rua) e a BMX parada do lado
+    const WOOD = hex('#a8834f'), WOOD2 = hex('#8e6c3d'), WOOD3 = hex('#c39a5f'), BLK = hex('#9b968c'), BLK2 = hex('#857f74');
+    const ramp = (cu, cv, ang, L, h, w) => {   // sobe ao longo de "ang" (em relação ao eixo v do terreno)
+      const p = WP(cu, cv), g = groundAt(p[0], p[1]), B = chunkB(p[0], p[1]);
+      const ca = Math.cos(ang), sa = Math.sin(ang), F = [AZ[0] * ca + AX[0] * sa, 0, AZ[2] * ca + AX[2] * sa], S = [AX[0] * ca - AZ[0] * sa, 0, AX[2] * ca - AZ[2] * sa];
+      const t = Math.atan2(h, L), Tt = { o: [p[0], g + 0.02, p[1]], ax: S, ay: [-F[0] * Math.sin(t), Math.cos(t), -F[2] * Math.sin(t)], az: [F[0] * Math.cos(t), Math.sin(t), F[2] * Math.cos(t)] };
+      const Ll = Math.hypot(L, h);
+      for (let k = 0; k < 4; k++) { const a = -w / 2 + k * w / 4; box(B, Tt, a + 0.01, a + w / 4 - 0.01, 0, 0.04, 0, Ll, k % 2 ? WOOD : WOOD3, WOOD2); }   // tábuas
+      box(B, Tt, -w / 2 - 0.02, w / 2 + 0.02, 0.04, 0.07, Ll * 0.33, Ll * 0.33 + 0.08, WOOD2, WOOD2); box(B, Tt, -w / 2 - 0.02, w / 2 + 0.02, 0.04, 0.07, Ll * 0.72, Ll * 0.72 + 0.08, WOOD2, WOOD2);
+      const Tb = { o: [p[0] + F[0] * (L - 0.25), g, p[1] + F[2] * (L - 0.25)], ax: S, ay: [0, 1, 0], az: F };   // tijolos/blocos embaixo da ponta alta
+      box(B, Tb, -w / 2 + 0.05, w / 2 - 0.05, 0, h - 0.02, -0.2, 0.2, BLK, BLK2); for (let y = 0.19; y < h; y += 0.19) box(B, Tb, -w / 2 + 0.04, w / 2 - 0.04, y, y + 0.015, -0.205, 0.205, BLK2, BLK2);
+      const q = P(Tb, 0, 0, 0); maskCircle(q[0], q[2], 0.3);
+    };
+    ramp(30, 16, 0.3, 2.2, 0.55, 1.0); ramp(35, 22, -0.4, 1.8, 0.4, 0.9); ramp(26, 25, 2.9, 2.5, 0.7, 1.1);
+    { const p = WP(33, 18.6), g = groundAt(p[0], p[1]), B = chunkB(p[0], p[1]), tl = 0.2, a0 = Math.atan2(AX[2], AX[0]) + 0.5;   // BMX vermelha, apoiada inclinada
+      const K = { o: [p[0], g, p[1]], ax: [Math.cos(a0), 0, Math.sin(a0)], ay: [-Math.sin(a0) * Math.sin(tl), Math.cos(tl), Math.cos(a0) * Math.sin(tl)], az: [-Math.sin(a0) * Math.cos(tl), -Math.sin(tl), Math.cos(a0) * Math.cos(tl)] };
+      const tire = hex('#17181b'), fr = hex('#d12f2f'), chrome = hex('#c9cdd2'), rr = 0.25;
+      const wheel = cu => { for (let q = 0; q < 12; q++) { const b0 = q / 12 * Math.PI * 2, b1 = (q + 1) / 12 * Math.PI * 2; beam(B, P(K, cu + Math.cos(b0) * rr, rr + Math.sin(b0) * rr, 0), P(K, cu + Math.cos(b1) * rr, rr + Math.sin(b1) * rr, 0), 0.07, tire); } for (let q = 0; q < 6; q++) { const b = q / 6 * Math.PI; beam(B, P(K, cu - Math.cos(b) * rr * 0.9, rr - Math.sin(b) * rr * 0.9, 0), P(K, cu + Math.cos(b) * rr * 0.9, rr + Math.sin(b) * rr * 0.9, 0), 0.012, chrome); } };
+      wheel(-0.42); wheel(0.42);
+      const rear = P(K, -0.42, rr, 0), crank = P(K, -0.05, 0.27, 0), seat = P(K, -0.22, 0.68, 0), head = P(K, 0.3, 0.72, 0), front = P(K, 0.42, rr, 0);
+      beam(B, rear, crank, 0.04, fr); beam(B, rear, seat, 0.04, fr); beam(B, crank, seat, 0.05, fr); beam(B, crank, head, 0.055, fr); beam(B, seat, head, 0.05, fr); beam(B, head, front, 0.04, chrome);
+      box(B, K, -0.34, -0.1, 0.72, 0.77, -0.06, 0.06, tire, tire);                                   // selim
+      beam(B, head, P(K, 0.26, 0.98, 0), 0.035, chrome); beam(B, P(K, 0.26, 0.98, -0.3), P(K, 0.26, 0.98, 0.3), 0.035, chrome);   // guidão alto
+      for (const sv of [-0.3, 0.3]) beam(B, P(K, 0.26, 0.98, sv), P(K, 0.2, 0.98, sv), 0.05, tire);
+      for (const sv of [-0.12, 0.12]) box(B, K, -0.1, 0.0, 0.25, 0.29, sv - 0.06, sv + 0.06, hex('#2a2a2a'), hex('#2a2a2a'));   // pedais
+      maskCircle(p[0], p[1], 0.5); }
     for (const [u0, u1] of [[U0, U0], [U1, U1]]) { const B = chunkB(...WP(u0, (VS + V1) / 2)), g = gp(u0, VS), T = at(0, 0, g); for (let k = 0; k < steps; k++) { const v0 = VS + k * sd; box(B, T, u0 - 0.01, u0 + 0.01, -1, (k + 1) * sh, v0, V1, RED2, RED2); } }
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'wandir1') {   // casa amarela da R. Wandir de Carvalho (Street View): grade branca sobre mureta cinza, varanda à esquerda, óculo redondo
@@ -2889,6 +2915,7 @@ function dogRun(d, dt, spd) {   // segue d.path; devolve true ao terminar
 const VHS = { open: false, near: false, vis: false, cur: null, tapes: [
   { video: 'm_XQgDBdaG8', u: 19, v: 3.3 },     // calçada em frente ao terreno vazio (muro liso com as mangueiras)
   { video: 'IQjjz3oMf1w', u: 22.6, v: 27.6 },  // dentro do quintal, canto do fundo à esquerda (olhando da rua)
+  { video: 'IQjjz3oMf1w', start: 47, pos: (() => { const L = (W.landmarks || []).find(l => l.type === 'baldio'); if (!L) return null; const u = -16, v = 14; return [L.x + L.u[0] * u + L.v[0] * v, L.z + L.u[1] * u + L.v[1] * v, Math.atan2(L.u[1], L.u[0])]; })() },   // terreno baldio, lado direito
   { video: 'FfL2Yv2F4mo', start: 60, pos: BENCH && BENCH.tape },   // ao lado do banco da praça da rotatória
   { video: '437DR4XdGjU', more: ['YVNCtyXO51Q', '4gY35lBxOII'], u: 9, v: 28.15 },   // lista: toca um depois do outro    // no muro do fundo, do lado de dentro, junto da hera
 ].map(o => Object.assign(o, { pos: o.pos || null, sx: -1e4, sy: -1e4, vis: false, near: false })) };
