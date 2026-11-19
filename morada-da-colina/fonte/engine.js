@@ -2631,6 +2631,7 @@ const SKIN = hex('#c98d62'), HAIR = hex('#2a1d14'), SHIRT = hex('#f2c230'), SHIR
 // skins especiais pelo nome do jogador (primeiro nome, sem diferenciar maiúscula/acento)
 function skinOf(name) {
   const f = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().split(/\s+/)[0];
+  if (f === 'bruno' || f === 'mendes') return 'biblia';
   return ['carlos', 'kiko', 'miguel', 'manoel'].includes(f) ? f : null;
 }
 function buildPlayer(B, p, look) {
@@ -2659,9 +2660,18 @@ function buildPlayer(B, p, look) {
   box(B, Tb, 0.181, 0.19, 1.05, 1.3, -0.12, 0.12, SHIRT2, SHIRT2);
   for (const [v, ph] of [[-0.39, -sw], [0.39, sw]]) {
     const armed = p.gun !== undefined && v > 0;   // pegador: braço direito aponta para a mira com a arma
-    const A = swing(Tb, 0, 1.42, v, armed ? Math.PI / 2 + p.gun : ph * 0.9);
+    const bib = sk === 'biblia' && v < 0;   // Bruno / Mendes: bíblia na mão esquerda, junto ao peito
+    const A = swing(Tb, 0, 1.42, v, armed ? Math.PI / 2 + p.gun : bib ? 0.85 + ph * 0.1 : ph * 0.9);
     box(B, A, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, SHIRT_, SHIRT_);
     box(B, A, -0.08, 0.08, -0.62, -0.3, -0.08, 0.08, SKN, SKN);
+    if (bib) {
+      const BK = hex('#1c1714'), BK2 = hex('#2a211c'), PG = hex('#f1ead6'), GD = hex('#d8b24a');
+      box(B, A, -0.04, 0.26, -0.78, -0.42, 0.06, 0.15, BK, BK2);                 // capa
+      box(B, A, -0.03, 0.25, -0.77, -0.43, 0.075, 0.135, PG, PG);                 // folhas
+      box(B, A, 0.255, 0.265, -0.75, -0.45, 0.065, 0.145, BK, BK);
+      box(B, A, 0.08, 0.14, -0.7, -0.5, 0.151, 0.156, GD, GD); box(B, A, 0.03, 0.19, -0.58, -0.55, 0.151, 0.156, GD, GD);   // cruz dourada
+      box(B, A, 0.1, 0.12, -0.42, -0.36, 0.1, 0.11, hex('#a3262a'), hex('#a3262a'));   // marcador de fita
+    }
     if (armed) {
       const G = hex('#26282c'), G2 = hex('#3a3d42');
       box(B, A, -0.06, 0.06, -0.98, -0.58, -0.045, 0.045, G, G2);      // cano/ferrolho
