@@ -67,8 +67,6 @@
   #btnSit .k{opacity:.6}
   #skyNote{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:7;pointer-events:none;font-family:'Silkscreen',monospace;font-size:clamp(14px,2.4vw,22px);color:#fff3c4;background:rgba(40,22,6,.82);border:3px solid #ffb347;padding:10px 16px;text-align:center;text-shadow:2px 2px 0 #000;opacity:0;transition:opacity .6s;max-width:90vw}
   #skyNote.on{opacity:1;animation:skyPulse 1.4s ease-in-out infinite}
-  #skyText{position:absolute;z-index:0;pointer-events:none;display:none;align-items:center;justify-content:center;text-align:center;padding:2% 4%;box-sizing:border-box;font-family:'VT323',monospace;line-height:1.05;color:#4a2a0e;overflow:hidden}
-  #skyText .txt{word-wrap:break-word;max-width:100%}
   #skyNote span{display:block;font-size:1.4em;animation:skyArrow 1s ease-in-out infinite}
   @keyframes skyPulse{50%{box-shadow:0 0 22px #ff9d2e}}
   @keyframes skyArrow{50%{transform:translateY(-6px)}}
@@ -165,7 +163,6 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="skyText"><div class="txt"></div></div>
 <div id="labels"></div>
 <div id="hud" class="panel">
   <div class="t">MORADA DA COLINA</div>
@@ -258,6 +255,7 @@ const jit = (c, r, amt) => { const m = 1 + (r() - 0.5) * 2 * amt; return [Math.m
 const pick = (arr, r) => arr[Math.floor(r() * arr.length)];
 
 // vertex flag (stored in colour alpha)
+const F_SKYF = 2;   // céu com dissolver (uFade)
 const F_PLAIN = 255, F_TEX = 204, F_WATER = 140, F_PAVE = 100, F_FAR = 50, F_UNLIT = 20, F_GLOW = 11, F_SKY = 5;
 
 // ---------------- mesh builder ----------------
@@ -2019,13 +2017,14 @@ varying vec3 vN;varying vec4 vC;varying vec3 vW;varying vec4 vS;
 void main(){vN=aN;vC=aC;vW=aP;vS=uSVP*vec4(aP,1.0);gl_Position=uVP*vec4(aP,1.0);}`;
 const FS = `precision highp float;varying vec3 vN;varying vec4 vC;varying vec3 vW;varying vec4 vS;
 uniform sampler2D uSM;uniform vec3 uL;uniform vec3 uEye;uniform vec3 uFog;uniform vec2 uFogR;uniform float uT;uniform float uLv;uniform float uShadowOn;
-uniform vec3 uSunC;uniform vec3 uAmbC;uniform vec3 uTint;uniform float uNight;uniform vec4 uLamp[8];
+uniform vec3 uSunC;uniform vec3 uAmbC;uniform vec3 uTint;uniform float uNight;uniform vec4 uLamp[8];uniform float uFade;
 float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float unpack(vec4 c){return dot(c,vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0));}
 float b2(vec2 q){return mod(q.x*2.0+q.y*3.0,4.0);}
 float bayer(vec2 p){p=floor(mod(p,4.0));return (4.0*b2(mod(p,2.0))+b2(floor(p/2.0)))/16.0;}
 void main(){
  vec3 N=normalize(vN);vec3 base=vC.rgb;float fl=vC.a;
+ if(fl<0.012&&bayer(gl_FragCoord.xy)>=uFade)discard;
  if(fl>0.7&&fl<0.9){vec2 cell=floor(vW.xz*2.0+vec2(vW.y*1.7));base*=0.93+0.14*h21(cell);}
  else if(fl>0.33&&fl<0.47){vec2 q=vW.xz*vec2(4.0,2.0);q.x+=0.5*mod(floor(q.y),2.0);vec2 f=fract(q);base*=0.9+0.16*h21(floor(q));if(f.x<0.12||f.y<0.2)base*=0.72;}
  else if(fl>0.4&&fl<0.7){vec2 cell=floor(vW.xz*1.5);float w=sin(cell.x*0.9+uT*1.7)+sin(cell.y*1.3-uT*1.2)+sin((cell.x+cell.y)*0.5+uT*0.8);
@@ -2052,7 +2051,7 @@ const SFS = `precision highp float;varying float vD;vec4 pk(float d){vec4 e=frac
 const PM = prog(VS, FS), PS = prog(SVS, SFS);
 const LOC = { aP: gl.getAttribLocation(PM, 'aP'), aN: gl.getAttribLocation(PM, 'aN'), aC: gl.getAttribLocation(PM, 'aC') };
 const SLOC = { aP: gl.getAttribLocation(PS, 'aP') };
-const U = {}; ['uVP', 'uSVP', 'uSM', 'uL', 'uEye', 'uFog', 'uFogR', 'uT', 'uLv', 'uShadowOn', 'uSunC', 'uAmbC', 'uTint', 'uNight', 'uLamp'].forEach(k => U[k] = gl.getUniformLocation(PM, k));
+const U = {}; ['uVP', 'uSVP', 'uSM', 'uL', 'uEye', 'uFog', 'uFogR', 'uT', 'uLv', 'uShadowOn', 'uSunC', 'uAmbC', 'uTint', 'uNight', 'uLamp', 'uFade'].forEach(k => U[k] = gl.getUniformLocation(PM, k));
 const SU = { uSVP: gl.getUniformLocation(PS, 'uSVP') };
 
 function upload(B, dyn) {
@@ -2080,6 +2079,7 @@ function boxVisible(M, bb) {
 const groundM = upload(ground), farM = upload(farB);
 totalV += ground.n + farB.n;
 const dynB = new Builder(1 << 14); const dynVBO = gl.createBuffer();
+const skyMB = new Builder(1 << 12); const skyMVBO = gl.createBuffer();   // mensagem do criador (sem sombra)
 
 function bindMain(m) {
   gl.bindBuffer(gl.ARRAY_BUFFER, m.vbo);
@@ -2788,34 +2788,51 @@ document.getElementById('btnSit').addEventListener('touchstart', e => e.stopProp
 // ---------------- mensagem do criador no céu: duas nuvens 3D se abrem e um pergaminho desenrola ----------------
 let SKYMSG = null;
 function skyMsgAnchor(S) { const gy = surfAt(player.x, player.z); return [player.x + S.fx * 42, gy + 26, player.z + S.fz * 42]; }
-function skyMsgPt(S, u, y, v = 0) { const c = skyMsgAnchor(S), rx = -S.fz, rz = S.fx; return [c[0] + rx * u - S.fx * v, c[1] + y, c[2] + rz * u - S.fz * v]; }   // v > 0 = mais perto do jogador
+function skyMsgPt(S, u, y, v = 0) { const c = skyMsgAnchor(S), rx = -S.fz, rz = S.fx; return [c[0] + rx * u - S.fx * v, c[1] + y, c[2] + rz * u - S.fz * v]; }   // u = direita de quem olha, v > 0 = mais perto do jogador
+// texto em pixels de verdade (3D, atrás das árvores): desenha num canvas pequeno e vira faixas de blocos
+function skyMsgRuns(m) {
+  const Wc = 184, Hc = 96, cv2 = document.createElement('canvas'); cv2.width = Wc; cv2.height = Hc; const g = cv2.getContext('2d');
+  const words = m.split(/\s+/); let lines = [], size = 44;
+  for (; size >= 9; size -= 1) {
+    g.font = size + "px 'VT323', monospace"; lines = []; let cur = '';
+    for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width <= Wc - 8 || !cur) cur = t; else { lines.push(cur); cur = w; } }
+    if (cur) lines.push(cur);
+    if (lines.length * size * 0.92 <= Hc - 6 && lines.every(l => g.measureText(l).width <= Wc - 4)) break;
+  }
+  g.fillStyle = '#000'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const lh = size * 0.92, y0 = Hc / 2 - (lines.length - 1) * lh / 2;
+  lines.forEach((l, k) => g.fillText(l, Wc / 2, y0 + k * lh));
+  const d = g.getImageData(0, 0, Wc, Hc).data, runs = [];
+  for (let y = 0; y < Hc; y++) { let x0 = -1; for (let x = 0; x <= Wc; x++) { const on = x < Wc && d[(y * Wc + x) * 4 + 3] > 110; if (on && x0 < 0) x0 = x; else if (!on && x0 >= 0) { runs.push([(x0 - Wc / 2) * 0.1, (x - Wc / 2) * 0.1, (Hc / 2 - y) * 0.1]); x0 = -1; } } }
+  return runs;
+}
 function skyMsgFrame(B, t) {
   const S = SKYMSG; if (!S) return;
-  const now = performance.now(), el = S.seen ? (now - S.seen) / 1000 : 0, life = (24000 + S.m.length * 120) / 1000;
+  if (!S.runs) S.runs = skyMsgRuns(S.m);
+  const now = performance.now(), el = S.seen ? (now - S.seen) / 1000 : 0, L = S.life / 1000;
   const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
-  const part = ease(el / 2.8), unroll = ease((el - 1.6) / 2.2), fade = S.seen && el > life ? ease((el - life) / 2.5) : 0;
-  S.open = unroll; S.h = 0.6 + 10.4 * unroll;
-  const c = skyMsgAnchor(S), a = Math.atan2(S.fx, -S.fz), T = frame(c[0], c[1], c[2], a);   // ax = direita de quem olha, az = em direção ao jogador
-  if (Math.hypot(T.ax[0] + S.fz, T.ax[2] - S.fx) > 0.01) { T.ax = T.ax.map(x => -x); }
+  let part = ease(el / 2.8), unroll = ease((el - 1.6) / 2.2), fade = 0;
+  if (S.seen && el > L) { unroll = 1 - ease((el - L) / 2.2); part = 1 - ease((el - L - 1.4) / 2.6); fade = ease((el - L - 4.0) / 2.8); }   // enrola, nuvens se fecham, somem devagar
+  S.fade = fade; S.h = 0.6 + 10.4 * unroll;
+  const c = skyMsgAnchor(S), a = Math.atan2(S.fx, -S.fz), T = frame(c[0], c[1], c[2], a);   // ax = (-fz, fx) = direita de quem olha
   T.az = [-S.fx, 0, -S.fz];
-  // pergaminho (atrás das nuvens): papel + dois rolos de madeira
-  if (fade < 1) {
-    const h = S.h / 2, PAP = [244, 226, 180], PAP2 = [222, 196, 140], ROD = [122, 77, 34], ROD2 = [90, 54, 22], KNOB = [70, 40, 14], dy = -fade * 6;
-    if (unroll > 0.02) box(B, T, -9.6, 9.6, -h + 0.3 + dy, h - 0.3 + dy, -0.08, 0.08, PAP, PAP2, F_GLOW);
+  const h = S.h / 2, PAP = [244, 226, 180], PAP2 = [222, 196, 140], ROD = [122, 77, 34], ROD2 = [90, 54, 22], KNOB = [70, 40, 14], INK = [74, 42, 14];
+  if (fade < 0.05) {
+    if (unroll > 0.02) {
+      box(B, T, -9.6, 9.6, -h + 0.3, h - 0.3, -0.08, 0.08, PAP, PAP2, F_GLOW);
+      const lim = h - 0.4, n = [-S.fx, 0, -S.fz];
+      for (const [u0, u1, y] of S.runs) if (Math.abs(y) < lim) { const q = (u, yy) => skyMsgPt(S, u, yy, 0.1); B.quad(q(u0, y), q(u1, y), q(u1, y - 0.1), q(u0, y - 0.1), n, INK, F_GLOW); }
+    }
     for (const sg of [-1, 1]) {
-      const y = sg * h + dy;
-      box(B, T, -10.2, 10.2, y - 0.38, y + 0.38, -0.38, 0.38, ROD, ROD2, F_GLOW);
-      for (const e of [-1, 1]) box(B, T, e * 10.2 - 0.35, e * 10.2 + 0.35, y - 0.55, y + 0.55, -0.55, 0.55, KNOB, KNOB, F_GLOW);
+      box(B, T, -10.2, 10.2, sg * h - 0.38, sg * h + 0.38, -0.38, 0.38, ROD, ROD2, F_GLOW);
+      for (const e of [-1, 1]) box(B, T, e * 10.2 - 0.35, e * 10.2 + 0.35, sg * h - 0.55, sg * h + 0.55, -0.55, 0.55, KNOB, KNOB, F_GLOW);
     }
   }
-  // nuvens 3D (blocos como as do jogo), na frente do pergaminho; começam juntas e se afastam
-  const off = 6 + part * 20 + fade * 30, WC = hex('#ffffff'), SC = hex('#e8eef5');
-  const r = rngFor(7, 7, 99);
-  const lumps = []; for (let j = 0; j < 6; j++) lumps.push([(r() - 0.5) * 11, (r() - 0.5) * 4, 3.2 + r() * 4, 2.6 + r() * 3]);
-  for (const sg of [-1, 1]) for (const [u, y, sz, hy] of lumps) {
-    const uu = sg * off + u * sg;
-    box(B, T, uu - sz, uu + sz, y - hy, y + hy, 2.5 - sz * 0.6, 2.5 + sz * 0.6, WC, SC, F_SKY);
-  }
+  // nuvens 3D na frente do pergaminho
+  const off = 6 + part * 20, WC = hex('#ffffff'), SC = hex('#e8eef5'), r = rngFor(7, 7, 99), lumps = [];
+  for (let j = 0; j < 6; j++) lumps.push([(r() - 0.5) * 11, (r() - 0.5) * 4, 3.2 + r() * 4, 2.6 + r() * 3]);
+  for (const sg of [-1, 1]) for (const [u, y, sz, hy] of lumps) { const uu = sg * off + u * sg; box(B, T, uu - sz, uu + sz, y - hy, y + hy, 2.5 - sz * 0.6, 2.5 + sz * 0.6, WC, SC, F_SKYF, true); }
+  if (S.seen && el > L + 6.9) SKYMSG = null;
 }
 function beaglePet() { if (BEAGLE.near && BEAGLE.scratch <= 0) { BEAGLE.scratch = 3.5; const d = BEAGLE.d; d.a = Math.atan2(d.z - player.z, d.x - player.x); } }
 document.getElementById('btnPet').addEventListener('click', e => { e.stopPropagation(); beaglePet(); });
@@ -3123,26 +3140,15 @@ window.__net = (function () {
     // primeiro só o aviso; a mensagem fica no céu (direção para onde a câmera olhava), escondida entre duas nuvens 3D
     if (SKYMSG && !SKYMSG.chat) creatorChat(SKYMSG.m);
     $('skyNote').classList.add('on');
-    SKYMSG = { m, fx: -Math.sin(cam.yaw), fz: -Math.cos(cam.yaw), seen: 0, born: performance.now(), chat: false };
-    const el = $('skyText'); el.querySelector('.txt').textContent = m; el.style.display = 'none';
+    SKYMSG = { m, fx: -Math.sin(cam.yaw), fz: -Math.cos(cam.yaw), seen: 0, born: performance.now(), chat: false, life: 24000 + m.length * 120 };
   }
   window.__skyProj = VP => {
-    const S = SKYMSG, el = $('skyText'); if (!S) { el.style.display = 'none'; return; }
+    const S = SKYMSG; if (!S) return;
     const now = performance.now(), note = $('skyNote');
     if (!S.seen && now - S.born > 60000) { note.classList.remove('on'); if (!S.chat) { S.chat = true; creatorChat(S.m); } SKYMSG = null; return; }   // ninguém olhou: vai para o chat
-    const c = skyMsgAnchor(S), q = xform(VP, c);
+    const q = xform(VP, skyMsgAnchor(S));
     if (!S.seen && q[3] > 0 && Math.abs(q[0]) < 0.7 && Math.abs(q[1]) < 0.7) { S.seen = now; note.classList.remove('on'); }
     if (S.seen && !S.chat && now - S.seen > 4500) { S.chat = true; creatorChat(S.m); }
-    const life = 24000 + S.m.length * 120;
-    if (S.seen && now - S.seen > life + 2500) { SKYMSG = null; el.style.display = 'none'; return; }
-    // texto em cima do papel 3D: projeta os cantos do pergaminho
-    const k = S.open || 0; if (k < 0.85 || q[3] <= 0) { el.style.display = 'none'; return; }
-    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-    for (const [u, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = xform(VP, skyMsgPt(S, u * 9.2, y * S.h * 0.46)); if (p[3] <= 0) { el.style.display = 'none'; return; } const sx = (p[0] * 0.5 + 0.5) * innerWidth, sy = (-p[1] * 0.5 + 0.5) * innerHeight; x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy); }
-    el.style.display = 'flex'; el.style.left = x0 + 'px'; el.style.top = y0 + 'px'; el.style.width = (x1 - x0) + 'px'; el.style.height = (y1 - y0) + 'px';
-    const w = (x1 - x0) * 0.9, hh = (y1 - y0) * 0.8, fs = Math.max(9, Math.min(hh / 2.2, Math.sqrt(hh * w / (Math.max(8, S.m.length) * 0.55))));
-    let f = fs; el.style.fontSize = f + 'px'; const tx = el.firstChild;
-    for (let k = 0; k < 8 && f > 9 && tx.offsetHeight > (y1 - y0) * 0.88; k++) { f *= 0.88; el.style.fontSize = f + 'px'; }   // encolhe até caber no papel el.style.opacity = Math.min(1, (k - 0.85) / 0.15) * (S.seen && now - S.seen > life ? Math.max(0, 1 - (now - S.seen - life) / 2000) : 1);
   };
   N.creatorMsg = creatorMsg;
   const crSeen = new Set(); let crFirst = true;
@@ -3663,7 +3669,6 @@ function frame_() {
   gateFrame(dynB, dt);
   vhsFrame(dynB, t);
   beagleFrame(dynB, dt, t);
-  skyMsgFrame(dynB, t);
   benchFrame();
   dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
@@ -3674,6 +3679,8 @@ function frame_() {
     }
     drawSky(dynB, [player.x, groundAt(player.x, player.z) + 2, player.z], SKY); }
   for (const c of traffic) carMesh(dynB, groundFrame(c.x, c.z, c.a, 0.0), c.col);
+  skyMB.reset(); skyMsgFrame(skyMB, t);
+  if (skyMB.n) { gl.bindBuffer(gl.ARRAY_BUFFER, skyMVBO); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(skyMB.buf, 0, skyMB.n * 20), gl.DYNAMIC_DRAW); }
   gl.bindBuffer(gl.ARRAY_BUFFER, dynVBO);
   gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(dynB.buf, 0, dynB.n * 20), gl.DYNAMIC_DRAW);
   const dynM = { vbo: dynVBO, n: dynB.n };
@@ -3750,6 +3757,7 @@ function frame_() {
     bindMain(c.m); gl.drawArrays(gl.TRIANGLES, 0, c.m.n);
   }
   bindMain(dynM); gl.drawArrays(gl.TRIANGLES, 0, dynM.n);
+  if (skyMB.n) { gl.uniform1f(U.uFade, SKYMSG ? 1 - (SKYMSG.fade || 0) : 1); bindMain({ vbo: skyMVBO, n: skyMB.n }); gl.drawArrays(gl.TRIANGLES, 0, skyMB.n); }
   bindMain(farM); gl.drawArrays(gl.TRIANGLES, 0, farM.n);
 
   // labels
@@ -3782,7 +3790,7 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, bench: () => BENCH, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
 
 },30);
@@ -3790,7 +3798,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119001922";
+  const BUILD = "v20261119002605";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;

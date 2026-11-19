@@ -67,8 +67,6 @@
   #btnSit .k{opacity:.6}
   #skyNote{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:7;pointer-events:none;font-family:'Silkscreen',monospace;font-size:clamp(14px,2.4vw,22px);color:#fff3c4;background:rgba(40,22,6,.82);border:3px solid #ffb347;padding:10px 16px;text-align:center;text-shadow:2px 2px 0 #000;opacity:0;transition:opacity .6s;max-width:90vw}
   #skyNote.on{opacity:1;animation:skyPulse 1.4s ease-in-out infinite}
-  #skyText{position:absolute;z-index:0;pointer-events:none;display:none;align-items:center;justify-content:center;text-align:center;padding:2% 4%;box-sizing:border-box;font-family:'VT323',monospace;line-height:1.05;color:#4a2a0e;overflow:hidden}
-  #skyText .txt{word-wrap:break-word;max-width:100%}
   #skyNote span{display:block;font-size:1.4em;animation:skyArrow 1s ease-in-out infinite}
   @keyframes skyPulse{50%{box-shadow:0 0 22px #ff9d2e}}
   @keyframes skyArrow{50%{transform:translateY(-6px)}}
@@ -165,7 +163,6 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="skyText"><div class="txt"></div></div>
 <div id="labels"></div>
 <div id="hud" class="panel">
   <div class="t">MORADA DA COLINA</div>
