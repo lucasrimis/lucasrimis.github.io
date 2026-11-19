@@ -2933,6 +2933,7 @@ function dogRun(d, dt, spd) {   // segue d.path; devolve true ao terminar
 const VHS = { open: false, near: false, vis: false, cur: null, tapes: [
   { video: 'm_XQgDBdaG8', u: 19, v: 3.3 },     // calçada em frente ao terreno vazio (muro liso com as mangueiras)
   { video: 'IQjjz3oMf1w', u: 22.6, v: 27.6 },  // dentro do quintal, canto do fundo à esquerda (olhando da rua)
+  { video: 'HL8Ucpfu4Fg', start: 174, pos: [-212, 515, 0] },   // no meio da colina, entre as árvores (sul do mapa)
   { video: 'GZI6GsWwDmE', pos: [-392.6, -315.8, 0.18] },   // calçada da Av. Darcy Ribeiro (principal), entrada oeste do bairro
   { video: 'IQjjz3oMf1w', start: 47, pos: (() => { const L = (W.landmarks || []).find(l => l.type === 'baldio'); if (!L) return null; const u = -16, v = 14; return [L.x + L.u[0] * u + L.v[0] * v, L.z + L.u[1] * u + L.v[1] * v, Math.atan2(L.u[1], L.u[0])]; })() },   // terreno baldio, lado direito
   { video: 'FfL2Yv2F4mo', start: 60, pos: BENCH && BENCH.tape },   // ao lado do banco da praça da rotatória
