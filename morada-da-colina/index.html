@@ -1780,14 +1780,14 @@ for (const h of W.houses) {
     { const Tw = at(hu + hw / 2 + 2.2, hv + 1.5, hmax + 0.1); box(B, Tw, -2.2, 2.2, hmin - hmax - 0.5, 2.9, -3.2, 3.2, WALL2, WALL2); wallFeat(B, Tw, -1.0, 0.4, 1.0, 2.1, -3.2, -1, DARK); hipRoof(B, Tw, 4.4, 6.4, 2.9, 1.0, 0.7, hex('#ad5c39')); }
     // antena parabólica no telhado
     { const p = P(T, -3.6, 6.4, -1.2); const Td = frame(p[0], p[1], p[2], Math.atan2(uz, ux) + 2.4); box(B, Td, -0.03, 0.03, -0.4, 0.2, -0.03, 0.03, hex('#777'), hex('#777')); box(B, Td, -0.06, 0.06, 0.05, 0.75, -0.36, 0.36, hex('#d7d7d2'), hex('#bdbdb7')); }
-    maskRect(at(0, 0, 0), hu - hw / 2, hu + hw / 2 + 4.4, hv - hd / 2, hv + hd / 2);
+    maskRect(at(0, 0, 0), hu - hw / 2, hu + hw / 2, hv - hd / 2, hv + hd / 2); maskRect(at(0, 0, 0), hu + hw / 2, hu + hw / 2 + 4.4, hv + 1.5 - 3.2, hv + 1.5 + 3.2);   // casa + ala sul (antes a máscara cobria também a frente da ala, bloqueando a entrada)
     // os 4 cachorros do quintal: pitbull, bull terrier e dois yorkshires (um de roupinha com brinquedo)
     { const yard = { x: lm.x, z: lm.z, u: lm.u, v: lm.v, u0: -5.2, u1: 23.2, v0: 5.6, v1: 28.2, nu0: 3.3, nu1: 11.8, nv: 8.0 };
       for (const [kind, du, dv] of [['pitbull', 14, 10], ['bull', 18, 14], ['yorkie', -2, 7], ['yorkieRoupa', 13, 18]]) {
         const p = WP(du, dv); DOGS.push({ kind, x: p[0], z: p[1], a: Math.random() * 6.28, yard, tx: p[0], tz: p[1], wait: Math.random() * 3, ph: Math.random() * 6, wag: 0, spd: 0 }); } }
     // árvores: mangueiras grandes ao sul, coqueiro atrás do muro, arbusto que passa por cima do muro
-    for (const [tu, tv, s] of [[17.5, 9.5, 2.1], [21.5, 15, 1.9], [16, 20.5, 1.8], [21.5, 24.5, 1.6], [12.5, 24.5, 1.5]]) { const p = WP(tu, tv); tree(chunkB(p[0], p[1]), p[0], p[1], 0, s, true); }
-    { const p = WP(14.2, 10.6); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.45, true); }
+    for (const [tu, tv, s] of [[17.5, 9.5, 2.1]]) { const p = WP(tu, tv); tree(chunkB(p[0], p[1]), p[0], p[1], 0, s, true); }   // só a mangueira perto do muro da frente
+    { const p = WP(21.6, 26.2); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.45, true); }   // coqueiro no canto do fundo, perto da fita
     for (const [bu, bv, h] of [[14.4, 7.3, 2.9], [17.4, 7.0, 2.6], [-3.0, 6.6, 2.2]]) box(B, at(bu, bv), -1.1, 1.1, 0, h, -0.9, 0.9, hex('#4f8a3a'), hex('#41772f'), F_TEX);
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'weedlot') { // terreno baldio: mato alto
@@ -2825,14 +2825,11 @@ cv.addEventListener('touchstart', e => {
   hideHelpSoon();
   for (const t of e.changedTouches) {
     if (t.identifier === joy.id || t.identifier === look.id || t.identifier === pinch.id2) continue;
-    // dois dedos quase juntos (pinça): mesmo que o 1º tenha caído na área do joystick, vira zoom
-    if (e.touches.length === 2 && ((joy.id !== null && performance.now() - (joy.t0 || 0) < 700 && Math.hypot(joy.dx, joy.dy) < 0.35) || (look.id !== null && joy.id === null))) {
-      if (joy.id !== null && look.id === null) { const o = [...e.touches].find(q => q.identifier === joy.id); joy.id = null; joy.dx = joy.dy = 0; jEl.style.display = 'none'; if (o) { look.id = o.identifier; look.x = o.clientX; look.y = o.clientY; } }
-      if (look.id !== null && t.identifier !== look.id) { pinch.d = null; pinch.id2 = t.identifier; pinch.zin = 1; continue; }
-    }
+    // pinça (zoom) só na metade direita da tela: o dedo que gira a câmera + um segundo dedo, ambos à direita
+    if (look.id !== null && t.clientX >= innerWidth * 0.5 && look.x >= innerWidth * 0.5 && pinch.id2 == null) { pinch.d = null; pinch.id2 = t.identifier; pinch.zin = 1; continue; }
     if (t.clientX < innerWidth * 0.45 && joy.id === null) { joy.t0 = performance.now(); joy.id = t.identifier; joy.x = t.clientX; joy.y = t.clientY; joy.dx = joy.dy = 0; jEl.style.left = (t.clientX - 70) + 'px'; jEl.style.top = (t.clientY - 70) + 'px'; jEl.classList.remove('run'); jEl.style.display = 'block'; jKnob.style.transform = 'translate(0px,0px)'; }
     else if (look.id === null) { look.id = t.identifier; look.x = t.clientX; look.y = t.clientY; }
-    else { pinch.d = null; pinch.id2 = t.identifier; }
+
   }
   e.preventDefault();
 }, { passive: false });
@@ -4476,7 +4473,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119162346";
+  const BUILD = "v20261119163548";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
