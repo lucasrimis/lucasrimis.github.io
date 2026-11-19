@@ -299,7 +299,7 @@ function gameClock() { const sec = Date.now() / 1000 + (window.__timeShift || 0)
 let PEAK_A = -Math.PI / 2;   // direção (a partir do centro do mapa) do pico mais alto da serra: o sol nasce e se põe atrás dele
 let PORTELA_PARK = null;     // onde a bicicleta do Portela fica parada
 let GATE116 = null;          // portão de correr da casa 116
-let GATE489 = null;          // portão da garagem da casa 489 (abre para dentro)
+let GATE489 = null;          // porta de madeira da casa 389 (abre para dentro para a Pantufa)
 const angOf = T => Math.atan2(T.ax[2], T.ax[0]);
 function P(T, u, y, v) { return [T.o[0] + u * T.ax[0] + y * T.ay[0] + v * T.az[0], T.o[1] + u * T.ax[1] + y * T.ay[1] + v * T.az[1], T.o[2] + u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
 function N(T, u, y, v) { return [u * T.ax[0] + y * T.ay[0] + v * T.az[0], u * T.ax[1] + y * T.ay[1] + v * T.az[1], u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
@@ -1180,12 +1180,10 @@ for (const h of W.houses) {
       { const u0 = 4.75, u1 = 5.85, g = gmin(u0, u1, MV, MV), T = at(0, 0, g);
         box(B, T, u0, u1, 2.15, 2.5, MV - 0.12, MV + 0.12, BG, BG2);                            // verga
         for (const [a, b] of [[u0, u0 + 0.12], [u1 - 0.12, u1]]) box(B, T, a, b, -0.6, 2.15, MV - 0.12, MV + 0.45, BG, BG2);
-        box(B, T, u0 + 0.12, u1 - 0.12, 0.25, 2.15, MV + 0.4, MV + 0.48, WD, WD2);              // porta
-        box(B, T, u0 + 0.2, u1 - 0.2, 1.2, 2.0, MV + 0.38, MV + 0.4, hex('#6a2a26'), hex('#6a2a26'));   // pano vermelho atrás do vidro
-        box(B, T, u0 + 0.85, u0 + 0.9, 1.0, 1.15, MV + 0.36, MV + 0.4, hex('#c9c3b2'), hex('#c9c3b2'));
+        GATE489 = { T: at(u0 + 0.12, MV + 0.44, g), L: u1 - u0 - 0.24, open: 0, want: 0, WP, door: true, WD, WD2 };   // porta: desenhada a cada quadro (abre para a Pantufa)
         box(B, T, u0 - 0.1, u1 + 0.1, -0.6, 0.13, MV - 0.55, MV + 0.4, hex('#b9b4a8'), hex('#a9a498'));   // degraus
         box(B, T, u0 + 0.05, u1 - 0.05, 0.13, 0.25, MV - 0.25, MV + 0.4, hex('#b9b4a8'), hex('#a9a498'));
-        maskRect(T0, u0, u1, MV - 0.55, MV + 0.5); }
+        maskRect(T0, u0, u0 + 0.12, MV - 0.12, MV + 0.5); maskRect(T0, u1 - 0.12, u1, MV - 0.12, MV + 0.5); }
       // trecho mais alto à direita da porta (frontão), terminando em rampa até o pilar do portão
       const TB = seg(5.85, 8.25, 2.45); cap(TB, 4.75, 7.75, 2.5, 0.02);
       { const T = TB; for (let k = 0; k < 6; k++) { const a = 7.75 + k * 0.083, y = 2.5 - k * 0.06; box(B, T, a, a + 0.09, y - 0.1, y + 0.12, MV - 0.2, MV + 0.16, CAPC, BG2); }   // capa descendo em rampa
@@ -1211,7 +1209,7 @@ for (const h of W.houses) {
       const rails = (u0, u1, ys) => { const T = at(0, 0, gmin(u0, u1, MV, MV)); for (const y of ys) box(B, T, u0, u1, y, y + 0.045, MV - 0.025, MV + 0.025, RAIL, RAIL2); };
       // frente: portão de correr da garagem, portãozinho, mureta verde com grade branca
       pil(-6.25, 0.25, 2.1);
-      GATE489 = { T: at(-6.0, MV, gmin(-6.0, -1.55, MV, MV)), L: 4.45, open: 0, want: 0, WP, RAIL, RAIL2 };   // portão da esquerda: desenhado a cada quadro (abre para a Pantufa)
+      bars(-6.0, -1.55, 0.05, 1.95, 0.14, true); rails(-6.0, -1.55, [0.05, 0.95, 1.85]); maskRect(T0, -6.0, -1.55, MV - 0.05, MV + 0.05);
       { const T = at(0, 0, gp(-3.8, MV)); box(B, T, -3.95, -3.65, 0.9, 1.15, MV - 0.04, MV - 0.02, hex('#f4f4f2'), hex('#f4f4f2')); }   // placa do portão
       pil(-1.35, 0.2, 2.25);
       bars(-1.15, 0.2, 0.05, 1.95, 0.14, true); rails(-1.15, 0.2, [0.05, 0.95, 1.85]); maskRect(T0, -1.15, 0.2, MV - 0.05, MV + 0.05);
@@ -3184,32 +3182,43 @@ function beagleAt(s) { const R = BEAGLE; s = ((s % R.len) + R.len) % R.len; let 
 function gate489Frame(B, dt) {
   const G = GATE489; if (!G) return;
   G.open += Math.max(-dt * 0.7, Math.min(dt * 0.7, G.want - G.open));
-  const a = G.open * 1.45, H = yawChild(G.T, 0, 0, 0, a), { RAIL, RAIL2 } = G;   // gira para dentro do lote, dobradiça no pilar da esquerda
-  for (let u = 0.07; u < G.L; u += 0.14) { box(B, H, u - 0.017, u + 0.017, 0.05, 1.95, -0.017, 0.017, RAIL, RAIL2); box(B, H, u - 0.04, u + 0.04, 1.95, 2.07, -0.03, 0.03, RAIL, RAIL2); }
-  for (const y of [0.05, 0.95, 1.85]) box(B, H, 0, G.L, y, y + 0.045, -0.025, 0.025, RAIL, RAIL2);
+  const a = G.open * 1.45, H = yawChild(G.T, 0, 0, 0, a);   // gira para dentro do lote, dobradiça do lado esquerdo
+  box(B, H, 0, G.L, 0.25, 2.15, -0.04, 0.04, G.WD, G.WD2);
+  box(B, H, 0.08, G.L - 0.08, 1.2, 2.0, -0.06, -0.04, hex('#6a2a26'), hex('#6a2a26'));   // pano vermelho atrás do vidro
+  box(B, H, G.L - 0.15, G.L - 0.1, 1.0, 1.15, -0.08, -0.04, hex('#c9c3b2'), hex('#c9c3b2'));   // maçaneta
 }
 // rotina da Pantufa: no fim do dia vai para a casa 489; sai de novo às 10 h
 function beagleHome(R, d, dt) {
   const G = GATE489; if (!G) return false;
   const h = gameClock().h, night = h >= 18 || h < 10;
-  const out = G.WP(-3.8, 3.4), ins = G.WP(-3.8, 6.4), spot = G.WP(-4.2, 10.5);
-  if (R.sH === undefined) { let b = 1e9; for (let s = 0; s < R.len; s += 1) { const p = beagleAt(s), dd = Math.hypot(p[0] - out[0], p[1] - out[1]); if (dd < b) { b = dd; R.sH = s; } } }
+  const out = G.WP(5.3, 3.4), ins = G.WP(5.3, 6.3), spot = G.WP(5.6, 7.6);
+  if (R.sH === undefined) {   // ponto do passeio mais perto da casa + caminho pela calçada da Albert Sabin até a porta
+    let b = 1e9; for (let s = 0; s < R.len; s += 1) { const p = beagleAt(s), dd = Math.hypot(p[0] - out[0], p[1] - out[1]); if (dd < b) { b = dd; R.sH = s; } }
+    const st = beagleAt(R.sH), rd = W.roads.find(r => r.n === 'Rua Albert Sabin'), nv = [G.T.az[0], G.T.az[2]], ex = [G.T.ax[0], G.T.ax[2]];
+    const proj = p => (p[0] - out[0]) * ex[0] + (p[1] - out[1]) * ex[1], uS = proj(st), side = (p, d) => { const q = [p[0] - out[0], p[1] - out[1]]; return q[0] * nv[0] + q[1] * nv[1]; };
+    const mid = [];
+    if (rd) for (let i = 0; i < rd.pts.length - 1; i++) { const a = rd.pts[i], c = rd.pts[i + 1], L = Math.hypot(c[0] - a[0], c[1] - a[1]); for (let t = 0; t < L; t += 4) { const p = [a[0] + (c[0] - a[0]) * t / L, a[1] + (c[1] - a[1]) * t / L], u = proj(p);
+      if ((u > 0.5 && u < uS - 2) || (u < -0.5 && u > uS + 2)) { const nx = -(c[1] - a[1]) / L, nz = (c[0] - a[0]) / L, sg = (nx * nv[0] + nz * nv[1]) > 0 ? 1 : -1; mid.push([p[0] + nx * sg * (rd.h + 1.2), p[1] + nz * sg * (rd.h + 1.2), u]); } } }
+    mid.sort((p, q) => Math.abs(q[2]) - Math.abs(p[2]));
+    R.toHome = [[st[0], st[1]], ...mid.map(p => [p[0], p[1]]), out];
+  }
   if (!R.home) { R.home = night ? 'in' : 'out'; if (R.home === 'in') { d.x = spot[0]; d.z = spot[1]; d.a = Math.atan2(out[1] - spot[1], out[0] - spot[0]); } }
   const walk = spd => { d.spd = spd; return dogRun(d, dt, spd); };
   if (R.home === 'out') { if (night) R.home = 'going'; return false; }
   if (R.home === 'going') {   // segue o passeio até o ponto em frente à casa, depois atravessa
     const sm = ((R.s % R.len) + R.len) % R.len; if (Math.abs(sm - R.sH) > 1.2 || R.scratch > 0) return false;
-    R.home = 'enter'; d.path = [out, ins, spot]; d.pi = 0; d.delay = 0; R.stop = 0; d.sniff = false;
+    R.home = 'enter'; d.path = [...R.toHome, ins, spot]; d.pi = 0; d.delay = 0; R.stop = 0; d.sniff = false;
   }
-  if (R.home === 'enter') { G.want = 1; if (G.open < 0.8 && Math.hypot(d.x - out[0], d.z - out[1]) < 0.6) { d.spd = 0; d.wag = 1; return true; }
+  if (R.home === 'enter') { const atDoor = Math.hypot(d.x - out[0], d.z - out[1]) < 2.5; if (atDoor) G.want = 1; if (G.open < 0.8 && Math.hypot(d.x - out[0], d.z - out[1]) < 0.6) { d.spd = 0; d.wag = 1; return true; }
     if (walk(1.3)) { R.home = 'in'; R.closeT = 1.5; } return true; }
   if (R.home === 'in') {
     if (R.closeT > 0) { R.closeT -= dt; if (R.closeT <= 0) G.want = 0; }
     d.spd = 0; d.sit = true; d.wag = Math.hypot(player.x - d.x, player.z - d.z) < 6 ? 1 : 0.2; d.sniff = false;
-    if (!night) { R.home = 'leave'; G.want = 1; const p = beagleAt(R.sH); d.path = [ins, out, [p[0], p[1]]]; d.pi = 0; d.sit = false; }
+    if (!night) { R.home = 'leave'; G.want = 1; d.path = [ins, out, ...R.toHome.slice(0, -1).reverse()]; d.pi = 0; d.sit = false; R.closeAt = 2; }
     return true;
   }
-  if (R.home === 'leave') { d.sit = false; if (G.open < 0.8) { d.spd = 0; d.wag = 1; return true; }
+  if (R.home === 'leave') { d.sit = false; if (G.open < 0.8 && d.pi === 0) { d.spd = 0; d.wag = 1; return true; }
+    if (d.pi >= 2) G.want = 0;
     if (walk(1.3)) { R.home = 'out'; R.s = R.sH; G.want = 0; } return true; }
   return false;
 }
@@ -4277,7 +4286,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119102954";
+  const BUILD = "v20261119105112";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
