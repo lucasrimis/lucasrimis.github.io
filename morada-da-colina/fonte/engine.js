@@ -210,13 +210,16 @@ const creekD = (x, z, C) => { let d = 1e9; for (let k = 0; k < C.length - 1; k++
 
 const TS = 5; // terrain lattice spacing (m)
 const LW = Math.ceil((EX1 - EX0) / TS) + 1, LH = Math.ceil((EZ1 - EZ0) / TS) + 1;
-const LAT = new Float32Array(LW * LH);
+const LAT = new Float32Array(LW * LH), LOT = 26;   // profundidade dos lotes nivelados com a calçada (m)
 for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
   const x = EX0 + i * TS, z = EZ0 + j * TS;
   let h = demRaw(x, z);
   // flatten road beds
   const rs = roadSurf(x, z);
-  if (rs && rs.e < TS + 8) {
+  if (rs && !rs.foot && rs.e < LOT + 10) {   // lotes ao longo das ruas ficam na altura da calçada (casas e muros alinhados com ela)
+    const lot = rs.h, under = rs.h - 0.22;
+    h = rs.e < 0.8 ? under : rs.e < LOT ? lot : lot + (h - lot) * sstep(LOT, LOT + 10, rs.e);
+  } else if (rs && rs.e < TS + 8) {
     const target = rs.h - (rs.foot ? 0.12 : 0.22), inner = TS + 0.8;
     h = rs.e < inner ? target : target + (h - target) * sstep(inner, TS + 8, rs.e);
   }
@@ -231,8 +234,26 @@ for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
     if (d < 6) h -= 1.5 * sstep(6, 1.5, d);
   }
   if (CREEK2) { const d = creekD(x, z, CREEK2); if (d < 4.5) h -= 1.1 * sstep(4.5, 1.2, d); }   // valinha da continuação do riacho
-  if (rs && rs.e < TS + 0.8) h = Math.min(h, rs.h - (rs.foot ? 0.12 : 0.22));
+  if (rs && rs.e < (rs.foot ? TS + 0.8 : 0.8)) h = Math.min(h, rs.h - (rs.foot ? 0.12 : 0.22));
   LAT[j * LW + i] = h;
+}
+// cada casa fica na altura da calçada da sua rua; o terreno em volta é rebaixado para não atravessar paredes
+for (const h of W.houses) {
+  const [cx, cz, w, d, ang, , , , , , , , , face] = h, setb = h[16] || 0, real = ((h[15] || 0) & 4) !== 0;
+  const T0 = frame(cx, 0, cz, ang), sg = (Math.cos(face) * T0.az[0] + Math.sin(face) * T0.az[2]) > 0 ? 1 : -1;
+  let S = null;
+  for (let k = 0; k < 14 && S === null; k++) { const p = P(T0, 0, 0, sg * (d / 2 + (real ? setb : 2.4) + 0.5 + k)); const rs = roadSurf(p[0], p[2]); if (rs && !rs.foot && rs.e <= 0.5) S = rs.h; }
+  if (S === null) continue;
+  h.S = S;
+  const M = 7.2, u0 = -w / 2 - M, u1 = w / 2 + M, v0 = -d / 2 - M, v1 = d / 2 + M, mvv = sg * (d / 2 + (real ? setb : 2.4));
+  const ext = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].map(([u, v]) => P(T0, u, 0, v));
+  const xi0 = Math.max(0, Math.floor((Math.min(...ext.map(p => p[0])) - EX0) / TS)), xi1 = Math.min(LW - 1, Math.ceil((Math.max(...ext.map(p => p[0])) - EX0) / TS));
+  const zi0 = Math.max(0, Math.floor((Math.min(...ext.map(p => p[2])) - EZ0) / TS)), zi1 = Math.min(LH - 1, Math.ceil((Math.max(...ext.map(p => p[2])) - EZ0) / TS));
+  for (let j = zi0; j <= zi1; j++) for (let i = xi0; i <= xi1; i++) {
+    const x = EX0 + i * TS - cx, z = EZ0 + j * TS - cz, u = x * T0.ax[0] + z * T0.ax[2], v = x * T0.az[0] + z * T0.az[2];
+    if (u < u0 || u > u1 || v < v0 || v > v1) continue;
+    const k = j * LW + i; LAT[k] = Math.min(LAT[k], S - 0.02);
+  }
 }
 function groundAt(x, z) {
   const fx = (x - EX0) / TS, fz = (z - EZ0) / TS;
@@ -563,7 +584,7 @@ for (const h of W.houses) {
   const r = rngFor(cx, cz, seed);
   const B = chunkB(cx, cz);
   const T0 = frame(cx, 0, cz, ang);
-  const [hmin, hmax] = cornersH(T0, w, d);
+  const [hmin, hmax0] = cornersH(T0, w, d), hmax = h.S !== undefined ? h.S : hmax0;   // base na altura da calçada
   const T = frame(cx, hmax + 0.05, cz, ang);
   const wall = jit(WALLS[(wc + seed) % WALLS.length], r, 0.04);
   const H = floors * 3.0;
@@ -632,26 +653,27 @@ for (const h of W.houses) {
   const gcol = GRAD[seed % GRAD.length];
   const muro = (u0, u1) => {
     const pa = P(T0, u0, 0, mv), pb = P(T0, u1, 0, mv);
-    const ha = groundAt(pa[0], pa[2]), hb = groundAt(pb[0], pb[2]);
+    let ha = groundAt(pa[0], pa[2]), hb = groundAt(pb[0], pb[2]);
+    const lo = Math.min(ha, hb); if (h.S !== undefined) { ha = hb = h.S; }
     if (real && (hf & 2)) { // gradil: low wall + iron bars + pillars
-      const y0 = Math.min(ha, hb) - 0.6, yb = Math.max(ha, hb) + 0.7, yt = Math.max(ha, hb) + mh;
+      const y0 = Math.min(lo, ha) - 0.6, yb = Math.max(ha, hb) + 0.7, yt = Math.max(ha, hb) + mh;
       box(B, T0, u0, u1, y0, yb, mv - 0.12, mv + 0.12, hex('#e2ddd2'), mcol);
       box(B, T0, u0, u1, yt - 0.06, yt, mv - 0.03, mv + 0.03, gcol, gcol);
       for (let u = u0 + 0.12; u < u1 - 0.05; u += 0.22) box(B, T0, u - 0.025, u + 0.025, yb, yt, mv - 0.025, mv + 0.025, gcol, gcol);
       for (const u of [u0, u1]) box(B, T0, u - 0.18, u + 0.18, y0, yt + 0.12, mv - 0.18, mv + 0.18, mcol, mcol);
-    } else box(B, T0, u0, u1, Math.min(ha, hb) - 0.6, Math.max(ha, hb) + mh, mv - 0.12, mv + 0.12, hex('#e2ddd2'), mcol);
+    } else box(B, T0, u0, u1, Math.min(lo, ha) - 0.6, Math.max(ha, hb) + mh, mv - 0.12, mv + 0.12, hex('#e2ddd2'), mcol);
     maskRect(T0, u0, u1, mv - 0.15, mv + 0.15);
   };
   const condo = (hf & 32) !== 0;
   if (!condo && (real || r() < 0.85)) { if (gap0 > mu0) muro(mu0, gap0); if (gap1 < mu1) muro(gap1, mu1); }
   if (real && !condo) {
     // gate in the driveway gap (portão)
-    const pa = P(T0, gap0, 0, mv), ga = groundAt(pa[0], pa[2]);
+    const pa = P(T0, gap0, 0, mv), ga = h.S !== undefined ? h.S : groundAt(pa[0], pa[2]);
     box(B, T0, gap0, gap1, ga, ga + 2.0, mv - 0.05, mv + 0.05, gcol === GRAD[0] ? hex('#c9ccd0') : gcol, gcol);
     for (let u = gap0 + 0.2; u < gap1; u += 0.4) box(B, T0, u - 0.02, u + 0.02, ga + 0.1, ga + 1.9, mv - 0.07, mv + 0.07, hex('#00000000'.slice(0, 7)), hex('#2a2a2a'));
     maskRect(T0, gap0, gap1, mv - 0.1, mv + 0.1);
     // side walls between neighbouring lots, from the property line to the house
-    for (const su of [-w / 2 - 0.4, w / 2 + 0.4]) { const pa2 = P(T0, su, 0, mv), g2 = groundAt(pa2[0], pa2[2]); const v0 = Math.min(mv, vf), v1 = Math.max(mv, vf); box(B, T0, su - 0.1, su + 0.1, g2 - 0.6, g2 + 1.9, v0, v1, hex('#e2ddd2'), mcol); }
+    for (const su of [-w / 2 - 0.4, w / 2 + 0.4]) { const pa2 = P(T0, su, 0, mv), g2r = groundAt(pa2[0], pa2[2]), g2 = h.S !== undefined ? h.S : g2r; const v0 = Math.min(mv, vf), v1 = Math.max(mv, vf); box(B, T0, su - 0.1, su + 0.1, Math.min(g2, g2r) - 0.6, g2 + 1.9, v0, v1, hex('#e2ddd2'), mcol); }
     // sacada (balcony) on sobrados
     if ((hf & 8) && floors === 2) {
       const bw = w * 0.55, bu = (r() - 0.5) * (w - bw - 1), y = 3.0;
@@ -2543,7 +2565,7 @@ function toggleCar() {
 }
 // touch controls
 const joy = { id: null, x: 0, y: 0, dx: 0, dy: 0 }, look = { id: null, x: 0, y: 0 };
-const pinch = {}; window.__touch = { joy, look, pinch };
+const pinch = {}; window.__touch = { joy, look, pinch }; window.__houses = W.houses;
 const jEl = document.getElementById('joy'), jKnob = document.getElementById('knob');
 cv.addEventListener('touchstart', e => {
   hideHelpSoon();
@@ -2658,12 +2680,14 @@ function skinOf(name) {
   if (f === 'bruno' || f === 'mendes') return 'biblia';
   return ['carlos', 'kiko', 'miguel', 'manoel'].includes(f) ? f : null;
 }
+const PSC = 0.84;   // escala das pessoas (~1,70 m), proporcional às casas e portas
+function scaleT(T, k) { T.ax = T.ax.map(x => x * k); T.ay = T.ay.map(x => x * k); T.az = T.az.map(x => x * k); return T; }
 function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   const SHIRT_ = look.shirt, CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
   const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#6a4129') : SKIN;
-  const T = frame(p.x, p.sit ? p.sit.y - 0.75 : surfAt(p.x, p.z) + 0.02, p.z, p.a);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
   const bob = Math.abs(Math.cos(p.walk)) * 0.06 * Math.min(1, p.speed / 3);
   const Tb = { o: [T.o[0], T.o[1] + bob, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
@@ -2725,7 +2749,7 @@ function buildPlayer(B, p, look) {
 const P_SKIN = hex('#a8754f'), P_SHIRT = hex('#5f6d80'), P_PANTS = hex('#30343c'), P_CAP = hex('#24365e'), P_HAIR = hex('#b9b4ac'), P_SHOE = hex('#2a2420');
 const C_SKIN = hex('#b07a50'), C_SHORTS = hex('#1d4f9c'), C_HAIR = hex('#17110c'), C_SLIP = hex('#f2f2f2'), C_DARK = hex('#120d0a');
 function buildCaudinho(B, n, t) {
-  const T = frame(n.x, n.y, n.z, n.base);
+  const T = scaleT(frame(n.x, n.y, n.z, n.base), PSC);
   const br = Math.sin(t * 2.2) * 0.015; // breathing hard, irritated
   const Tb = { o: [T.o[0], T.o[1] + br, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
   for (const v of [-0.16, 0.16]) {
@@ -3354,7 +3378,7 @@ function buildRider(B, n, t) {   // Portela pedalando, de boné
 function buildNPC(B, n, t) {
   if (n.style === 'caudinho') return buildCaudinho(B, n, t);
   if (n.style === 'note') return;
-  const T = frame(n.x, n.y, n.z, n.base);
+  const T = scaleT(frame(n.x, n.y, n.z, n.base), PSC);
   const br = Math.sin(t * 1.6) * 0.012;
   const Tb = { o: [T.o[0], T.o[1] + br, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
   for (const v of [-0.15, 0.15]) {
@@ -3666,7 +3690,7 @@ window.__net = (function () {
     return { o, ax: d, ay: u, az: r };
   }
   const muzzle = (p, a, ap) => {
-    if (p === player && cam.fp && H.eye) return P(fpGun(), 0.4, 0, 0); const c = Math.cos(a), s_ = Math.sin(a), y = surfAt(p.x, p.z) + 0.02 + 1.42, sx = p.x - s_ * 0.39, sz = p.z + c * 0.39, f = Math.cos(ap) * 1.0; return [sx + c * f, y + Math.sin(ap) * 1.0, sz + s_ * f]; };
+    if (p === player && cam.fp && H.eye) return P(fpGun(), 0.4, 0, 0); const c = Math.cos(a), s_ = Math.sin(a), y = surfAt(p.x, p.z) + 0.02 + 1.42 * PSC, sx = p.x - s_ * 0.39 * PSC, sz = p.z + c * 0.39 * PSCC, f = Math.cos(ap) * 1.0; return [sx + c * f, y + Math.sin(ap) * 1.0, sz + s_ * f]; };
   H.draw = B => {
     const now = performance.now();
     if (cam.fp && player.gun !== undefined && H.eye) { // arma em primeira pessoa
@@ -4091,12 +4115,12 @@ function frame_() {
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
   let eye, tgt;
   if (cam.fp) { // primeira pessoa: olhos na altura da cabeça (ou do objeto, no esconde-esconde)
-    const eh = (window.__net && window.__net.eyeH && window.__net.eyeH()) || (player.car ? 1.48 : 1.68);
+    const eh = (window.__net && window.__net.eyeH && window.__net.eyeH()) || (player.car ? 1.48 : 1.68 * PSC);
     const fx = Math.cos(player.a), fz = Math.sin(player.a);
     eye = player.car ? [player.x + fx * 0.15 - fz * 0.38, camY + eh, player.z + fz * 0.15 + fx * 0.38] : [player.x + fx * 0.12, camY + eh, player.z + fz * 0.12];
     tgt = [eye[0] - Math.sin(cam.yaw) * cp, eye[1] - sp, eye[2] - Math.cos(cam.yaw) * cp];
   } else {
-    tgt = [player.x, camY + (player.car ? 1.2 : 1.3), player.z];
+    tgt = [player.x, camY + (player.car ? 1.2 : 1.3 * PSC), player.z];
     if (window.__hunt && window.__hunt.shoulder()) { tgt[0] += Math.cos(cam.yaw) * 0.9; tgt[2] -= Math.sin(cam.yaw) * 0.9; tgt[1] += 0.35; }   // mira por cima do ombro
     // olhando para cima: a câmera para de descer (fica baixa, atrás do jogador, mais perto) e só o olhar sobe
     const PL = 0.14, up = Math.max(0, PL - cam.pitch), pe = Math.max(cam.pitch, PL), de = cam.dist * (1 - 0.55 * Math.min(1, up / 0.7));
