@@ -2849,9 +2849,23 @@ window.__net = (function () {
     pushHist({ who: 'CRIADOR', m, cr: true, t: Date.now() });
     const d = document.createElement('div'); d.className = 'cr'; d.innerHTML = '<b class="cr">CRIADOR:</b> ' + esc(m); chatLog.appendChild(d);
     while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 20000);
-    const sky = $('skyMsg'); sky.querySelector('.t').textContent = m; sky.classList.remove('on'); void sky.offsetWidth; sky.classList.add('on');
-    clearTimeout(N.skyT); N.skyT = setTimeout(() => sky.classList.remove('on'), 14000);
+    // aviso na tela; a mensagem fica no céu, na direção para onde a câmera olhava, entre duas nuvens que se abrem
+    const el = $('skyScroll'), note = $('skyNote');
+    el.querySelector('.txt').textContent = m; el.classList.remove('open', 'bye'); el.style.display = 'none';
+    note.classList.add('on');
+    N.sky = { m, fx: -Math.sin(cam.yaw), fz: -Math.cos(cam.yaw), seen: 0, until: 0 };
+    clearTimeout(N.noteT); N.noteT = setTimeout(() => note.classList.remove('on'), 45000);
   }
+  window.__skyProj = VP => {
+    const S = N.sky, el = $('skyScroll'); if (!S) return;
+    const now = performance.now();
+    if (S.until && now > S.until) { el.classList.add('bye'); if (now > S.until + 1500) { el.style.display = 'none'; N.sky = null; } }
+    const gy = surfAt(player.x, player.z), q = xform(VP, [player.x + S.fx * 90, gy + 15, player.z + S.fz * 90]);
+    const on = q[3] > 0 && Math.abs(q[0]) < 0.9 && q[1] < 0.75 && q[1] > -0.5;
+    if (q[3] <= 0) { el.style.display = 'none'; return; }
+    el.style.display = 'block'; el.style.transform = `translate(${(q[0] * 0.5 + 0.5) * innerWidth}px,${(-q[1] * 0.5 + 0.5) * innerHeight}px) translate(-50%,-50%)`;
+    if (on && !S.seen) { S.seen = now; S.until = now + 22000 + S.m.length * 120; el.classList.add('open'); $('skyNote').classList.remove('on'); }
+  };
   N.creatorMsg = creatorMsg;
   const crSeen = new Set(); let crFirst = true;
   async function crPoll() {
@@ -3405,6 +3419,7 @@ function frame_() {
   const proj = persp(cam.fp ? 0.95 : cam.dist > 60 ? 0.6 : 0.75, cv.width / cv.height, cam.fp ? 0.3 : 1.0, 2600);
   const VP = mul(proj, lookAt(eye, tgt, [0, 1, 0]));
   if (window.__vhsProj) window.__vhsProj(VP);
+  if (window.__skyProj) window.__skyProj(VP);
   const fogR = cam.fp ? [220, 760] : [Math.max(220, cam.dist * 3), Math.max(760, cam.dist * 6)];
 
   // shadow pass
