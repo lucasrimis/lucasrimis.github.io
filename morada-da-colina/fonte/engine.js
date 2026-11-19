@@ -1080,6 +1080,41 @@ for (const h of W.houses) {
         LATE_NOTES.push({ name: '', style: 'note', x: gx, z: gz, y: groundAt(gx, gz) + 0.9, base: 0, look: 0, t: 0, r: 3.2, says: ['R.I.P. Balu'] });
         window.__grave = [gx, gz]; } }
   }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'baldio') {   // terreno baldio (Street View 10/2011): terra batida, capim, arvorezinhas secas e a ladeira cortada em degraus
+    const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz], r = rngFor(lm.x, lm.z, 11);
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const gp = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
+    const U0 = -34, U1 = 46, V0 = 5.6, VS = 44, V1 = 62;
+    const DIRT = [hex('#9b6f48'), hex('#a77a50'), hex('#8e6440'), hex('#b0835a')], GR = [hex('#7f9a4a'), hex('#8aa452'), hex('#6f8c40'), hex('#9aa85e')];
+    // chão: retalhos de terra batida e capim
+    for (let u = U0; u < U1; u += 2) for (let v = V0; v < VS; v += 2) {
+      const B = chunkB(...WP(u + 1, v + 1)), n = r(), c = n < 0.55 ? DIRT[Math.floor(r() * 4)] : GR[Math.floor(r() * 4)];
+      const q = [[u, v], [u + 2, v], [u + 2, v + 2], [u, v + 2]].map(([a, b]) => { const p = WP(a, b); return [p[0], groundAt(p[0], p[1]) + 0.06, p[1]]; });
+      B.quad(q[0], q[1], q[2], q[3], UP, c, F_TEX);
+      if (n > 0.55 && r() < 0.6) for (let k = 0; k < 3; k++) { const tu = u + r() * 2, tv = v + r() * 2, T = at(tu, tv); box(B, T, -0.12, 0.12, 0, 0.25 + r() * 0.35, -0.12, 0.12, GR[Math.floor(r() * 4)], GR[2]); }   // tufos de capim
+    }
+    // barranquinho na beira da calçada (como no Street View)
+    for (let u = U0; u < U1; u += 3) { const B = chunkB(...WP(u, V0)), T = at(u + 1.5, V0 + 0.8); box(B, T, -1.5, 1.5, -0.3, 0.2 + r() * 0.25, -0.8, 0.8, DIRT[Math.floor(r() * 4)], hex('#a0714a'), F_TEX); }
+    // arvorezinhas secas, galhos finos
+    for (const [tu, tv] of [[-6, 9], [4, 12], [-18, 16], [14, 20], [26, 14], [-26, 26], [6, 30]]) { const B = chunkB(...WP(tu, tv)), T = at(tu, tv), BR = hex('#6b5a48'), base = P(T, 0, 0, 0), top = P(T, 0, 2.6 + r(), 0);
+      beam(B, base, top, 0.1, BR);
+      for (let k = 0; k < 5; k++) { const a = r() * 6.28, y = 1.3 + r() * 1.4, l = 0.7 + r() * 0.8, p0 = P(T, 0, y, 0), p1 = [p0[0] + Math.cos(a) * l, p0[1] + 0.6 + r() * 0.5, p0[2] + Math.sin(a) * l]; beam(B, p0, p1, 0.05, BR); }
+      const p = WP(tu, tv); maskCircle(p[0], p[1], 0.15); }
+    // lixinho jogado
+    for (let k = 0; k < 10; k++) { const tu = U0 + 4 + r() * (U1 - U0 - 8), tv = V0 + 1 + r() * 6, B = chunkB(...WP(tu, tv)), T = at(tu, tv); box(B, T, -0.15, 0.15, 0.04, 0.1, -0.1, 0.1, [hex('#e8e8e2'), hex('#5a8ad0'), hex('#d9d2b0')][k % 3], hex('#cfcfc8')); }
+    // ladeira do morro ao fundo, cortada em degraus pela escavadeira (barro vermelho com capim em cima)
+    const RED = hex('#b2552e'), RED2 = hex('#9d4826'), RED3 = hex('#c46a3c'), TOPG = hex('#7d9246');
+    const steps = 5, sd = (V1 - VS) / steps, sh = 1.6;
+    for (let u = U0; u < U1; u += 4) { const B = chunkB(...WP(u + 2, (VS + V1) / 2)), g = Math.min(gp(u, VS), gp(u + 4, VS));
+      for (let k = 0; k < steps; k++) { const T = at(0, 0, g), v0 = VS + k * sd, y1 = (k + 1) * sh + (r() - 0.5) * 0.25;
+        box(B, T, u, u + 4.02, -1.0, y1, v0, V1, k % 2 ? RED : RED3, RED2);
+        const q = [[u, v0 + 0.05], [u + 4.02, v0 + 0.05], [u + 4.02, v0 + sd * 0.45], [u, v0 + sd * 0.45]].map(([a, b]) => P(T, a, y1 + 0.02, b)); B.quad(q[0], q[1], q[2], q[3], UP, TOPG, F_TEX);   // capinzal no patamar
+        for (let j = 0; j < 3; j++) wallFeat(B, T, u + r() * 3.5, u + 0.3 + r() * 3.7, y1 - 0.3 - r() * 1.0, y1 - 0.15 - r() * 0.5, v0, -1, RED2);   // marcas da escavadeira
+      }
+      maskRect(at(0, 0, 0), u, u + 4, VS + 0.1, V1); }
+    for (const [u0, u1] of [[U0, U0], [U1, U1]]) { const B = chunkB(...WP(u0, (VS + V1) / 2)), g = gp(u0, VS), T = at(0, 0, g); for (let k = 0; k < steps; k++) { const v0 = VS + k * sd; box(B, T, u0 - 0.01, u0 + 0.01, -1, (k + 1) * sh, v0, V1, RED2, RED2); } }
+  }
   for (const lm of (W.landmarks || [])) if (lm.type === 'wandir1') {   // casa amarela da R. Wandir de Carvalho (Street View): grade branca sobre mureta cinza, varanda à esquerda, óculo redondo
     const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
     const AX = [ux, 0, uz], AZ = [vx, 0, vz], U = a => -32.5 - a;   // a = metros da esquerda para a direita de quem olha da rua

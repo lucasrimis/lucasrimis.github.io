@@ -772,6 +772,16 @@ houses = [h for h in houses if not _inwd(h[0], h[1], 0)]
 trees = [t for t in trees if not _inwd(t[0], t[1], 1)]
 landmarks.append({'type': 'wandir1', 'x': _c[0], 'z': _c[1], 'u': [-_d[0], -_d[1]], 'v': [-_vn[0], -_vn[1]]})
 print('wandir1 removed houses', _nb - len(houses))
+# ---- terreno baldio na junção da R. João Manoel com a R. Dr. Astor (Street View 10/2011): terra batida e ladeira em degraus ----
+_o = (-168.4, -74.2); _d = (0.8647, 0.5023); _vn = (-0.5023, 0.8647)
+def _inbd(x, z, m=0):
+    dx, dz = x - _o[0], z - _o[1]; uu = dx * _d[0] + dz * _d[1]; vv = dx * _vn[0] + dz * _vn[1]
+    return -34 - m < uu < 46 + m and 5.5 - m < vv < 62 + m
+_nb = len(houses)
+houses = [h for h in houses if not any(_inbd(x, z, 0.5) for x, z in _hcorners(h))]
+trees = [t for t in trees if not _inbd(t[0], t[1], 1)]
+landmarks.append({'type': 'baldio', 'x': _o[0], 'z': _o[1], 'u': list(_d), 'v': list(_vn)})
+print('baldio removed houses', _nb - len(houses))
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
