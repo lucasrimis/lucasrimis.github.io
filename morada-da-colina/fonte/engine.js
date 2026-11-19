@@ -58,7 +58,7 @@ function frame(x, y, z, ang) { const c = Math.cos(ang), s = Math.sin(ang); retur
 const PROPS = [];
 const LATE_NOTES = [];   // mensagens criadas antes da lista de NPCs existir
 const DOGS = [];
-const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa', labrador: 'Balu', pastor: 'Zatara' };         // cachorros soltos em quintais (andam sozinhos)
+const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa', labrador: 'Balu', pastor: 'Zatara', golden: 'Laica' };         // cachorros soltos em quintais (andam sozinhos)
 // relógio do jogo: 1 hora do jogo = 1 minuto real (o dia inteiro dura 24 minutos), igual para todos os jogadores
 const DAY_SEC = 24 * 60;
 function gameClock() { const sec = Date.now() / 1000 + (window.__timeShift || 0); const day = Math.floor(sec / DAY_SEC); return { day, h: (sec - day * DAY_SEC) / 60, sec, dayStart: day * DAY_SEC }; }
@@ -793,6 +793,10 @@ for (const h of W.houses) {
     panel(sideU(6.6), 6.6, sideU(MV) + 1.2, MV, H);  // canto chanfrado
     panel(sideU(MV) + 1.2, MV, 11.0, MV, H);         // frente, à esquerda do portão
     panel(18.3, MV, 24.5, MV, H);            // frente, à direita da portaria
+    panel(24.5, MV, 24.5, 24.5, H);          // lateral direita (fecha o lote)
+    panel(24.5, 24.5, sideU(24.5), 24.5, H); // fundo
+    { const yard = { x: WP(0, 0)[0], z: WP(0, 0)[1], u: lm.u, v: lm.v, u0: 8.2, u1: 23.8, v0: 21.7, v1: 24.0, nu0: 0, nu1: 0, nv: -1 };   // Laica no quintal dos fundos
+      const p = WP(15, 22.8); DOGS.push({ kind: 'golden', x: p[0], z: p[1], a: Math.random() * 6.28, yard, tx: p[0], tz: p[1], wait: 1, ph: 0, wag: 0, spd: 0 }); }
     // ---- portaria: pilares de pedra, portão de garagem marrom, portinha e telhadinho de barro ----
     const g0 = gy(14.5, MV), G = at(0, 0, g0);
     for (const [a, b] of [[11.0, 11.7], [15.5, 16.4], [17.5, 18.3]]) box(B, G, a, b, -0.5, 2.55, MV - 0.3, MV + 0.3, STONEC, STONEC);
@@ -2649,6 +2653,7 @@ const DOGDEF = {
   yorkie:      { L: 0.44, W: 0.2, lh: 0.14, bh: 0.19, s: 1.0, body: '#1f1c1e', dark: '#141214', spd: 1.9 },
   yorkieRoupa: { L: 0.44, W: 0.21, lh: 0.14, bh: 0.2, s: 1.0, body: '#cfe6f0', dark: '#b9d6e2', spd: 1.7 },
   beagle:      { L: 0.62, W: 0.27, lh: 0.24, bh: 0.26, s: 1.0, body: '#f3eee6', dark: '#e4ddd1', spd: 1.1 },
+  golden:      { L: 0.82, W: 0.34, lh: 0.33, bh: 0.31, s: 1.0, body: '#d9a04e', dark: '#c48a3c', spd: 1.3 },
   labrador:    { L: 0.8, W: 0.33, lh: 0.33, bh: 0.3, s: 1.0, body: '#ecd7a8', dark: '#dcc490', spd: 1.3 },
   pastor:      { L: 0.86, W: 0.32, lh: 0.36, bh: 0.3, s: 1.0, body: '#b9783a', dark: '#a5682f', spd: 1.5 },
 };
@@ -2658,7 +2663,7 @@ function buildDog(B, d, t) {
   const walk = Math.min(1, d.spd / 0.6), sw = Math.sin(d.ph) * 0.55 * walk;
   const TAN = hex('#b5702c'), TAN2 = hex('#a3612a'), WHITE = hex('#f3efe8'), PINK = hex('#e8a2a8'), NOSE = hex('#151313'), EYE = hex('#1a1414');
   // pernas (balançam ao andar)
-  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : (d.kind === 'bull' || d.kind === 'beagle' || d.kind === 'labrador') ? [BODY, BODY] : [TAN, TAN];
+  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : (d.kind === 'bull' || d.kind === 'beagle' || d.kind === 'labrador' || d.kind === 'golden') ? [BODY, BODY] : [TAN, TAN];
   for (const [lu, lv, ph] of [[L * 0.36, -W * 0.3, sw], [L * 0.36, W * 0.3, -sw], [-L * 0.36, -W * 0.3, -sw], [-L * 0.36, W * 0.3, sw]]) {
     const thump = d.thump && lu < 0 && lv > 0, A = swing(T, lu, lh, lv, thump ? -0.5 + Math.sin(t * 32) * 0.55 : ph), lw = W * 0.17, [c1, c2] = legC(lu > 0);   // beagle: pata de trás batendo no chão
     box(B, A, -lw, lw, -lh, 0, -lw, lw, c1, c1);
@@ -2688,13 +2693,14 @@ function buildDog(B, d, t) {
     const Tt = { o: P(T, -L / 2, yb + bh * 0.8, 0), ax: N(T, -Math.cos(up) * Math.cos(wg), Math.sin(up), -Math.cos(up) * Math.sin(wg)), ay: T.ay, az: T.az };
     const tl = d.kind.startsWith('yorkie') ? 0.13 : 0.24, tw = d.kind.startsWith('yorkie') ? 0.035 : 0.025, tc = d.kind === 'yorkie' ? BODY : d.kind === 'yorkieRoupa' ? TAN2 : d.kind === 'beagle' ? hex('#7a4a2a') : d.kind === 'pastor' ? hex('#3a2a1e') : BODY;
     beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl, Tt.o[1] + Tt.ax[1] * tl, Tt.o[2] + Tt.ax[2] * tl], tw, tc);
+    if (d.kind === 'golden') beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl * 0.9, Tt.o[1] + Tt.ax[1] * tl * 0.9, Tt.o[2] + Tt.ax[2] * tl * 0.9], tw * 2.6, hex('#e6b56a'));   // rabo peludo
     if (d.kind === 'beagle') beam(B, [Tt.o[0] + Tt.ax[0] * tl * 0.75, Tt.o[1] + Tt.ax[1] * tl * 0.75, Tt.o[2] + Tt.ax[2] * tl * 0.75], [Tt.o[0] + Tt.ax[0] * tl * 1.05, Tt.o[1] + Tt.ax[1] * tl * 1.05, Tt.o[2] + Tt.ax[2] * tl * 1.05], tw * 1.2, WHITE); }
   // cabeça (vira um pouco para quem olha)
   const sn = d.sniff ? 0.2 + Math.sin(t * 9) * 0.025 : 0;   // cheirando: cabeça baixa, focinho mexendo
   const H = { o: P(T, L / 2 - 0.02 + sn * 0.3, yb + bh * 0.55 - sn, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
   { const ha = d.a + (d.look || 0); H.ax = [Math.cos(ha), 0, Math.sin(ha)]; H.az = [-Math.sin(ha), 0, Math.cos(ha)]; }
   { // auréola dourada flutuando em cima da cabeça
-    const small = d.kind.startsWith('yorkie'), up = { beagle: 0.36, pitbull: 0.46, bull: 0.46, labrador: 0.42, pastor: 0.5 }[d.kind] || 0.38, R = small ? 0.085 : 0.12, GOLD = [255, 214, 90];
+    const small = d.kind.startsWith('yorkie'), up = { beagle: 0.36, pitbull: 0.46, bull: 0.46, labrador: 0.42, pastor: 0.5, golden: 0.43 }[d.kind] || 0.38, R = small ? 0.085 : 0.12, GOLD = [255, 214, 90];
     const c = P(H, small ? 0.06 : 0.1, up + Math.sin(t * 2.4 + d.x) * 0.02, 0); d.hy = c[1]; d.hc = c;
     for (let i = 0; i < 14; i++) { const a0 = i / 14 * Math.PI * 2, a1 = (i + 1) / 14 * Math.PI * 2, p0 = [c[0] + Math.cos(a0) * R, c[1], c[2] + Math.sin(a0) * R], p1 = [c[0] + Math.cos(a1) * R, c[1], c[2] + Math.sin(a1) * R];
       beam(B, p0, p1, 0.016, GOLD, F_GLOW); }
@@ -2709,7 +2715,7 @@ function buildDog(B, d, t) {
       box(B, H, 0.165, 0.172, 0.13, 0.16, sv * 0.05 - 0.016, sv * 0.05 + 0.016, EYE, EYE);
       box(B, H, -0.02, 0.09, -0.12, 0.19, sv * 0.1 - 0.008 + sv * 0.012, sv * 0.1 + 0.022 + sv * 0.012, hex('#8a5229'), hex('#7a4824'));   // orelhas compridas caídas
     }
-  } else if (d.kind === 'labrador') {
+  } else if (d.kind === 'labrador' || d.kind === 'golden') {
     box(B, H, -0.01, 0.2, 0.02, 0.26, -0.12, 0.12, BODY, BODY);                       // cabeça larga
     box(B, H, 0.2, 0.36, 0.02, 0.16, -0.085, 0.085, BODY, DARK);                       // focinho
     box(B, H, 0.355, 0.385, 0.1, 0.16, -0.045, 0.045, hex('#5a3d2b'), hex('#5a3d2b'));   // nariz marrom
