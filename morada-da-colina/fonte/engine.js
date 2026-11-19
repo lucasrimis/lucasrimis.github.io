@@ -1075,22 +1075,30 @@ for (const h of W.houses) {
     grade(5.25, 13.6, 1.0, 1.85);
     grade(0.3, 3.5, 0.05, 1.85); maskRect(T0, U(3.5), U(0.3), MV - 0.05, MV + 0.05);   // portão da garagem
     grade(3.75, 5.0, 0.05, 1.85); maskRect(T0, U(5.0), U(3.75), MV - 0.05, MV + 0.05); // portãozinho
-    // casa térrea amarela
-    const v0 = 9.0, vP = 12.0, v1 = 19.0, H = 2.9;
-    bx(4.5, 12.5, LB, H, v0, v1, YL, YL2); bx(1.0, 4.5, LB, H, vP, v1, YL, YL2); maskRect(T0, U(12.5), U(1.0), vP, v1); maskRect(T0, U(12.5), U(4.5), v0, vP);
-    bx(0.6, 12.9, LB, 0.15, v0 - 0.3, v1, hex('#b5b0a5'), hex('#a7a297'));
-    hipRoof(B, at(U(6.75), 13.9, g), 12.3, 10.6, H + 0.05, 1.9, 0.6, TILE);
-    bx(4.35, 4.6, 0.15, H, v0 + 0.1, v0 + 0.35, YL, YL2); { const p = P(T, U(4.47), 0, v0 + 0.22); maskCircle(p[0], p[2], 0.2); }   // pilar da varanda
-    bx(0.6, 4.5, H - 0.25, H, v0 - 0.3, v0 + 0.1, YL, YL2);
-    wf(1.8, 3.2, 1.4, 2.0, vP, hex('#d9d2a8')); for (let a = 1.85; a < 3.2; a += 0.14) wf(a, a + 0.07, 1.42, 1.98, vP - 0.01, hex('#9a9478'));   // cobogó
-    // óculo redondo com grade
-    { const cA = 5.9, cy = 1.75, R = 0.38; for (let k = 0; k < 10; k++) { const y = cy - R + (k + 0.5) * 2 * R / 10, w = Math.sqrt(Math.max(0, R * R - (y - cy) ** 2)); wf(cA - w, cA + w, y - R / 10, y + R / 10, v0, hex('#2f343a')); }
-      for (const d of [-0.2, 0, 0.2]) wf(cA + d - 0.02, cA + d + 0.02, cy - 0.35, cy + 0.35, v0 - 0.01, WH); wf(cA - 0.36, cA + 0.36, cy - 0.02, cy + 0.02, v0 - 0.01, WH); }
-    wf(7.2, 8.0, 0.15, 2.25, v0, WH); for (let y = 0.5; y < 2.2; y += 0.28) wf(7.3, 7.9, y, y + 0.16, v0 - 0.01, hex('#c9ccc9'));   // porta branca
-    wf(8.8, 11.0, 0.9, 2.2, v0, hex('#2f343a')); for (let a = 8.85; a < 11.0; a += 0.18) wf(a, a + 0.05, 0.9, 2.2, v0 - 0.01, WH);   // janelão com grade branca
-    for (const y of [0.92, 1.55, 2.15]) wf(8.8, 11.0, y, y + 0.05, v0 - 0.01, WH);
+    // casa térrea amarela em L (planta do Lucas): fundo largo, frente avançando à direita com a janela; no recuo, óculo e porta
+    const vF = 9.0, vR = 12.6, v1 = 21.0, aL = 3.8, aM = 7.0, aR = 11.5, H = 2.9;
+    bx(aL, aR, LB, H, vR, v1, YL, YL2); bx(aM, aR, LB, H, vF, vR, YL, YL2); maskRect(T0, U(aR), U(aL), vR, v1); maskRect(T0, U(aR), U(aM), vF, vR);
+    bx(aL - 0.3, aR + 0.3, LB, 0.15, vF - 0.3, v1, hex('#b5b0a5'), hex('#a7a297'));   // calçadinha / piso da varanda
+    hipRoof(B, at(U((aL + aR) / 2), (vF + v1) / 2, g), aR - aL, v1 - vF, H + 0.05, 2.0, 0.6, TILE);   // telhado cobre também o recuo (varanda)
+    bx(aL, aL + 0.25, 0.15, H, vF + 0.05, vF + 0.3, YL, YL2); { const p = P(T, U(aL + 0.12), 0, vF + 0.17); maskCircle(p[0], p[2], 0.2); }   // pilar da varanda
+    bx(aL, aM, H - 0.25, H, vF - 0.1, vF + 0.1, YL, YL2);                                   // viga
+    // óculo redondo com grade e porta branca, na parede recuada
+    { const cA = 4.9, cy = 1.75, R = 0.38; for (let k = 0; k < 10; k++) { const y = cy - R + (k + 0.5) * 2 * R / 10, w = Math.sqrt(Math.max(0, R * R - (y - cy) ** 2)); wf(cA - w, cA + w, y - R / 10, y + R / 10, vR, hex('#2f343a')); }
+      for (const d of [-0.2, 0, 0.2]) wf(cA + d - 0.02, cA + d + 0.02, cy - 0.35, cy + 0.35, vR - 0.01, WH); wf(cA - 0.36, cA + 0.36, cy - 0.02, cy + 0.02, vR - 0.01, WH); }
+    wf(5.9, 6.7, 0.15, 2.25, vR, WH); for (let y = 0.5; y < 2.2; y += 0.28) wf(6.0, 6.6, y, y + 0.16, vR - 0.01, hex('#c9ccc9'));
+    // janelão com grade branca na frente que avança
+    wf(8.1, 10.4, 0.9, 2.2, vF, hex('#2f343a')); for (let a = 8.15; a < 10.4; a += 0.18) wf(a, a + 0.05, 0.9, 2.2, vF - 0.01, WH);
+    for (const y of [0.92, 1.55, 2.15]) wf(8.1, 10.4, y, y + 0.05, vF - 0.01, WH);
+    // lateral da parte que avança (vista do recuo): janelinha
+    box(B, T, U(aM) - 0.01, U(aM) + 0.01, 1.2, 2.0, 10.2, 11.4, hex('#2f343a'), hex('#2f343a'));
+    // garagem à esquerda: piso de concreto até o fundo
+    { const q = [[0.3, MV + 0.15], [aL - 0.1, MV + 0.15], [aL - 0.1, v1], [0.3, v1]].map(([a, v]) => { const p = WP(U(a), v); return [p[0], groundAt(p[0], p[1]) + 0.06, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#a9a69e'), F_TEX); }
+    // muros laterais e do fundo fechando o lote
+    const SW = hex('#e3dcc3'), SW2 = hex('#d4cdb4');
+    for (const [a0, a1, va, vb] of [[0.0, 0.3, MV, 22.5], [13.6, 14.0, MV, 22.5], [0.0, 14.0, 22.2, 22.5]]) { const n = Math.max(1, Math.ceil((vb - va) / 4)); for (let k = 0; k < n; k++) { const p0 = va + (vb - va) * k / n, p1 = va + (vb - va) * (k + 1) / n; bx(a0, a1, LB, 2.0, p0, p1, SW, SW2); }
+      maskRect(T0, U(a1), U(a0), va, vb); mx.beginPath(); mx.lineWidth = 0.5; const q0 = WP(U((a0 + a1) / 2), va), q1 = WP(U((a0 + a1) / 2), vb); if (vb - va > 1) { mx.moveTo(q0[0], q0[1]); mx.lineTo(q1[0], q1[1]); mx.stroke(); } }
     // cadeiras de plástico brancas na varanda
-    for (const a of [2.2, 3.0]) { const c = U(a); box(B, T, c - 0.22, c + 0.22, 0.15, 0.6, 10.6, 11.0, WH, WH2); box(B, T, c - 0.22, c + 0.22, 0.6, 1.05, 11.0, 11.06, WH, WH2); }
+    for (const a of [4.5, 5.4]) { const c = U(a); box(B, T, c - 0.22, c + 0.22, 0.15, 0.6, 10.4, 10.8, WH, WH2); box(B, T, c - 0.22, c + 0.22, 0.6, 1.05, 10.8, 10.86, WH, WH2); }
     wallFeat(B, T, U(13.9), U(13.65), 1.3, 1.7, MV - 0.15, -1, hex('#c9c9c4'));
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'padoca') {   // Padóca: esquina da Av. Antenor O'Reilly com a R. Wandir de Carvalho (Street View 2024)
