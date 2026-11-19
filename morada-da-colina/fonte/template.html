@@ -65,6 +65,9 @@
   #btnPet .k{opacity:.6}
   #btnSit{position:fixed;left:50%;bottom:calc(205px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#86592f;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018}
   #btnSit .k{opacity:.6}
+  #achv{position:fixed;left:50%;top:14px;transform:translate(-50%,-140%);z-index:30;display:flex;gap:12px;align-items:center;background:rgba(22,18,30,.94);border:3px solid #ffd84a;padding:10px 18px 10px 12px;font-family:'Silkscreen',monospace;color:#fff;box-shadow:0 0 0 3px #0d1018,0 6px 18px rgba(0,0,0,.5);transition:transform .45s cubic-bezier(.2,1.4,.4,1);pointer-events:none}
+  #achv.on{transform:translate(-50%,0)}
+  #achv .ic{font-size:30px} #achv .h{font-size:10px;color:#ffd84a;letter-spacing:2px} #achv .t{font-size:14px} #achv .n{font-size:20px;color:#9fe07a}
   #skyNote{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:7;pointer-events:none;font-family:'Silkscreen',monospace;font-size:clamp(14px,2.4vw,22px);color:#fff3c4;background:rgba(40,22,6,.82);border:3px solid #ffb347;padding:10px 16px;text-align:center;text-shadow:2px 2px 0 #000;opacity:0;transition:opacity .6s;max-width:90vw}
   #skyNote.on{opacity:1;animation:skyPulse 1.4s ease-in-out infinite}
   #skyNote span{display:block;font-size:1.4em;animation:skyArrow 1s ease-in-out infinite}
@@ -200,6 +203,7 @@
 </div>
 <div id="result" class="panel"><div class="r1" id="resTitle"></div><div id="resBody"></div><div class="r3">Voltando para a sala…</div></div>
 <div id="toast"></div>
+<div id="achv"><div class="ic">📼</div><div><div class="h">🏆 CONQUISTA</div><div class="t"></div><div class="n"></div></div></div>
 <div id="skyNote">✦ Mensagem do criador, olhe para o céu. ✦<span>⬆</span></div>
 <button id="btnSit" class="tbtn" style="display:none">🪑 SENTAR <span class="k">(X)</span></button>
 <button id="btnPet" class="tbtn" style="display:none">🐾 COÇAR O BUMBUM <span class="k">(C)</span></button>

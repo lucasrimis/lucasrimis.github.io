@@ -2988,9 +2988,23 @@ window.__vhsProj = VP => {   // posição da fita na tela, para o clique/toque
   }
   VHS.vis = VHS.tapes.some(o => o.vis);
 };
+// conquista: fitas encontradas (guardadas no navegador)
+const TAPE_KEY = 'mdc_fitas', tapeId = o => o.video + '@' + (o.pos ? Math.round(o.pos[0]) + ',' + Math.round(o.pos[1]) : '');
+function tapesFound() { try { return new Set(JSON.parse(localStorage.getItem(TAPE_KEY) || '[]')); } catch (e) { return new Set(VHS.found || []); } }
+function tapeFound(o) {
+  const f = tapesFound(), id = tapeId(o); if (f.has(id)) return;
+  f.add(id); VHS.found = [...f]; try { localStorage.setItem(TAPE_KEY, JSON.stringify(VHS.found)); } catch (e) {}
+  const ids = new Set(VHS.tapes.map(tapeId)), x = [...f].filter(k => ids.has(k)).length, y = ids.size;
+  const el = document.getElementById('achv'); if (!el) return;
+  el.querySelector('.t').textContent = x === y ? 'Todas as fitas encontradas!' : 'Fita encontrada!';
+  el.querySelector('.n').textContent = x + '/' + y + ' fitas';
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  clearTimeout(VHS.achT); VHS.achT = setTimeout(() => el.classList.remove('on'), 5000);
+}
 function vhsOpen(o) {
   o = o || VHS.cur || VHS.tapes[0];
   if (VHS.open) return;
+  tapeFound(o);
   if (document.pointerLockElement) document.exitPointerLock();
   VHS.open = true; for (const k in keys) keys[k] = false;
   const ov = document.getElementById('vhsOv'), box_ = document.getElementById('vhsTv'), noise = document.getElementById('vhsNoise');
