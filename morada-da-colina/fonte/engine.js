@@ -2383,27 +2383,44 @@ function segDist(x, z, s) {
   return Math.hypot(x - (ax + t * dx), z - (az + t * dz));
 }
 
-// moving cars
+// moving cars: andam pela malha de ruas fazendo circuitos (só em ruas que não são sem saída)
 const traffic = [];
+const RNET = (() => {
+  const nodes = new Map(), key = p => Math.round(p[0]) + ',' + Math.round(p[1]);
+  const node = p => { const k = key(p); let n = nodes.get(k); if (!n) { n = { x: p[0], z: p[1], e: [] }; nodes.set(k, n); } return n; };
+  for (const r of W.roads) {
+    if (!(r.t === 'residential' || r.t === 'secondary' || r.t === 'living_street' || r.t === 'tertiary' || r.t === 'unclassified') || r.dirt) continue;
+    for (let i = 0; i < r.pts.length - 1; i++) { const a = node(r.pts[i]), b = node(r.pts[i + 1]); if (a === b || a.e.some(e => e.n === b)) continue; const L = Math.hypot(a.x - b.x, a.z - b.z), h = r.h, t = r.t; a.e.push({ n: b, L, h, t }); b.e.push({ n: a, L, h, t }); }
+  }
+  // tira as ruas sem saída (núcleo de grau 2): os carros só circulam onde dá para fazer a volta completa
+  let changed = true; const live = new Set(nodes.values());
+  while (changed) { changed = false; for (const n of live) { const deg = n.e.filter(e => live.has(e.n)).length; if (deg < 2) { live.delete(n); changed = true; } } }
+  for (const n of live) n.e = n.e.filter(e => live.has(e.n));
+  return [...live];
+})();
+function carNext(c) {   // escolhe a próxima rua no cruzamento (sem voltar pela mesma)
+  const n = c.b, opts = n.e.filter(e => e.n !== c.a);
+  const ain = Math.atan2(c.b.z - c.a.z, c.b.x - c.a.x);
+  const w = opts.map(e => { let tr = Math.atan2(e.n.z - n.z, e.n.x - n.x) - ain; while (tr > Math.PI) tr -= 2 * Math.PI; while (tr < -Math.PI) tr += 2 * Math.PI; return Math.abs(tr) < 0.35 ? 3 : Math.abs(tr) < 2.4 ? 1 : 0.05; });
+  let sum = w.reduce((p, q) => p + q, 0), k = Math.random() * sum, e = opts[0];
+  for (let i = 0; i < opts.length; i++) { k -= w[i]; if (k <= 0) { e = opts[i]; break; } }
+  if (!e) e = n.e[0];
+  c.a = n; c.b = e.n; c.L = e.L; c.h = e.h; c.t = e.t; c.s = 0;
+}
 {
   const r = rngFor(3, 1, 4);
-  const cand = ROUTES.filter(x => x.len > 80);
-  for (let i = 0; i < 34; i++) {
-    const rt = cand[Math.floor(r() * cand.length)];
-    const cum = [0]; for (let k = 1; k < rt.pts.length; k++) cum.push(cum[k - 1] + Math.hypot(rt.pts[k][0] - rt.pts[k - 1][0], rt.pts[k][1] - rt.pts[k - 1][1]));
-    traffic.push({ rt, cum, s: r() * rt.len, dir: r() < 0.5 ? 1 : -1, vmax: rt.t === 'secondary' ? 11 + r() * 5 : 6 + r() * 4, v: 0, col: jit(pick(CARS, r), r, 0.05), lane: rt.t === 'secondary' && rt.h < 4 ? (r() < 0.5 ? 1.7 : -1.7) : 1.15, x: 0, z: 0, a: 0 });
+  if (RNET.length) for (let i = 0; i < 34; i++) {
+    const a = RNET[Math.floor(r() * RNET.length)], e = a.e[Math.floor(r() * a.e.length)];
+    traffic.push({ a, b: e.n, L: e.L, h: e.h, t: e.t, s: r() * e.L, vmax0: e.t === 'secondary' ? 11 + r() * 5 : 6 + r() * 4, v: 0, col: jit(pick(CARS, r), r, 0.05), x: 0, z: 0, a_: 0, ad: null });
   }
 }
 function placeCar(c) {
-  const { pts } = c.rt, cum = c.cum;
-  let i = 1; while (i < cum.length - 1 && cum[i] < c.s) i++;
-  const t = (c.s - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
-  const ax = pts[i - 1][0], az = pts[i - 1][1], bx = pts[i][0], bz = pts[i][1];
-  let ux = bx - ax, uz = bz - az; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
-  const fx = ux * c.dir, fz = uz * c.dir;
-  const off = c.rt.t === 'secondary' && c.rt.h < 4 ? c.lane * c.dir : c.lane;
+  const ax = c.a.x, az = c.a.z, bx = c.b.x, bz = c.b.z, t = Math.min(1, c.s / (c.L || 1));
+  const fx = (bx - ax) / (c.L || 1), fz = (bz - az) / (c.L || 1), off = Math.min(1.7, Math.max(1.1, c.h * 0.42));
   c.x = ax + (bx - ax) * t - fz * off; c.z = az + (bz - az) * t + fx * off;
-  c.a = Math.atan2(fz, fx);
+  const ta = Math.atan2(fz, fx); if (c.ad === null) c.ad = ta;
+  let d = ta - c.ad; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; c.ad += d * 0.25;
+  c.a_ = c.ad;
 }
 
 // ---------------- input ----------------
@@ -3881,12 +3898,12 @@ function step(dt) {
   for (const c of traffic) {
     placeCar(c);
     const dx = player.x - c.x, dz = player.z - c.z, d = Math.hypot(dx, dz);
-    const ahead = (dx * Math.cos(c.a) + dz * Math.sin(c.a)) > 0;
-    const tv = (d < 9 && ahead) ? 0 : c.vmax;
+    const ahead = (dx * Math.cos(c.a_) + dz * Math.sin(c.a_)) > 0;
+    const vmax = c.t === 'secondary' ? c.vmax0 : Math.min(c.vmax0, 10);
+    const tv = (d < 9 && ahead) ? 0 : vmax;
     c.v += (tv - c.v) * Math.min(1, dt * (tv < c.v ? 4 : 1));
-    c.s += c.v * c.dir * dt;
-    if (c.s > c.rt.len - 3) { c.s = c.rt.len - 3; c.dir = -1; c.v = 0; }
-    if (c.s < 3) { c.s = 3; c.dir = 1; c.v = 0; }
+    c.s += c.v * dt;
+    let guard = 0; while (c.s >= c.L && guard++ < 8) { const over = c.s - c.L; carNext(c); c.s = over; }
   }
 }
 function frame_() {
@@ -3938,7 +3955,7 @@ function frame_() {
       else { box(dynB, T, 2.4, 3.0, 7.48, 7.57, -0.19, 0.19, c, c, F_GLOW); box(dynB, T, 2.47, 2.93, 7.42, 7.48, -0.14, 0.14, c, c, F_GLOW); }
     }
     drawSky(dynB, [player.x, groundAt(player.x, player.z) + 2, player.z], SKY); }
-  for (const c of traffic) carMesh(dynB, groundFrame(c.x, c.z, c.a, 0.0), c.col);
+  for (const c of traffic) carMesh(dynB, groundFrame(c.x, c.z, c.a_, 0.0), c.col);
   skyMB.reset(); skyMsgFrame(skyMB, t);
   if (skyMB.n) { gl.bindBuffer(gl.ARRAY_BUFFER, skyMVBO); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(skyMB.buf, 0, skyMB.n * 20), gl.DYNAMIC_DRAW); }
   gl.bindBuffer(gl.ARRAY_BUFFER, dynVBO);
@@ -4050,5 +4067,5 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, traffic, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
