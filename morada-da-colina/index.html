@@ -2978,11 +2978,11 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     const leaf = ['...X...', 'X.XXX.X', '.XXXXX.', '..XXX..', '...X...'];   // folha estampada no peito
     leaf.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === 'X') put(j - 3, 5 - i, 1, i === 4 ? LF2 : LF); }));
   }) : vxPart('tor' + kS, (b, put) => { b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? SH2 : SH); b(-1, 1, 6, 6, 1, 1, SKN); put(0, 5, 1, SKN); b(-1, 1, 7, 7, -1, 1, SKN); });
-  const head = sk === 'biblia' ? vxPart('hdBruno2', (b, put) => {   // Bruno: pele morena, cabelo escuro bagunçado com franja, bigode fino e cavanhaque no queixo, lábios grossos entreabertos
+  const head = sk === 'biblia' ? vxPart('hdBruno3', (b, put) => {   // Bruno: pele morena, cabelo escuro bagunçado com franja, bigode fino e cavanhaque no queixo, lábios grossos entreabertos
     const BS = hex('#b98563'), BS2 = hex('#a3714f'), BD = hex('#3a2a20'), HB = hex('#221a14'), HB2 = hex('#33271e');
     b(-3, 3, 0, 7, -3, 3, BS); b(-4, -4, 1, 4, -2, 2, BS); b(4, 4, 1, 4, -2, 2, BS); b(-2, 2, -1, -1, -2, 2, BS);   // rosto arredondado
-    b(-1, 1, -2, -1, 1, 3, BD); b(-2, 2, -1, -1, 2, 3, BD); put(-2, 0, 3, BD); put(2, 0, 3, BD);   // cavanhaque no queixo
-    b(-2, 2, 2, 2, 3, 3, BD); put(-2, 1, 3, BD); put(2, 1, 3, BD);                     // bigode fino caindo nos cantos
+    b(-1, 1, -2, -2, 0, 2, BS);   // cavanhaque no queixo
+                         // bigode fino caindo nos cantos
     b(-1, 1, 1, 1, 3, 3, hex('#a8665d')); b(-1, 1, 0, 0, 3, 3, hex('#b97c70')); put(0, 0, 4, hex('#c48a7e')); put(0, 1, 3, hex('#5a3029'));   // lábios grossos entreabertos
     for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#2a1a12')); put(ex + (ex < 0 ? 0 : 1), 4, 3, hex('#eadfd4')); b(ex, ex + 1, 5, 5, 3, 3, BS2); b(ex, ex + 1, 6, 6, 3, 3, HB2); }   // olhos escuros com pálpebra pesada
     b(-1, 1, 3, 3, 4, 4, BS); put(0, 4, 4, BS); put(-1, 3, 5, BS2); put(1, 3, 5, BS2);   // nariz largo
@@ -4638,7 +4638,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119211241";
+  const BUILD = "v20261119211708";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
