@@ -3257,39 +3257,63 @@ function buildPlayer(B, p, look) {
 
 const P_SKIN = hex('#a8754f'), P_SHIRT = hex('#5f6d80'), P_PANTS = hex('#30343c'), P_CAP = hex('#24365e'), P_HAIR = hex('#b9b4ac'), P_SHOE = hex('#2a2420');
 const C_SKIN = hex('#b07a50'), C_SHORTS = hex('#1d4f9c'), C_HAIR = hex('#17110c'), C_SLIP = hex('#f2f2f2'), C_DARK = hex('#120d0a');
-function buildCaudinho(B, n, t) {
-  const T = scaleT(frame(n.x, n.y, n.z, n.base), PSC);
-  const br = Math.sin(t * 2.2) * 0.015; // breathing hard, irritated
-  const Tb = { o: [T.o[0], T.o[1] + br, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
-  for (const v of [-0.16, 0.16]) {
-    box(B, Tb, -0.11, 0.11, 0.05, 0.55, v - 0.1, v + 0.1, C_SKIN, C_SKIN);          // shins
-    box(B, Tb, -0.13, 0.13, 0.5, 0.95, v - 0.13, v + 0.13, C_SHORTS, C_SHORTS);    // shorts
-    box(B, Tb, -0.13, 0.24, 0.0, 0.05, v - 0.12, v + 0.12, C_SLIP, C_SLIP);        // chinelo
-  }
-  box(B, Tb, -0.14, 0.14, 0.9, 0.98, -0.3, 0.3, hex('#f2f2f2'), hex('#f2f2f2'));   // elastic of the shorts
-  box(B, Tb, -0.19, 0.19, 0.95, 1.5, -0.32, 0.32, C_SKIN, C_SKIN);                // bare torso
-  box(B, Tb, 0.19, 0.2, 1.22, 1.3, -0.2, -0.05, hex('#9a6a44'), hex('#9a6a44'));   // chest shading
-  box(B, Tb, 0.19, 0.2, 1.22, 1.3, 0.05, 0.2, hex('#9a6a44'), hex('#9a6a44'));
-  box(B, Tb, 0.19, 0.2, 1.02, 1.14, -0.03, 0.03, hex('#9a6a44'), hex('#9a6a44'));
-  // arms crossed over the chest
-  for (const sg of [-1, 1]) {
-    box(B, Tb, -0.08, 0.1, 1.05, 1.47, sg * 0.32 - 0.09, sg * 0.32 + 0.09, C_SKIN, C_SKIN);
-    box(B, Tb, 0.2, 0.36, 1.18 + (sg > 0 ? 0.09 : 0), 1.32 + (sg > 0 ? 0.09 : 0), -0.3, 0.3, C_SKIN, C_SKIN);
-  }
-  const H = yawChild(Tb, 0, 0, 0, n.look);
-  box(B, H, -0.08, 0.08, 1.48, 1.56, -0.08, 0.08, C_SKIN, C_SKIN);                // neck
-  box(B, H, -0.2, 0.2, 1.55, 1.95, -0.2, 0.2, C_SKIN, C_SKIN);
-  box(B, H, -0.22, 0.17, 1.86, 2.0, -0.22, 0.22, C_HAIR, C_HAIR);                 // short hair
-  box(B, H, -0.22, -0.12, 1.62, 1.95, -0.22, 0.22, C_HAIR, C_HAIR);
-  // angry face: slanted brows, narrow eyes, frown
-  const f = 0.2;
-  B.quad(P(H, f + 0.01, 1.83, -0.15), P(H, f + 0.01, 1.83, -0.04), P(H, f + 0.01, 1.78, -0.03), P(H, f + 0.01, 1.86, -0.15), N(H, 1, 0, 0), C_DARK, F_PLAIN);
-  B.quad(P(H, f + 0.01, 1.83, 0.15), P(H, f + 0.01, 1.86, 0.15), P(H, f + 0.01, 1.78, 0.03), P(H, f + 0.01, 1.83, 0.04), N(H, 1, 0, 0), C_DARK, F_PLAIN);
-  box(B, H, f, f + 0.01, 1.72, 1.755, -0.13, -0.05, C_DARK, C_DARK);
-  box(B, H, f, f + 0.01, 1.72, 1.755, 0.05, 0.13, C_DARK, C_DARK);
-  box(B, H, f, f + 0.01, 1.62, 1.645, -0.07, 0.07, hex('#5a2a1e'), hex('#5a2a1e')); // mouth
-  box(B, H, f, f + 0.01, 1.6, 1.625, -0.1, -0.07, hex('#5a2a1e'), hex('#5a2a1e'));
-  box(B, H, f, f + 0.01, 1.6, 1.625, 0.07, 0.1, hex('#5a2a1e'), hex('#5a2a1e'));
+// ================= NPCs em cubinhos (mesmo esqueleto dos jogadores) =================
+const VOFF = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
+function ik2(a, b, dz, dy) {   // perna/braço de dois segmentos: ângulo do 1º (a partir de "para baixo", + = para a frente) e dobra do 2º
+  const L = Math.min(a + b - 0.01, Math.hypot(dz, dy)), th = Math.atan2(dz, -dy), al = Math.acos(Math.max(-1, Math.min(1, (a * a + L * L - b * b) / (2 * a * L))));
+  return [th, al, Math.PI - Math.acos(Math.max(-1, Math.min(1, (a * a + b * b - L * L) / (2 * a * b))))];
+}
+function npcParts(key, o) {   // o: pele, roupa de cima (null = sem camisa), manga, calça/short, perna de fora?, sapato, cinto
+  const SK = o.skin, SK2 = shade(SK, 0.86), PA = o.pants, PA2 = shade(PA, 0.82);
+  return {
+    pelvis: vxPart('npel' + key, (b, put) => { b(-3, 3, 0, 1, -1, 1, PA); b(-3, 3, 2, 2, -1, 1, o.belt); if (o.buckle) put(0, 2, 2, o.buckle); }),
+    torso: vxPart('ntor' + key, (b, put) => {
+      if (o.shirt) { b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? shade(o.shirt, 0.85) : o.shirt); b(-1, 1, 6, 6, 1, 1, SK); put(0, 5, 1, SK); if (o.pocket) b(-3, -2, 4, 5, 2, 2, shade(o.shirt, 0.88)); }
+      else { b(-3, 3, 0, 6, -1, 1, SK); b(-3, -1, 4, 5, 2, 2, SK); b(1, 3, 4, 5, 2, 2, SK); put(-2, 4, 2, SK2); put(2, 4, 2, SK2); put(0, 1, 2, SK2); if (o.belly) b(-2, 2, 0, 2, 2, 2, SK); }
+      b(-1, 1, 7, 7, -1, 1, SK);
+    }),
+    uArm: vxPart('nua' + key, b => { b(-1, 0, -2, 0, -1, 1, o.sleeve || SK); b(-1, 0, -4, -3, -1, 1, SK); }),
+    fArm: vxPart('nfa' + key, b => { b(-1, 0, -4, -1, -1, 0, SK); b(-1, 0, -5, -5, -1, 0, SK2); }),
+    thigh: vxPart('nth' + key, b => { if (o.shorts) { b(-1, 1, -3, -1, -1, 1, PA); b(-1, 1, -4, -4, -1, 1, PA2); b(-1, 1, -6, -5, -1, 1, SK); } else b(-1, 1, -6, -1, -1, 1, (x, y, z) => x === 0 && z === 1 ? PA2 : PA); }),
+    shin: vxPart('nsh' + key, b => b(-1, 1, -3, -1, -1, 1, o.shorts ? SK : (x, y) => y === -3 ? PA2 : PA)),
+    foot: vxPart('nft' + key, (b, put) => { if (o.slipper) { b(-1, 1, -3, -3, -2, 3, o.shoe); b(-1, 1, -2, -2, -1, 3, SK); put(0, -2, 2, o.shoe); b(-1, 1, -2, -2, 1, 1, o.shoe); }
+      else { b(-1, 1, -3, -3, -2, 3, shade(o.shoe, 0.7)); b(-1, 1, -2, -1, -1, 3, o.shoe); } }),
+  };
+}
+function npcPose(B, T, Pt, head, pose) {   // pose: y, lean, legs [[hip,knee,ank],..] (sd -1, +1), arms [[sw,el,rz,er],..], hy (cabeça), hp, extra [[parte, f(tor)]]
+  const root = { R: vRy(pose.twist || 0), t: [0, pose.y === undefined ? 12 : pose.y, pose.z || 0] };
+  const out = [[Pt.pelvis, root]];
+  const tor = vX(root, [0, 3, 0], vRx(-(pose.lean || 0)));
+  out.push([Pt.torso, tor]);
+  out.push([head, vX(tor, [0, 8, 0], vMM(vRy(pose.hy || 0), vRx(pose.hp || 0)))]);
+  [-1, 1].forEach((sd, i) => {
+    const [hip, knee, ank] = pose.legs[i];
+    const th = vX(root, [sd * 2, 0, 0], vRx(hip)), sh = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(sh, [0, -3, 0], vRx(ank));
+    out.push([Pt.thigh, th], [Pt.shin, sh], [Pt.foot, ft]);
+    const a = pose.arms[i]; if (!a) return;
+    const ua = vX(tor, [sd * 4.5, 6, 0], vMM(vRx(a[0]), vRz(sd * (a[2] || 0.06))));
+    const fa = vX(ua, [0, -4.5, 0], vMM(vRx(a[1]), vRz(-sd * (a[3] || 0))));
+    out.push([Pt.uArm, VOFF(ua)], [Pt.fArm, VOFF(fa)]);
+  });
+  if (pose.extra) for (const [part, f] of pose.extra) out.push([part, f(tor)]);
+  vxDraw(B, T, out);
+}
+function buildCaudinho(B, n, t) {   // sem camisa, short azul de elástico branco, chinelo, braços cruzados, cara de bravo
+  const T = scaleT(frame(n.x, n.y, n.z, n.base), PSC), br = Math.sin(t * 2.2);   // respirando forte, irritado
+  const Pt = npcParts('caud', { skin: C_SKIN, pants: C_SHORTS, belt: hex('#f2f2f2'), shorts: true, shoe: C_SLIP, slipper: true, belly: true });
+  const head = vxPart('hdCaud', (b, put) => {
+    const S = C_SKIN, S2 = shade(C_SKIN, 0.85), H = C_HAIR, D = C_DARK, M = hex('#5a2a1e');
+    b(-3, 3, 0, 7, -3, 3, S); b(-4, -4, 2, 4, -1, 0, S2); b(4, 4, 2, 4, -1, 0, S2);
+    b(-3, 3, 8, 8, -3, 2, H); b(-3, 3, 7, 7, -3, -3, H); b(-3, 3, 3, 7, -4, -4, H); b(-4, -4, 5, 7, -3, 1, H); b(4, 4, 5, 7, -3, 1, H); b(-3, 3, 7, 7, 3, 3, H);   // cabelo curto
+    for (const sd of [-1, 1]) { put(sd * 2, 6, 3, D); put(sd * 1, 5, 3, D); put(sd * 3, 6, 3, D);   // sobrancelhas franzidas, descendo para o meio
+      put(sd * 2, 4, 3, D); put(sd > 0 ? 1 : -1, 4, 3, hex('#e9e2d8')); }   // olhos apertados
+    b(-1, 1, 3, 3, 4, 4, S); put(0, 2, 4, S2);   // nariz
+    b(-1, 1, 1, 1, 3, 3, M); put(-2, 0, 3, M); put(2, 0, 3, M);   // boca virada para baixo
+  });
+  const cross = vxPart('crossCaud', b => { b(-4, 3, 3, 3, 2, 3, C_SKIN); b(-3, 4, 4, 4, 2, 3, shade(C_SKIN, 0.93)); b(-5, -5, 3, 4, 2, 3, shade(C_SKIN, 0.86)); b(5, 5, 4, 5, 2, 3, shade(C_SKIN, 0.86)); });   // antebraços cruzados no peito
+  const up = vxPart('nuaCaudX', b => b(-1, 0, -4, 0, -1, 1, C_SKIN));
+  npcPose(B, T, Pt, head, { y: 12 + br * 0.12, lean: -0.04 - br * 0.02, hy: -(n.look || 0), hp: -0.08, legs: [[0, 0.03, 0.03], [0, 0.03, 0.03]], arms: [null, null],
+    extra: [[up, tor => VOFF(vX(tor, [-4.5, 6, 0], vMM(vRx(0.35), vRz(-0.12))))], [up, tor => VOFF(vX(tor, [4.5, 6, 0], vMM(vRx(0.35), vRz(0.12))))], [cross, tor => tor]] });
 }
 // ---------------- cachorros ----------------
 const DOGDEF = {
@@ -3302,103 +3326,117 @@ const DOGDEF = {
   labrador:    { L: 0.8, W: 0.33, lh: 0.33, bh: 0.3, s: 1.0, body: '#ecd7a8', dark: '#dcc490', spd: 1.3 },
   pastor:      { L: 0.86, W: 0.32, lh: 0.36, bh: 0.3, s: 1.0, body: '#b9783a', dark: '#a5682f', spd: 1.5 },
 };
+// cães em cubinhos (~3,5 cm), no mesmo estilo dos personagens: as partes são montadas em metros e viram voxels
+const DS = 0.035;
+function dogVox(key, fill) {   // fill(m, put): m(u0,u1,y0,y1,v0,v1,cor) em metros (u frente, y cima, v lado) → cubinhos
+  return vxPart('dog' + key, (b, put) => {
+    const r = (a, c) => { let i0 = Math.round(a / DS), i1 = Math.round(c / DS) - 1; if (i1 < i0) i0 = i1 = Math.floor((a + c) / 2 / DS); return [i0, i1]; };
+    const m = (u0, u1, y0, y1, v0, v1, c) => { const [z0, z1] = r(u0, u1), [y0_, y1_] = r(y0, y1), [x0, x1] = r(-v1, -v0); b(x0, x1, y0_, y1_, z0, z1, c); };
+    fill(m, put);
+  });
+}
 function buildDog(B, d, t) {
-  const D = DOGDEF[d.kind], y0 = surfAt(d.x, d.z) + 0.02, T = frame(d.x, y0, d.z, d.a);
-  const { L, W, lh, bh } = D, BODY = hex(D.body), DARK = hex(D.dark);
+  const D = DOGDEF[d.kind], y0 = surfAt(d.x, d.z) + 0.02, T = frame(d.x, y0, d.z, d.a), Tv = scaleT(frame(d.x, y0, d.z, d.a), DS / VX);
+  const { L, W, lh, bh } = D, BODY = hex(D.body), DARK = hex(D.dark), k = d.kind;
   const walk = Math.min(1, d.spd / 0.6), sw = Math.sin(d.ph) * 0.55 * walk;
-  const TAN = hex('#b5702c'), TAN2 = hex('#a3612a'), WHITE = hex('#f3efe8'), PINK = hex('#e8a2a8'), NOSE = hex('#151313'), EYE = hex('#1a1414');
-  // pernas (balançam ao andar)
-  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : (d.kind === 'bull' || d.kind === 'beagle' || d.kind === 'labrador' || d.kind === 'golden') ? [BODY, BODY] : [TAN, TAN];
-  for (const [lu, lv, ph] of [[L * 0.36, -W * 0.3, sw], [L * 0.36, W * 0.3, -sw], [-L * 0.36, -W * 0.3, -sw], [-L * 0.36, W * 0.3, sw]]) {
-    const thump = d.thump && lu < 0 && lv > 0, A = swing(T, lu, lh, lv, thump ? -0.5 + Math.sin(t * 32) * 0.55 : ph), lw = W * 0.17, [c1, c2] = legC(lu > 0);   // beagle: pata de trás batendo no chão
-    box(B, A, -lw, lw, -lh, 0, -lw, lw, c1, c1);
-    box(B, A, -lw * 1.1, lw * 1.3, -lh, -lh * 0.72, -lw * 1.1, lw * 1.1, c2, c2);   // pata
-  }
-  // corpo
+  const TAN = hex('#b5702c'), TAN2 = hex('#a3612a'), WHITE = hex('#f3efe8'), PINK = hex('#e8a2a8'), NOSE = hex('#151313'), EYE = hex('#1a1414'), SHINE = hex('#f6f2ea');
   const yb = lh + (d.sit ? -lh * 0.4 : 0);
-  box(B, T, -L / 2, L / 2, yb, yb + bh, -W / 2, W / 2, BODY, DARK);
-  if (d.kind === 'pitbull') { box(B, T, L * 0.1, L / 2 + 0.01, yb - 0.01, yb + bh * 0.75, -W * 0.3, W * 0.3, WHITE, WHITE); box(B, T, -L * 0.2, L * 0.2, yb - 0.012, yb + 0.03, -W * 0.35, W * 0.35, WHITE, WHITE); }
-  if (d.kind === 'bull') for (const [pu, pv, py] of [[0.1, W / 2, 0.15], [-0.18, -W / 2, 0.1], [0.22, W / 2, 0.06]]) box(B, T, pu - 0.04, pu + 0.03, yb + py, yb + py + 0.05, pv - 0.005, pv + 0.005, PINK, PINK);
-  if (d.kind === 'yorkie') { box(B, T, -L / 2, L / 2, yb - 0.07, yb + 0.02, -W / 2 - 0.02, W / 2 + 0.02, DARK, DARK); box(B, T, L * 0.25, L / 2 + 0.02, yb - 0.04, yb + bh * 0.8, -W / 2 - 0.01, W / 2 + 0.01, TAN, TAN); }   // pelo comprido e peito caramelo
-  if (d.kind === 'pastor') {   // capa preta nas costas
-    const BK = hex('#1e1b19'), BK2 = hex('#2a2522');
-    box(B, T, -L * 0.45, L * 0.32, yb + bh * 0.45, yb + bh + 0.012, -W / 2 - 0.01, W / 2 + 0.01, BK, BK2);
+  const at = (u, y, v, R) => ({ R, t: vMV(R, [0.5, 0, 0.5]).map((x, i) => x + [-v / DS, y / DS, u / DS][i]) });   // posição em metros → transformação da parte
+  const out = [];
+  // pernas
+  const legC = front => k === 'pitbull' ? [front ? WHITE : BODY, WHITE] : (k === 'bull' || k === 'beagle' || k === 'labrador' || k === 'golden') ? [BODY, shade(BODY, 0.9)] : [TAN, TAN2];
+  const lw = W * 0.17;
+  const legP = front => dogVox(k + 'leg' + (front ? 'F' : 'B'), m => { const [c1, c2] = legC(front); m(-lw, lw, -lh, 0, -lw, lw, c1); m(-lw * 1.1, lw * 1.3, -lh, -lh * 0.72, -lw * 1.1, lw * 1.1, c2); });
+  for (const [lu, lv, ph] of [[L * 0.36, -W * 0.3, sw], [L * 0.36, W * 0.3, -sw], [-L * 0.36, -W * 0.3, -sw], [-L * 0.36, W * 0.3, sw]]) {
+    const thump = d.thump && lu < 0 && lv > 0;   // beagle: pata de trás batendo no chão
+    out.push([legP(lu > 0), at(lu, lh, lv, vRx(thump ? -0.5 + Math.sin(t * 32) * 0.55 : ph))]);
   }
-  if (d.kind === 'beagle') {   // manta marrom nas costas e lados, barriga e peito brancos
-    const BR = hex('#7a4a2a'), BR2 = hex('#6b3f23');
-    box(B, T, -L * 0.42, L * 0.3, yb + bh * 0.35, yb + bh + 0.012, -W / 2 - 0.01, W / 2 + 0.01, BR, BR2);
-    box(B, T, -L * 0.5 - 0.005, -L * 0.3, yb + bh * 0.4, yb + bh * 0.9, -W / 2 + 0.03, W / 2 - 0.03, hex('#b9773d'), hex('#a8692f'));   // traseiro caramelo
-  }
-  if (d.kind === 'yorkieRoupa') { // roupinha azul com estampas rosa e cinza; pernas e rabo marrons
-    for (const [pu, pv, c] of [[0.1, W / 2, '#e2a6c4'], [-0.1, W / 2, '#9a9aa4'], [0.05, -W / 2, '#9a9aa4'], [-0.14, -W / 2, '#e2a6c4']]) box(B, T, pu - 0.04, pu + 0.04, yb + 0.07, yb + 0.14, pv - 0.006, pv + 0.006, hex(c), hex(c));
-    box(B, T, -L * 0.2, L * 0.1, yb + bh, yb + bh + 0.006, -0.04, 0.04, hex('#e2a6c4'), hex('#e2a6c4'));
-    box(B, T, -L / 2 - 0.01, -L * 0.3, yb - 0.04, yb + bh * 0.7, -W / 2 - 0.01, W / 2 + 0.01, TAN2, TAN2); }
+  // corpo (com a barriga mais escura e as marcas de cada raça)
+  out.push([dogVox(k + 'body', m => {
+    m(-L / 2, L / 2, 0, bh, -W / 2, W / 2, BODY); m(-L / 2, L / 2, 0, DS, -W / 2, W / 2, DARK); m(-L / 2, L / 2 - DS, bh - DS, bh, -W / 2 + DS, W / 2 - DS, shade(BODY, 1.05));
+    if (k === 'pitbull') { m(L * 0.1, L / 2 + 0.01, -0.01, bh * 0.75, -W * 0.3, W * 0.3, WHITE); m(-L * 0.2, L * 0.2, -0.012, 0.03, -W * 0.35, W * 0.35, WHITE); }
+    if (k === 'bull') for (const [pu, pv, py] of [[0.1, W / 2, 0.15], [-0.18, -W / 2, 0.1], [0.22, W / 2, 0.06]]) m(pu - 0.04, pu + 0.03, py, py + 0.05, pv - 0.035, pv, PINK);
+    if (k === 'yorkie') { m(-L / 2, L / 2, -0.07, 0.02, -W / 2 - 0.02, W / 2 + 0.02, DARK); m(L * 0.25, L / 2 + 0.02, -0.04, bh * 0.8, -W / 2 - 0.01, W / 2 + 0.01, TAN); }   // pelo comprido e peito caramelo
+    if (k === 'pastor') m(-L * 0.45, L * 0.32, bh * 0.45, bh + 0.02, -W / 2 - 0.01, W / 2 + 0.01, hex('#1e1b19'));   // capa preta nas costas
+    if (k === 'beagle') { m(-L * 0.42, L * 0.3, bh * 0.35, bh + 0.02, -W / 2 - 0.01, W / 2 + 0.01, hex('#7a4a2a')); m(-L * 0.5 - 0.01, -L * 0.3, bh * 0.4, bh * 0.9, -W / 2 + 0.03, W / 2 - 0.03, hex('#b9773d')); }   // manta marrom, traseiro caramelo
+    if (k === 'yorkieRoupa') {   // roupinha azul com estampas rosa e cinza; traseiro marrom
+      for (const [pu, pv, c] of [[0.1, W / 2, '#e2a6c4'], [-0.1, W / 2, '#9a9aa4'], [0.05, -W / 2, '#9a9aa4'], [-0.14, -W / 2, '#e2a6c4']]) m(pu - 0.04, pu + 0.04, 0.07, 0.14, pv < 0 ? pv : pv - 0.035, pv < 0 ? pv + 0.035 : pv, hex(c));
+      m(-L * 0.2, L * 0.1, bh, bh + 0.03, -0.04, 0.04, hex('#e2a6c4'));
+      m(-L / 2 - 0.01, -L * 0.3, -0.04, bh * 0.7, -W / 2 - 0.01, W / 2 + 0.01, TAN2);
+    }
+  }), at(0, yb, 0, vRx(0))]);
   // rabo (abana)
-  { const wg = Math.sin(t * 14 + d.ph) * 0.6 * d.wag, up = d.kind === 'pitbull' || d.kind === 'bull' ? 0.5 : 1.1;
-    const Tt = { o: P(T, -L / 2, yb + bh * 0.8, 0), ax: N(T, -Math.cos(up) * Math.cos(wg), Math.sin(up), -Math.cos(up) * Math.sin(wg)), ay: T.ay, az: T.az };
-    const tl = d.kind.startsWith('yorkie') ? 0.13 : 0.24, tw = d.kind.startsWith('yorkie') ? 0.035 : 0.025, tc = d.kind === 'yorkie' ? BODY : d.kind === 'yorkieRoupa' ? TAN2 : d.kind === 'beagle' ? hex('#7a4a2a') : d.kind === 'pastor' ? hex('#3a2a1e') : BODY;
-    beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl, Tt.o[1] + Tt.ax[1] * tl, Tt.o[2] + Tt.ax[2] * tl], tw, tc);
-    if (d.kind === 'golden') beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl * 0.9, Tt.o[1] + Tt.ax[1] * tl * 0.9, Tt.o[2] + Tt.ax[2] * tl * 0.9], tw * 2.6, hex('#e6b56a'));   // rabo peludo
-    if (d.kind === 'beagle') beam(B, [Tt.o[0] + Tt.ax[0] * tl * 0.75, Tt.o[1] + Tt.ax[1] * tl * 0.75, Tt.o[2] + Tt.ax[2] * tl * 0.75], [Tt.o[0] + Tt.ax[0] * tl * 1.05, Tt.o[1] + Tt.ax[1] * tl * 1.05, Tt.o[2] + Tt.ax[2] * tl * 1.05], tw * 1.2, WHITE); }
+  { const wg = Math.sin(t * 14 + d.ph) * 0.6 * d.wag, up = k === 'pitbull' || k === 'bull' ? 0.5 : 1.1;
+    const tl = k.startsWith('yorkie') ? 0.13 : 0.24, tw = k.startsWith('yorkie') ? 0.035 : 0.025, tc = k === 'yorkie' ? BODY : k === 'yorkieRoupa' ? TAN2 : k === 'beagle' ? hex('#7a4a2a') : k === 'pastor' ? hex('#3a2a1e') : BODY;
+    out.push([dogVox(k + 'tail', m => { m(-tl, 0, -tw, tw, -tw, tw, tc);
+      if (k === 'golden') m(-tl * 0.9, -0.03, -tw * 2.4, tw * 2.4, -tw * 2.2, tw * 2.2, hex('#e6b56a'));   // rabo peludo
+      if (k === 'beagle') m(-tl * 1.1, -tl * 0.72, -tw * 1.2, tw * 1.2, -tw * 1.2, tw * 1.2, WHITE); }),   // ponta branca
+      at(-L / 2 + 0.02, yb + bh * 0.8, 0, vMM(vRy(wg), vRx(-up)))]); }
   // cabeça (vira um pouco para quem olha)
   const sn = d.sniff ? 0.2 + Math.sin(t * 9) * 0.025 : 0;   // cheirando: cabeça baixa, focinho mexendo
-  const H = { o: P(T, L / 2 - 0.02 + sn * 0.3, yb + bh * 0.55 - sn, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
+  const hu = L / 2 - 0.02 + sn * 0.3, hy = yb + bh * 0.55 - sn;
+  const H = { o: P(T, hu, hy, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
   { const ha = d.a + (d.look || 0); H.ax = [Math.cos(ha), 0, Math.sin(ha)]; H.az = [-Math.sin(ha), 0, Math.cos(ha)]; }
   { // auréola dourada flutuando em cima da cabeça
-    const small = d.kind.startsWith('yorkie'), up = { beagle: 0.36, pitbull: 0.46, bull: 0.46, labrador: 0.42, pastor: 0.5, golden: 0.43 }[d.kind] || 0.38, R = small ? 0.085 : 0.12, GOLD = [255, 214, 90];
+    const small = k.startsWith('yorkie'), up = { beagle: 0.36, pitbull: 0.46, bull: 0.46, labrador: 0.42, pastor: 0.5, golden: 0.43 }[k] || 0.38, R = small ? 0.085 : 0.12, GOLD = [255, 214, 90];
     const c = P(H, small ? 0.06 : 0.1, up + Math.sin(t * 2.4 + d.x) * 0.02, 0); d.hy = c[1]; d.hc = c;
     for (let i = 0; i < 14; i++) { const a0 = i / 14 * Math.PI * 2, a1 = (i + 1) / 14 * Math.PI * 2, p0 = [c[0] + Math.cos(a0) * R, c[1], c[2] + Math.sin(a0) * R], p1 = [c[0] + Math.cos(a1) * R, c[1], c[2] + Math.sin(a1) * R];
       beam(B, p0, p1, 0.016, GOLD, F_GLOW); }
   }
-  if (d.kind === 'beagle') {
-    const CAR = hex('#c98a4a'), CAR2 = hex('#b47a3e');
-    box(B, H, -0.01, 0.17, 0.02, 0.22, -0.1, 0.1, CAR, CAR2);                      // cabeça caramelo
-    box(B, H, 0.17, 0.3, 0.02, 0.12, -0.065, 0.065, WHITE, WHITE);                 // focinho branco
-    box(B, H, 0.12, 0.172, 0.1, 0.22, -0.022, 0.022, WHITE, WHITE);                // listra branca na testa
-    box(B, H, 0.29, 0.315, 0.08, 0.125, -0.03, 0.03, NOSE, NOSE);
-    for (const sv of [-1, 1]) {
-      box(B, H, 0.165, 0.172, 0.13, 0.16, sv * 0.05 - 0.016, sv * 0.05 + 0.016, EYE, EYE);
-      box(B, H, -0.02, 0.09, -0.12, 0.19, sv * 0.1 - 0.008 + sv * 0.012, sv * 0.1 + 0.022 + sv * 0.012, hex('#8a5229'), hex('#7a4824'));   // orelhas compridas caídas
+  const eyes = (m, u, y, vs) => { for (const sv of [-1, 1]) { m(u - 0.03, u, y, y + 0.035, sv * vs - 0.018, sv * vs + 0.018, EYE); m(u - 0.03, u, y + 0.035, y + 0.045, sv * vs - 0.005 - (sv < 0 ? 0.012 : 0), sv * vs + 0.005 - (sv < 0 ? 0.012 : 0), SHINE); } };
+  const head = dogVox(k + 'head', m => {
+    if (k === 'beagle') {
+      const CAR = hex('#c98a4a');
+      m(-0.01, 0.17, 0.02, 0.22, -0.1, 0.1, CAR);                      // cabeça caramelo
+      m(0.17, 0.3, 0.02, 0.12, -0.065, 0.065, WHITE);                  // focinho branco
+      m(0.1, 0.18, 0.1, 0.22, -0.02, 0.02, WHITE);                     // listra branca na testa
+      m(0.28, 0.315, 0.08, 0.125, -0.03, 0.03, NOSE);
+      eyes(m, 0.18, 0.13, 0.055);
+      for (const sv of [-1, 1]) m(-0.02, 0.09, -0.12, 0.19, sv > 0 ? 0.1 : -0.135, sv > 0 ? 0.135 : -0.1, hex('#8a5229'));   // orelhas compridas caídas
+    } else if (k === 'labrador' || k === 'golden') {
+      m(-0.01, 0.2, 0.02, 0.26, -0.12, 0.12, BODY);                    // cabeça larga
+      m(0.2, 0.36, 0.02, 0.16, -0.085, 0.085, BODY);                   // focinho
+      m(0.34, 0.385, 0.1, 0.16, -0.045, 0.045, hex('#5a3d2b'));        // nariz marrom
+      m(0.24, 0.34, 0.0, 0.04, -0.06, 0.06, PINK);
+      eyes(m, 0.21, 0.16, 0.065);
+      for (const sv of [-1, 1]) m(0.0, 0.1, 0.05, 0.24, sv > 0 ? 0.12 : -0.155, sv > 0 ? 0.155 : -0.12, DARK);   // orelhas caídas
+    } else if (k === 'pastor') {
+      const BK = hex('#1e1b19');
+      m(-0.01, 0.18, 0.03, 0.25, -0.1, 0.1, BODY);
+      m(0.18, 0.4, 0.03, 0.15, -0.07, 0.07, BK);                       // focinho comprido escuro
+      m(0.39, 0.425, 0.09, 0.15, -0.035, 0.035, NOSE);
+      m(0.08, 0.19, 0.2, 0.26, -0.06, 0.06, BK);                       // máscara
+      eyes(m, 0.19, 0.16, 0.06);
+      for (const sv of [-1, 1]) { m(0.0, 0.09, 0.25, 0.44, sv * 0.07 - 0.03, sv * 0.07 + 0.03, BODY); m(0.06, 0.1, 0.28, 0.41, sv * 0.07 - 0.015, sv * 0.07 + 0.015, BK); }   // orelhas em pé
+    } else if (k === 'pitbull') {
+      m(0, 0.26, 0.02, 0.3, -0.15, 0.15, BODY);                        // cabeça larga
+      m(0.24, 0.38, 0.03, 0.17, -0.11, 0.11, WHITE);                   // focinho branco
+      m(0.1, 0.27, 0.17, 0.3, -0.04, 0.04, WHITE);                     // faixa branca na testa
+      m(0.24, 0.36, 0.0, 0.06, -0.12, 0.12, PINK);                     // beiço rosado
+      m(0.36, 0.395, 0.12, 0.18, -0.045, 0.045, NOSE);
+      eyes(m, 0.27, 0.19, 0.075);
+      for (const sv of [-1, 1]) m(0.04, 0.14, 0.24, 0.32, sv > 0 ? 0.12 : -0.19, sv > 0 ? 0.19 : -0.12, hex('#9a6534'));   // orelhas dobradas
+    } else if (k === 'bull') {
+      m(0, 0.2, 0.04, 0.27, -0.11, 0.11, BODY);                        // cabeça em ovo, longa
+      m(0.2, 0.34, 0.03, 0.22, -0.085, 0.085, BODY);
+      m(0.34, 0.42, 0.03, 0.15, -0.065, 0.065, BODY);
+      m(0.41, 0.445, 0.08, 0.14, -0.035, 0.035, NOSE);
+      m(0.3, 0.4, 0.0, 0.04, -0.07, 0.07, PINK);                       // boca aberta
+      eyes(m, 0.24, 0.17, 0.07);
+      for (const sv of [-1, 1]) { m(0.02, 0.09, 0.27, 0.42, sv * 0.07 - 0.03, sv * 0.07 + 0.03, BODY); m(0.06, 0.1, 0.29, 0.4, sv * 0.07 - 0.015, sv * 0.07 + 0.015, PINK); }   // orelhas em pé, rosadas por dentro
+    } else {   // yorkshires: cabeça caramelo peluda, topete, orelhinhas, barba
+      const HC = k === 'yorkie' ? TAN : TAN2;
+      m(-0.02, 0.16, 0.02, 0.2, -0.09, 0.09, HC);
+      m(0.0, 0.17, 0.17, 0.25, -0.1, 0.1, hex(k === 'yorkie' ? '#c27d3a' : '#b06c33'));   // topete
+      m(0.14, 0.24, -0.02, 0.11, -0.055, 0.055, HC);                   // focinho com barba
+      m(0.22, 0.255, 0.07, 0.11, -0.025, 0.025, NOSE);
+      eyes(m, 0.17, 0.12, 0.045);
+      for (const sv of [-1, 1]) m(0.0, 0.05, 0.22, 0.31, sv * 0.06 - 0.025, sv * 0.06 + 0.025, HC);
+      if (k === 'yorkieRoupa') m(0.2, 0.31, -0.03, 0.06, -0.06, 0.06, hex('#3fae5f'));   // brinquedo verde na boca
     }
-  } else if (d.kind === 'labrador' || d.kind === 'golden') {
-    box(B, H, -0.01, 0.2, 0.02, 0.26, -0.12, 0.12, BODY, BODY);                       // cabeça larga
-    box(B, H, 0.2, 0.36, 0.02, 0.16, -0.085, 0.085, BODY, DARK);                       // focinho
-    box(B, H, 0.355, 0.385, 0.1, 0.16, -0.045, 0.045, hex('#5a3d2b'), hex('#5a3d2b'));   // nariz marrom
-    box(B, H, 0.24, 0.34, 0.03, 0.05, -0.06, 0.06, PINK, PINK);
-    for (const sv of [-1, 1]) { box(B, H, 0.2, 0.21, 0.17, 0.2, sv * 0.065 - 0.016, sv * 0.065 + 0.016, EYE, EYE);
-      box(B, H, 0.0, 0.1, 0.05, 0.24, sv * 0.125 - 0.02, sv * 0.125 + 0.025 * sv, DARK, DARK); }   // orelhas caídas
-  } else if (d.kind === 'pastor') {
-    const BK = hex('#1e1b19');
-    box(B, H, -0.01, 0.18, 0.03, 0.25, -0.1, 0.1, BODY, BODY);
-    box(B, H, 0.18, 0.4, 0.03, 0.15, -0.07, 0.07, BK, BK);                            // focinho comprido escuro
-    box(B, H, 0.4, 0.425, 0.09, 0.15, -0.035, 0.035, NOSE, NOSE);
-    box(B, H, 0.08, 0.18, 0.2, 0.26, -0.06, 0.06, BK, BK);                             // máscara
-    for (const sv of [-1, 1]) { box(B, H, 0.17, 0.18, 0.17, 0.2, sv * 0.06 - 0.015, sv * 0.06 + 0.015, EYE, EYE);
-      box(B, H, 0.0, 0.09, 0.25, 0.44, sv * 0.07 - 0.03, sv * 0.07 + 0.03, BODY, BODY); box(B, H, 0.088, 0.094, 0.27, 0.42, sv * 0.07 - 0.02, sv * 0.07 + 0.02, BK, BK); }   // orelhas em pé
-  } else if (d.kind === 'pitbull') {
-    box(B, H, 0, 0.26, 0.02, 0.3, -0.15, 0.15, BODY, BODY);                       // cabeça larga
-    box(B, H, 0.24, 0.38, 0.03, 0.17, -0.11, 0.11, WHITE, WHITE);                 // focinho branco
-    box(B, H, 0.1, 0.262, 0.17, 0.3, -0.04, 0.04, WHITE, WHITE);                  // faixa branca na testa
-    box(B, H, 0.24, 0.36, 0.02, 0.07, -0.12, 0.12, PINK, PINK);                   // beiço rosado
-    box(B, H, 0.36, 0.395, 0.12, 0.18, -0.045, 0.045, NOSE, NOSE);
-    for (const sv of [-1, 1]) { box(B, H, 0.255, 0.265, 0.19, 0.23, sv * 0.06 - 0.025, sv * 0.06 + 0.025, EYE, EYE); box(B, H, 0.04, 0.14, 0.24, 0.31, sv * 0.15 - 0.02, sv * 0.15 + 0.04 * sv, BODY, hex('#9a6534')); }
-  } else if (d.kind === 'bull') {
-    box(B, H, 0, 0.2, 0.04, 0.27, -0.11, 0.11, BODY, BODY);                       // cabeça em ovo, longa
-    box(B, H, 0.2, 0.34, 0.03, 0.22, -0.085, 0.085, BODY, BODY);
-    box(B, H, 0.34, 0.42, 0.03, 0.15, -0.065, 0.065, BODY, BODY);
-    box(B, H, 0.42, 0.445, 0.08, 0.14, -0.035, 0.035, NOSE, NOSE);
-    box(B, H, 0.3, 0.4, 0.02, 0.05, -0.07, 0.07, PINK, PINK);                     // boca aberta
-    for (const sv of [-1, 1]) { box(B, H, 0.2, 0.21, 0.17, 0.2, sv * 0.065 - 0.015, sv * 0.065 + 0.015, EYE, EYE);
-      box(B, H, 0.02, 0.09, 0.27, 0.42, sv * 0.07 - 0.03, sv * 0.07 + 0.03, BODY, BODY); box(B, H, 0.088, 0.094, 0.29, 0.4, sv * 0.07 - 0.02, sv * 0.07 + 0.02, PINK, PINK); }   // orelhas em pé, rosadas por dentro
-  } else { // yorkshires: cabeça caramelo peluda, orelhinhas, barba
-    const HC = d.kind === 'yorkie' ? TAN : TAN2;
-    box(B, H, -0.02, 0.16, 0.02, 0.2, -0.09, 0.09, HC, HC);
-    box(B, H, 0.0, 0.17, 0.17, 0.25, -0.1, 0.1, hex(d.kind === 'yorkie' ? '#c27d3a' : '#b06c33'), HC);   // topete
-    box(B, H, 0.14, 0.24, 0.0, 0.11, -0.055, 0.055, HC, HC);                       // focinho com barba
-    box(B, H, 0.235, 0.255, 0.07, 0.11, -0.025, 0.025, NOSE, NOSE);
-    for (const sv of [-1, 1]) { box(B, H, 0.16, 0.165, 0.12, 0.15, sv * 0.045 - 0.015, sv * 0.045 + 0.015, EYE, EYE); box(B, H, 0.0, 0.05, 0.22, 0.31, sv * 0.06 - 0.025, sv * 0.06 + 0.025, HC, HC); }
-    if (d.kind === 'yorkieRoupa') box(B, H, 0.2, 0.31, -0.02, 0.06, -0.06, 0.06, hex('#3fae5f'), hex('#2f8f4c'));   // brinquedo verde na boca
-  }
+  });
+  out.push([head, at(hu, hy, 0, vRy(-(d.look || 0)))]);
+  vxDraw(B, Tv, out);
 }
 // ---------------- portão da casa 116 + fuga dos yorkshires ----------------
 function gateFrame(B, dt) {
@@ -3864,52 +3902,41 @@ function portelaUpdate(n) {
   const hd = Math.atan2(b[1] - a[1], b[0] - a[0]); let dh = hd - (n.hd === undefined ? hd : n.hd); while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
   n.hd = (n.hd === undefined ? hd : n.hd) + dh * 0.15; n.ped = sd / 0.9; n.riding = true; n.says = RIDE_SAYS;
 }
+const PORTELA_O = { skin: P_SKIN, shirt: P_SHIRT, sleeve: P_SHIRT, pants: P_PANTS, belt: hex('#2a2a2a'), buckle: hex('#c9b46a'), shoe: P_SHOE, pocket: true };
+function portelaHead() {   // cabelo grisalho, bigode grisalho, boné azul-marinho com botão amarelo
+  return vxPart('hdPortela2', (b, put) => {
+    const S = P_SKIN, S2 = shade(P_SKIN, 0.85), G = P_HAIR, C = P_CAP;
+    b(-3, 3, 0, 7, -3, 3, S); b(-4, -4, 2, 4, -1, 0, S2); b(4, 4, 2, 4, -1, 0, S2);
+    b(-4, -4, 3, 6, -3, 0, G); b(4, 4, 3, 6, -3, 0, G); b(-3, 3, 2, 6, -4, -4, G);   // grisalho dos lados e na nuca
+    for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#1c1410')); put(ex + (ex < 0 ? 0 : 1), 4, 3, hex('#efe8dc')); b(ex, ex + 1, 5, 5, 3, 3, hex('#8a8580')); }
+    b(-1, 1, 3, 3, 4, 4, S); put(0, 2, 4, S2);   // nariz
+    b(-2, 2, 2, 2, 3, 3, hex('#cfc9bf')); put(-2, 1, 3, hex('#cfc9bf')); put(2, 1, 3, hex('#cfc9bf'));   // bigode grisalho
+    b(-1, 1, 1, 1, 3, 3, hex('#7a4a3a'));
+    b(-4, 4, 7, 8, -4, 3, C); b(-3, 3, 9, 9, -3, 2, C); b(-3, 3, 7, 7, 4, 6, C); put(0, 10, 0, hex('#f2c230'));   // boné, aba e botão
+    b(-1, 1, 8, 8, 4, 4, hex('#f2c230'));   // escudo na frente
+  });
+}
 function buildRider(B, n, t) {   // Portela pedalando, de boné
   buildProp(B, 'bike', n.x, n.z, n.hd, {});
-  const T = frame(n.x, n.y, n.z, n.hd), ph = n.ped;
-  const hip = P(T, -0.2, 1.02, 0);
-  for (const sv of [-1, 1]) {   // pernas nos pedais
-    const pa = ph + (sv > 0 ? 0 : Math.PI), ped = P(T, -0.05 + Math.cos(pa) * 0.17, 0.33 - Math.sin(pa) * 0.17, sv * 0.13);   // pedal da frente desce: pedalada para a frente
-    const h = P(T, -0.2, 1.02, sv * 0.12), mid = [(h[0] + ped[0]) / 2, (h[1] + ped[1]) / 2, (h[2] + ped[2]) / 2], kn = P({ o: mid, ax: T.ax, ay: T.ay, az: T.az }, 0.22, 0.12, 0);
-    beam(B, h, kn, 0.17, P_PANTS); beam(B, kn, ped, 0.15, P_PANTS); box(B, frame(ped[0], ped[1] - 0.05, ped[2], n.hd), -0.08, 0.13, 0, 0.09, -0.06, 0.06, P_SHOE, P_SHOE);
-  }
-  const Tt = { o: hip, ax: T.ax, ay: T.ay, az: T.az };
-  box(B, Tt, -0.14, 0.2, 0.0, 0.6, -0.3, 0.3, P_SHIRT, P_SHIRT);   // tronco inclinado
-  box(B, Tt, -0.15, 0.21, 0.0, 0.08, -0.31, 0.31, hex('#2a2a2a'), hex('#2a2a2a'));
-  for (const sv of [-1, 1]) { const sh = P(Tt, 0.05, 0.55, sv * 0.36), hand = P(T, 0.38, 1.12, sv * 0.27); beam(B, sh, hand, 0.15, P_SHIRT); box(B, frame(hand[0], hand[1] - 0.06, hand[2], n.hd), -0.06, 0.06, 0, 0.11, -0.06, 0.06, P_SKIN, P_SKIN); }
-  const H = { o: P(Tt, 0.04, 0.6, 0), ax: T.ax, ay: T.ay, az: T.az };
-  box(B, H, -0.19, 0.19, 0.02, 0.4, -0.19, 0.19, P_SKIN, P_SKIN);
-  box(B, H, -0.2, -0.05, 0.09, 0.34, -0.2, 0.2, P_HAIR, P_HAIR);
-  box(B, H, 0.19, 0.2, 0.2, 0.25, -0.11, -0.05, hex('#1c1410'), hex('#1c1410')); box(B, H, 0.19, 0.2, 0.2, 0.25, 0.05, 0.11, hex('#1c1410'), hex('#1c1410'));
-  box(B, H, 0.19, 0.205, 0.08, 0.12, -0.08, 0.08, hex('#cfc9bf'), hex('#cfc9bf'));
-  box(B, H, -0.21, 0.21, 0.34, 0.52, -0.21, 0.21, P_CAP, P_CAP); box(B, H, 0.21, 0.45, 0.34, 0.39, -0.17, 0.17, P_CAP, P_CAP);
+  const SC = 0.95, T = scaleT(frame(n.x, n.y, n.z, n.hd), SC), u = 1 / (VX * SC), ph = n.ped;   // u: metros → cubinhos
+  const hipY = 0.86 * u, hipZ = -0.2 * u, lean = 0.42;
+  const legs = [-1, 1].map(sd => {
+    const pa = ph + (sd > 0 ? 0 : Math.PI), py = (0.33 - Math.sin(pa) * 0.17) * u + 2.6, pz = (-0.05 + Math.cos(pa) * 0.17) * u - 0.5;   // tornozelo em cima do pedal
+    const [th, al, kb] = ik2(6, 3, pz - hipZ, py - hipY);
+    return [th + al, kb, kb - (th + al) - 0.1];
+  });
+  const sy = hipY + 3 + 6 * Math.cos(lean), sz = hipZ + 6 * Math.sin(lean), hy = 1.12 * u, hz = 0.38 * u;   // ombro → guidão
+  const [ath, aal, akb] = ik2(4.5, 5, hz - sz, hy - sy);
+  const arm = [ath - aal + lean, akb, 0.02, 0];
+  npcPose(B, T, npcParts('portela', PORTELA_O), portelaHead(), { y: hipY - 3 * 0, z: hipZ, lean, hp: -lean * 0.8, legs, arms: [arm, arm] });
 }
 function buildNPC(B, n, t) {
   if (n.style === 'caudinho') return buildCaudinho(B, n, t);
   if (n.style === 'note') return;
-  const T = scaleT(frame(n.x, n.y, n.z, n.base), PSC);
-  const br = Math.sin(t * 1.6) * 0.012;
-  const Tb = { o: [T.o[0], T.o[1] + br, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
-  for (const v of [-0.15, 0.15]) {
-    box(B, Tb, -0.12, 0.12, 0.08, 0.85, v - 0.11, v + 0.11, P_PANTS, P_PANTS);
-    box(B, Tb, -0.13, 0.22, 0.0, 0.1, v - 0.12, v + 0.12, P_SHOE, P_SHOE);
-  }
-  box(B, Tb, -0.2, 0.2, 0.82, 1.47, -0.31, 0.31, P_SHIRT, P_SHIRT);
-  box(B, Tb, -0.21, 0.21, 0.82, 0.9, -0.32, 0.32, hex('#2a2a2a'), hex('#2a2a2a')); // belt
-  // arms: one hand on the hip, one relaxed with a slow gesture
-  const g = Math.sin(t * 0.7) * 0.15;
-  const A1 = swing(Tb, 0, 1.42, -0.4, 0.15 + g); box(B, A1, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, P_SHIRT, P_SHIRT); box(B, A1, -0.08, 0.08, -0.62, -0.3, -0.08, 0.08, P_SKIN, P_SKIN);
-  const A2 = swing(Tb, 0, 1.42, 0.4, -0.1); box(B, A2, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, P_SHIRT, P_SHIRT); box(B, A2, -0.08, 0.08, -0.6, -0.3, -0.08, 0.08, P_SKIN, P_SKIN);
-  // head turns to look at the player
-  const H = yawChild(Tb, 0, 0, 0, n.look);
-  box(B, H, -0.19, 0.19, 1.48, 1.86, -0.19, 0.19, P_SKIN, P_SKIN);
-  box(B, H, -0.2, -0.05, 1.55, 1.8, -0.2, 0.2, P_HAIR, P_HAIR);
-  box(B, H, 0.19, 0.2, 1.66, 1.71, -0.11, -0.05, hex('#1c1410'), hex('#1c1410'));
-  box(B, H, 0.19, 0.2, 1.66, 1.71, 0.05, 0.11, hex('#1c1410'), hex('#1c1410'));
-  box(B, H, 0.19, 0.205, 1.54, 1.58, -0.08, 0.08, hex('#cfc9bf'), hex('#cfc9bf')); // grey moustache
-  box(B, H, -0.21, 0.21, 1.8, 1.98, -0.21, 0.21, P_CAP, P_CAP);   // boné
-  box(B, H, 0.21, 0.45, 1.8, 1.85, -0.17, 0.17, P_CAP, P_CAP);    // aba
-  box(B, H, -0.06, 0.06, 1.98, 2.01, -0.06, 0.06, hex('#f2c230'), hex('#f2c230'));
+  const T = scaleT(frame(n.x, n.y, n.z, n.base), PSC), br = Math.sin(t * 1.6), g = Math.sin(t * 0.7) * 0.15;
+  // Portela parado na guarita: uma mão na cintura, a outra gesticulando devagar; a cabeça vira para quem chega
+  npcPose(B, T, npcParts('portela', PORTELA_O), portelaHead(), { y: 12 + br * 0.08, hy: -(n.look || 0), legs: [[0, 0.03, 0.03], [0, 0.03, 0.03]],
+    arms: [[0.15 + g, 0.5 + g, 0.06], [-0.15, 1.9, 0.7, 1.2]] });
 }
 // ---------------- resize ----------------
 function resize() {
@@ -4731,7 +4758,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119220434";
+  const BUILD = "v20261119223553";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
