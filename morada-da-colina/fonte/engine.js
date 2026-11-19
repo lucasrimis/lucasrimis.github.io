@@ -3484,6 +3484,7 @@ window.__net = (function () {
   // sair do online: volta ao modo sozinho no mesmo lugar
   N.leave = async () => {
     if (!N.online) return;
+    N.tg({ t: 'leave', n: N.name, r: N.base ? N.base.split('/')[1] : '' });
     N.online = false;
     try { N.players.off(); N.chatQ.off(); N.connRef.off(); N.me.onDisconnect().cancel(); await N.me.remove(); } catch (e) { console.error(e); }
     for (const o of N.others.values()) { o.el.remove(); if (o.bub) o.bub.remove(); }
@@ -3518,6 +3519,10 @@ window.__net = (function () {
   // ---- Telegram: avisos para o criador (quem entrou + chat) e mensagens do CRIADOR no céu ----
   const TG = 'https://morada-da-colina.pages.dev/mdc-tg/';
   N.tg = o => { try { fetch(TG + 'notify', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(o), keepalive: true }).catch(() => {}); } catch (e) {} };
+  // fechou a aba / o app estando online: avisa que saiu (só uma vez)
+  addEventListener('pagehide', () => { if (!N.online || N.leftSent) return; N.leftSent = true; const b = JSON.stringify({ t: 'leave', n: N.name, r: N.base ? N.base.split('/')[1] : '', why: 'fechou' });
+    try { if (!(navigator.sendBeacon && navigator.sendBeacon(TG + 'notify', new Blob([b], { type: 'text/plain' })))) N.tg(JSON.parse(b)); } catch (e) {} });
+  addEventListener('pageshow', e => { if (e.persisted && N.online && N.leftSent) { N.leftSent = false; N.tg({ t: 'join', n: N.name, mode: 'online' }); } });
   N.badName = n => /^\s*criador\s*$/i.test(String(n).normalize('NFD').replace(/[̀-ͯ]/g, ''));
   function creatorChat(m) {
     pushHist({ who: 'CRIADOR', m, cr: true, t: Date.now() });
