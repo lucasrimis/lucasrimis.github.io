@@ -2543,12 +2543,18 @@ function toggleCar() {
 }
 // touch controls
 const joy = { id: null, x: 0, y: 0, dx: 0, dy: 0 }, look = { id: null, x: 0, y: 0 };
-const pinch = {};
+const pinch = {}; window.__touch = { joy, look, pinch };
 const jEl = document.getElementById('joy'), jKnob = document.getElementById('knob');
 cv.addEventListener('touchstart', e => {
   hideHelpSoon();
   for (const t of e.changedTouches) {
-    if (t.clientX < innerWidth * 0.45 && joy.id === null) { joy.id = t.identifier; joy.x = t.clientX; joy.y = t.clientY; joy.dx = joy.dy = 0; jEl.style.left = (t.clientX - 70) + 'px'; jEl.style.top = (t.clientY - 70) + 'px'; jEl.classList.remove('run'); jEl.style.display = 'block'; jKnob.style.transform = 'translate(0px,0px)'; }
+    if (t.identifier === joy.id || t.identifier === look.id || t.identifier === pinch.id2) continue;
+    // dois dedos quase juntos (pinça): mesmo que o 1º tenha caído na área do joystick, vira zoom
+    if (e.touches.length === 2 && ((joy.id !== null && performance.now() - (joy.t0 || 0) < 700 && Math.hypot(joy.dx, joy.dy) < 0.35) || (look.id !== null && joy.id === null))) {
+      if (joy.id !== null && look.id === null) { const o = [...e.touches].find(q => q.identifier === joy.id); joy.id = null; joy.dx = joy.dy = 0; jEl.style.display = 'none'; if (o) { look.id = o.identifier; look.x = o.clientX; look.y = o.clientY; } }
+      if (look.id !== null && t.identifier !== look.id) { pinch.d = null; pinch.id2 = t.identifier; pinch.zin = 1; continue; }
+    }
+    if (t.clientX < innerWidth * 0.45 && joy.id === null) { joy.t0 = performance.now(); joy.id = t.identifier; joy.x = t.clientX; joy.y = t.clientY; joy.dx = joy.dy = 0; jEl.style.left = (t.clientX - 70) + 'px'; jEl.style.top = (t.clientY - 70) + 'px'; jEl.classList.remove('run'); jEl.style.display = 'block'; jKnob.style.transform = 'translate(0px,0px)'; }
     else if (look.id === null) { look.id = t.identifier; look.x = t.clientX; look.y = t.clientY; }
     else { pinch.d = null; pinch.id2 = t.identifier; }
   }
@@ -2559,7 +2565,7 @@ cv.addEventListener('touchmove', e => {
     if (t.identifier === joy.id) { let dx = t.clientX - joy.x, dy = t.clientY - joy.y; const l = Math.hypot(dx, dy); const R = 60; if (l > R) { dx *= R / l; dy *= R / l; } joy.dx = dx / R; joy.dy = dy / R; jKnob.style.transform = `translate(${dx}px,${dy}px)`; jEl.classList.toggle('run', Math.hypot(joy.dx, joy.dy) > 0.82); }
     else if (t.identifier === look.id) {
       const t2 = [...e.touches].find(q => q.identifier === pinch.id2);
-      if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) { if (cam.fp) { if (d < pinch.d * 0.75) { setFP(false); cam.dist = 7.5; pinch.d = d; } } else { const nd = cam.dist * pinch.d / d; if (nd < 7 && cam.dist <= 7.05) { pinch.zin = (pinch.zin || 1) * pinch.d / d; if (pinch.zin > 1.35) { pinch.zin = 1; setFP(true); } } else pinch.zin = 1; cam.dist = Math.max(7, Math.min(260, nd)); } } if (!cam.fp || !pinch.d) pinch.d = d; }
+      if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) { if (cam.fp) { if (d < pinch.d * 0.75) { setFP(false); cam.dist = 7.5; pinch.d = d; } } else { const nd = cam.dist * pinch.d / d; if (nd < 7 && cam.dist <= 7.05) { pinch.zin = (pinch.zin || 1) * d / pinch.d; if (pinch.zin > 1.35) { pinch.zin = 1; setFP(true); } } else pinch.zin = 1; cam.dist = Math.max(7, Math.min(260, nd)); } } if (!cam.fp || !pinch.d) pinch.d = d; }
       else { cam.yaw -= (t.clientX - look.x) * 0.008; cam.pitch = Math.max(cam.fp ? -1.35 : -1.1, Math.min(1.45, cam.pitch + (t.clientY - look.y) * 0.006)); cam.follow = 1.5; }
       look.x = t.clientX; look.y = t.clientY;
     }
