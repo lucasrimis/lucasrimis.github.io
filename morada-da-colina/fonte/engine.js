@@ -56,7 +56,8 @@ function frame(x, y, z, ang) { const c = Math.cos(ang), s = Math.sin(ang); retur
 // objetos do cenário que podem ser copiados no esconde-esconde (tipo, posição, ângulo, extras)
 const PROPS = [];
 const LATE_NOTES = [];   // mensagens criadas antes da lista de NPCs existir
-const DOGS = [];         // cachorros soltos em quintais (andam sozinhos)
+const DOGS = [];
+const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa' };         // cachorros soltos em quintais (andam sozinhos)
 // relógio do jogo: 1 hora do jogo = 1 minuto real (o dia inteiro dura 24 minutos), igual para todos os jogadores
 const DAY_SEC = 24 * 60;
 function gameClock() { const sec = Date.now() / 1000 + (window.__timeShift || 0); const day = Math.floor(sec / DAY_SEC); return { day, h: (sec - day * DAY_SEC) / 60, sec, dayStart: day * DAY_SEC }; }
@@ -2261,6 +2262,12 @@ function buildDog(B, d, t) {
   const sn = d.sniff ? 0.2 + Math.sin(t * 9) * 0.025 : 0;   // cheirando: cabeça baixa, focinho mexendo
   const H = { o: P(T, L / 2 - 0.02 + sn * 0.3, yb + bh * 0.55 - sn, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
   { const ha = d.a + (d.look || 0); H.ax = [Math.cos(ha), 0, Math.sin(ha)]; H.az = [-Math.sin(ha), 0, Math.cos(ha)]; }
+  { // auréola dourada flutuando em cima da cabeça
+    const small = d.kind.startsWith('yorkie'), up = { beagle: 0.36, pitbull: 0.46, bull: 0.46 }[d.kind] || 0.38, R = small ? 0.085 : 0.12, GOLD = [255, 214, 90];
+    const c = P(H, small ? 0.06 : 0.1, up + Math.sin(t * 2.4 + d.x) * 0.02, 0); d.hy = c[1]; d.hc = c;
+    for (let i = 0; i < 14; i++) { const a0 = i / 14 * Math.PI * 2, a1 = (i + 1) / 14 * Math.PI * 2, p0 = [c[0] + Math.cos(a0) * R, c[1], c[2] + Math.sin(a0) * R], p1 = [c[0] + Math.cos(a1) * R, c[1], c[2] + Math.sin(a1) * R];
+      beam(B, p0, p1, 0.016, GOLD, F_GLOW); }
+  }
   if (d.kind === 'beagle') {
     const CAR = hex('#c98a4a'), CAR2 = hex('#b47a3e');
     box(B, H, -0.01, 0.17, 0.02, 0.22, -0.1, 0.1, CAR, CAR2);                      // cabeça caramelo
@@ -2729,9 +2736,9 @@ window.__net = (function () {
   LOOK_CSS.forEach((c, i) => { const b = document.createElement('button'); b.className = 'sw' + (i === N.look ? ' on' : ''); b.style.background = c; b.onclick = () => { N.look = i; [...sw.children].forEach((x, k) => x.classList.toggle('on', k === i)); }; sw.appendChild(b); });
   const CFG = window.FIREBASE_CONFIG;
   if (!CFG) { $('btnOnline').disabled = true; msgEl.textContent = 'O modo online ainda não foi configurado.'; }
-  const start = () => { N.crStart(); MY_LOOK = LOOKS[N.look]; player.n = nameIn.value.trim(); lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
+  const start = () => { MY_LOOK = LOOKS[N.look]; player.n = nameIn.value.trim(); lobby.style.display = 'none'; try { localStorage.setItem('mdc_profile', JSON.stringify({ n: nameIn.value.trim(), c: N.look })); } catch (e) {} };
   const offPill = () => { onlTxt.textContent = '○ offline'; $('btnLeave').textContent = 'ENTRAR'; $('btnLeave').classList.add('join'); onl.style.display = 'flex'; };
-  $('btnSolo').onclick = () => { N.tg({ t: 'join', n: nameIn.value.trim().slice(0, 16) || '(sem nome)', mode: 'sozinho' }); start(); if (CFG && !N.online) offPill(); };
+  $('btnSolo').onclick = () => { start(); if (CFG && !N.online) offPill(); };
   $('btnOnline').onclick = async () => {
     const n = nameIn.value.trim().replace(/\s+/g, ' ').slice(0, 16);
     if (!n) { msgEl.textContent = 'Digite um nome para jogar online.'; nameIn.focus(); return; }
@@ -2753,6 +2760,7 @@ window.__net = (function () {
     if (N.badName(name)) throw { message: 'Esse nome é reservado. Escolha outro.' };
     N.name = name; N.base = base || '';
     N.tg({ t: 'join', n: name, mode: base ? 'sala' : 'online', r: base ? base.split('/')[1] : '' });
+    N.crStart();
     const me = N.db.ref(N.base + 'players/' + N.uid);
     N.full = () => Object.assign({ n: N.name, c: N.look, x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0, t: firebase.database.ServerValue.TIMESTAMP }, H.fields());
     me.onDisconnect().remove();
@@ -2849,11 +2857,11 @@ window.__net = (function () {
   async function crPoll() {
     try {
       const r = await fetch(TG + 'criador', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json();
-      for (const x of j.msgs || []) { if (crSeen.has(x.id)) continue; crSeen.add(x.id); if (crFirst && j.now - x.d > 90) continue; creatorMsg(String(x.m).slice(0, 200)); }
+      for (const x of j.msgs || []) { if (crSeen.has(x.id)) continue; crSeen.add(x.id); if (crFirst && j.now - x.d > 90 || !N.online) continue; creatorMsg(String(x.m).slice(0, 200)); }
       crFirst = false;
     } catch (e) {}
   }
-  N.crStart = () => { if (N.crOn) return; N.crOn = true; crPoll(); setInterval(() => { if (!document.hidden) crPoll(); }, 10000); };
+  N.crStart = () => { if (N.crOn) return; N.crOn = true; crPoll(); setInterval(() => { if (!document.hidden && N.online) crPoll(); }, 10000); };
   const myBubble = document.createElement('div'); myBubble.className = 'bubble'; lblLayer.appendChild(myBubble);
   function say(o, m, uid) {
     if (uid === N.uid) { myBubble.textContent = m; myBubble.style.display = 'block'; clearTimeout(N.myT); N.myT = setTimeout(() => myBubble.style.display = 'none', 6000); return; }
@@ -3461,6 +3469,13 @@ function frame_() {
     if (!n.el) { n.el = document.createElement('div'); n.el.className = 'bubble' + (n.style === 'caudinho' ? ' mad' : n.style === 'note' ? ' note' : ''); document.getElementById('labels').appendChild(n.el); }
     if (n.show && q[3] > 0) { n.el.style.display = 'block'; n.el.innerHTML = (n.name ? '<b>' + n.name + ':</b> ' : '') + n.line; n.el.style.transform = `translate(${(q[0] * 0.5 + 0.5) * innerWidth}px,${(-q[1] * 0.5 + 0.5) * innerHeight}px) translate(-50%,-115%)`; }
     else n.el.style.display = 'none';
+  }
+  for (const d of DOGS.concat(BEAGLE.d ? [BEAGLE.d] : [])) {   // nome dos cães quando o jogador chega perto
+    const nm = DOG_NAMES[d.kind]; if (!nm) continue;
+    if (!d.el) { d.el = document.createElement('div'); d.el.className = 'lbl dog'; d.el.textContent = '🐾 ' + nm; lblLayer.appendChild(d.el); }
+    const dd = Math.hypot(d.x - player.x, d.z - player.z), q = xform(VP, d.hc ? [d.hc[0], d.hc[1] + 0.08, d.hc[2]] : [d.x, surfAt(d.x, d.z) + 0.7, d.z]);
+    if (dd < 7 && q[3] > 0 && Math.abs(q[0]) < 1.1 && Math.abs(q[1]) < 1.1) { d.el.style.display = 'block'; d.el.style.transform = `translate(${(q[0] * 0.5 + 0.5) * innerWidth}px,${(-q[1] * 0.5 + 0.5) * innerHeight}px) translate(-50%,-100%)`; }
+    else d.el.style.display = 'none';
   }
   if (window.__net) window.__net.labels(VP);
   hudT += dt; if (hudT > 0.2) { hudT = 0; updateHUD(); drawMini(); }
