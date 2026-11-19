@@ -2720,7 +2720,20 @@ function buildPlayerVox(B, p, look, sk, SKN) {
   const pelvis = vxPart('pel' + (sk === 'manoel' ? 'M' : ''), (b, put) => { b(-3, 3, 0, 1, -1, 1, JE); b(-3, 3, 2, 2, -1, 1, x => x === 0 ? hex('#c9b46a') : hex('#3b2a1e'));
     if (sk === 'manoel') { b(0, 0, 0, 0, 2, 3, hex('#efe6d2')); b(-1, 1, -1, 1, 4, 4, hex('#d23a2e')); b(-1, 1, 0, 0, 5, 5, hex('#d23a2e')); put(-1, 1, 5, WH); put(1, -1, 5, WH); put(0, 0, 5, WH); } });
   const torso = vxPart('tor' + kS, (b, put) => { b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? SH2 : SH); b(-1, 1, 6, 6, 1, 1, SKN); put(0, 5, 1, SKN); b(-1, 1, 7, 7, -1, 1, SKN); });
-  const head = vxPart('hd' + style + sk + SKN.join('.'), (b, put) => {
+  const head = sk === 'kiko' ? vxPart('hdKiko', (b, put) => {   // Kiko: testa alta enrugada, olhos arregalados, nariz marcado, boca aberta mostrando os dentes, cabelo escuro volumoso
+    const KS = hex('#d6a17c'), KS2 = hex('#c08a66'), KS3 = hex('#b07a58');
+    b(-3, 3, 0, 9, -3, 3, KS); b(-2, 2, -1, -1, -2, 2, KS);                    // cabeça alongada + queixo fino
+    b(-4, -4, 2, 4, -1, 0, KS2); b(4, 4, 2, 4, -1, 0, KS2);                     // orelhas
+    for (const y of [7, 8]) b(-2, 2, y, y, 3, 3, (x) => (x + y) % 2 ? KS3 : KS2);   // rugas da testa
+    for (const ex of [-3, 1]) { b(ex, ex + 1, 3, 4, 3, 3, WH); put(ex + (ex < 0 ? 1 : 0), 3, 4, hex('#5d6a74')); put(ex + (ex < 0 ? 1 : 0), 4, 4, PU);   // olhos arregalados (branco em volta da íris)
+      b(ex, ex + 1, 6, 6, 3, 3, BR); }                                           // sobrancelhas levantadas
+    b(0, 0, 2, 3, 4, 4, KS2); put(0, 1, 5, KS3);                                // nariz
+    b(-1, 1, 0, 0, 3, 3, hex('#7a3a2e')); b(-1, 1, 1, 1, 3, 3, hex('#f2efe6')); put(-2, 1, 3, hex('#7a3a2e')); put(2, 1, 3, hex('#7a3a2e'));   // boca aberta com os dentes
+    b(-1, 1, -1, -1, 3, 3, hex('#b8786a'));                                     // lábio de baixo
+    // cabelo: volume bagunçado em cima, laterais curtas
+    for (let x = -4; x <= 4; x++) for (let z = -4; z <= 3; z++) for (let y = 9; y <= 12; y++) { const d = x * x / 18 + (z + 0.5) * (z + 0.5) / 15 + (y - 9.5) * (y - 9.5) / 6; if (d < 1.1 && !(z === 3 && y < 10) && ((x * 5 + y * 7 + z * 3) % 5 !== 0 || d < 0.7)) put(x, y, z, (x + y * 2 + z) % 3 ? HR : shade(HR, 1.3)); }
+    b(-4, -4, 5, 9, -3, 1, HR); b(4, 4, 5, 9, -3, 1, HR); b(-3, 3, 3, 9, -4, -4, HR);
+  }) : vxPart('hd' + style + sk + SKN.join('.'), (b, put) => {
     b(-3, 3, 0, 6 + F, -3, 3, SKN); b(-4, -4, 2, 3, -1, 0, SK2); b(4, 4, 2, 3, -1, 0, SK2);
     for (const ex of [-2, 1]) { const droop = sk === 'miguel' && ex < 0 ? 1 : 0; put(ex, 3 - droop, 3, WH); put(ex + 1, 3 - droop, 3, PU); b(ex, ex + 1, 4, 4, 3, 3, droop ? SK2 : BR); }
     put(0, 2, 4, SK2); b(-1, 1, 1, 1, 3, 3, MO);
@@ -2772,7 +2785,7 @@ function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   const SHIRT_ = look.shirt, CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
-  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#6a4129') : SKIN;
+  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#6a4129') : sk === 'kiko' ? hex('#d6a17c') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
