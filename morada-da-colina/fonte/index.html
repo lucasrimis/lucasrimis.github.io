@@ -1856,7 +1856,7 @@ for (const lm of (W.landmarks || [])) {
   const vf = d / 2;
   // window with frame & bars
   wallFeat(B, T, -1.45, -0.15, 0.9, 2.05, vf, 1, hex('#e6e0d2'));
-  const wf = vf + 0.03;
+  const wf = vf + 0.05;   // à frente da moldura (wallFeat fica em vf + 0.04), para não piscar
   B.quad(P(T, -1.38, 0.97, wf + 0.01), P(T, -0.22, 0.97, wf + 0.01), P(T, -0.22, 1.98, wf + 0.01), P(T, -1.38, 1.98, wf + 0.01), N(T, 0, 0, 1), hex('#2b3644'), F_PLAIN);
   for (const u of [-1.0, -0.6]) B.quad(P(T, u - 0.025, 0.97, wf + 0.02), P(T, u + 0.025, 0.97, wf + 0.02), P(T, u + 0.025, 1.98, wf + 0.02), P(T, u - 0.025, 1.98, wf + 0.02), N(T, 0, 0, 1), hex('#e6e0d2'), F_PLAIN);
   B.quad(P(T, -1.38, 1.45, wf + 0.02), P(T, -0.22, 1.45, wf + 0.02), P(T, -0.22, 1.5, wf + 0.02), P(T, -1.38, 1.5, wf + 0.02), N(T, 0, 0, 1), hex('#e6e0d2'), F_PLAIN);
@@ -4196,7 +4196,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119021956";
+  const BUILD = "v20261119022502";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
