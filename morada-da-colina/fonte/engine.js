@@ -2724,7 +2724,18 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     const leaf = ['...X...', 'X.XXX.X', '.XXXXX.', '..XXX..', '...X...'];   // folha estampada no peito
     leaf.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === 'X') put(j - 3, 5 - i, 1, i === 4 ? LF2 : LF); }));
   }) : vxPart('tor' + kS, (b, put) => { b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? SH2 : SH); b(-1, 1, 6, 6, 1, 1, SKN); put(0, 5, 1, SKN); b(-1, 1, 7, 7, -1, 1, SKN); });
-  const head = sk === 'manoel' ? vxPart('hdManoel', (b, put) => {   // Manoel: rosto largo, olhos apertados de sorriso, sorrisão com dentes, barba rala, cabelo curto penteado para trás
+  const head = sk === 'biblia' ? vxPart('hdBruno', (b, put) => {   // Bruno: rosto fino e comprido, cabelo liso escuro até as orelhas com franja caída, olhos escuros, lábios finos
+    const BS = hex('#cf9f80'), BS2 = hex('#b98a6c'), HB = hex('#1e1712'), HB2 = hex('#2e241d');
+    b(-3, 3, 0, 7, -3, 3, BS); b(-2, 2, -1, -1, -2, 2, BS); put(0, -2, 1, BS);            // rosto fino, queixo estreito
+    for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#2a1a12')); put(ex + (ex < 0 ? 0 : 1), 4, 3, hex('#efe6dc')); b(ex, ex + 1, 5, 5, 3, 3, HB2); }   // olhos escuros, sobrancelhas finas
+    b(0, 0, 2, 4, 4, 4, BS); put(0, 2, 4, BS2);                                          // nariz reto e fino
+    b(-1, 1, 1, 1, 3, 3, hex('#b47b70'));                                                // lábios finos
+    // cabelo liso, repartido, franja caindo na testa e laterais cobrindo as orelhas
+    b(-4, 4, 7, 9, -4, 3, (x, y, z) => (x + z) % 3 ? HB : HB2);
+    b(-4, -4, 1, 6, -4, 2, HB); b(4, 4, 1, 6, -4, 2, HB); b(-3, 3, 0, 6, -4, -4, HB);
+    b(-3, 0, 6, 6, 3, 4, HB); b(1, 3, 6, 6, 3, 4, HB); put(-3, 5, 4, HB); put(-2, 5, 4, HB2); put(2, 5, 4, HB); put(3, 4, 4, HB); put(3, 5, 4, HB);   // franja repartida
+    for (const [x, y, z] of [[-4, 0, 1], [4, 0, 0], [-4, 3, 3], [4, 3, 3]]) put(x, y, z, HB2);   // pontas
+  }) : sk === 'manoel' ? vxPart('hdManoel', (b, put) => {   // Manoel: rosto largo, olhos apertados de sorriso, sorrisão com dentes, barba rala, cabelo curto penteado para trás
     const MS = hex('#d8ab92'), MS2 = hex('#c39479'), BEARD = hex('#8a6e5e'), HB = hex('#2b211b'), HB2 = hex('#3d3027');
     b(-3, 3, 0, 7, -3, 3, MS); b(-4, -4, 0, 5, -2, 2, MS); b(4, 4, 0, 5, -2, 2, MS);    // rosto largo
     b(-3, 3, -1, -1, -2, 2, MS); b(-5, -5, 2, 4, -1, 0, MS2); b(5, 5, 2, 4, -1, 0, MS2);
@@ -2835,7 +2846,7 @@ function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   const SHIRT_ = look.shirt, CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
-  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : SKIN;
+  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : sk === 'biblia' ? hex('#cf9f80') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
