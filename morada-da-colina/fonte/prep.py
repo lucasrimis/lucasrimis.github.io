@@ -714,6 +714,30 @@ houses = [h for h in houses if not any(in_lot127(x, z, 0.5) for x, z in _hcorner
 trees = [t for t in trees if not in_lot127(t[0], t[1], 1)]
 landmarks.append({'type': 'casa127', 'x': round(_O[0], 2), 'z': round(_O[1], 2), 'u': [round(_u[0], 4), round(_u[1], 4)], 'v': [round(_v[0], 4), round(_v[1], 4)]})
 print('casa127 at', [round(c, 1) for c in _O], 'removed houses', _nb - len(houses))
+# ---- casas 369, 84 (esquina com a Cel. José Fernando Bruno) e 489 da R. Albert Sabin (Street View 10/2011) ----
+# todas do lado norte da rua; u = ao longo da rua (para leste), v = para dentro do lote
+_asp = next(r for r in roads if r['n'] == 'Rua Albert Sabin')['pts']
+def _onroad(p):
+    best = None
+    for (ax, az), (bx, bz) in zip(_asp, _asp[1:]):
+        dx, dz = bx - ax, bz - az; L2 = dx * dx + dz * dz; t = max(0, min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / L2)); q = (ax + dx * t, az + dz * t)
+        d = math.hypot(p[0] - q[0], p[1] - q[1])
+        if best is None or d < best[0]: L = math.sqrt(L2); best = (d, q, (dx / L, dz / L))
+    return best[1], best[2]
+_J84 = proj(-22.4872126, -44.4757698)       # pano 2011 no cruzamento com a Cel. Bruno
+AS2011 = [('369', proj(-22.4867833, -44.476257), -7.0, 7.0, 26), ('489', proj(-22.4872978, -44.4752481), -6.5, 6.5, 24), ('84', _J84, -27.0, -5.0, 24)]
+for _id, _pin, _u0, _u1, _dep in AS2011:
+    _q, _d = _onroad(_pin)
+    _vn = (_d[1], -_d[0])                        # normal para o norte (z-)
+    if _vn[1] > 0: _vn = (-_vn[0], -_vn[1])
+    def _in(x, z, m=0, _q=_q, _d=_d, _vn=_vn, _u0=_u0, _u1=_u1, _dep=_dep):
+        dx, dz = x - _q[0], z - _q[1]; uu = dx * _d[0] + dz * _d[1]; vv = dx * _vn[0] + dz * _vn[1]
+        return _u0 - 0.5 - m < uu < _u1 + 0.5 + m and 4.0 - m < vv < _dep + m
+    _nb = len(houses)
+    houses = [h for h in houses if not any(_in(x, z, 0.5) for x, z in _hcorners(h))]
+    trees = [t for t in trees if not _in(t[0], t[1], 1)]
+    landmarks.append({'type': 'as2011', 'id': _id, 'x': round(_q[0], 2), 'z': round(_q[1], 2), 'u': [round(_d[0], 4), round(_d[1], 4)], 'v': [round(_vn[0], 4), round(_vn[1], 4)], 'u0': _u0, 'u1': _u1, 'dep': _dep})
+    print('as2011', _id, [round(c, 1) for c in _q], 'removed houses', _nb - len(houses))
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {

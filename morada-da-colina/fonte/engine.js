@@ -715,7 +715,7 @@ for (const h of W.houses) {
       for (let k = 1; k <= n; k++) { const t = k / n, sag = Math.sin(t * Math.PI) * 0.55; const p = [pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t - sag, pa[2] + (pb[2] - pa[2]) * t]; beam(B, prev, p, 0.03, wire, F_UNLIT); prev = p; }
     }
   }
-  for (const lm of (W.landmarks || [])) if (lm.type === 'esquina') { // casa de esquina com jardim (Albert Sabin x Cel. Bruno)
+  for (const lm of (W.landmarks || [])) if (lm.type === 'esquina' && !(W.landmarks || []).some(l => l.type === 'as2011' && l.id === '84')) {   // substituída pela casa 84 (Street View 2011) // casa de esquina com jardim (Albert Sabin x Cel. Bruno)
     const [ux, uz] = lm.u, [vx, vz] = lm.v;
     const WP2 = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
     const B = chunkB(...WP2(17, 17));
@@ -852,6 +852,110 @@ for (const h of W.houses) {
     { const p = WP(8.4, 7.6); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.25, true); }
     { const p = WP(sideU(22) + 2.5, 22); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 1.1, true); }
     for (const [pu, pv] of [[19.5, 6.0], [22.5, 6.2], [sideU(12) + 1.2, 12], [sideU(16) + 1.2, 16]]) { const S = at(pu, pv); box(B, S, -0.5, 0.5, 0, 0.8, -0.5, 0.5, hex('#4c8f3d'), hex('#3f7c33'), F_TEX); PROPS.push({ k: 'arbusto', x: S.o[0], z: S.o[2], a: Math.atan2(uz, ux), s: 1.0 }); }
+  }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'as2011') {   // casas 369, 84 e 489 da R. Albert Sabin (Street View 10/2011)
+    const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz], AZ2 = [-vz, 0, vx];
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const atR = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y, p[1]], ax: AZ, ay: [0, 1, 0], az: AZ2 }; };   // girado: eixo ao longo da profundidade
+    const B = chunkB(...WP((lm.u0 + lm.u1) / 2, 12)), r = rngFor(lm.x, lm.z, 2011), MV = 4.9, T0 = at(0, 0, 0);
+    const gp = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
+    const gmin = (u0, u1, v0, v1) => Math.min(gp(u0, v0), gp(u1, v0), gp(u0, v1), gp(u1, v1));
+    const gmax = (u0, u1, v0, v1) => Math.max(gp(u0, v0), gp(u1, v0), gp(u0, v1), gp(u1, v1));
+    const mline = (u0, v0, u1, v1) => { mx.beginPath(); mx.lineWidth = 0.5; const p0 = WP(u0, v0), p1 = WP(u1, v1); mx.moveTo(p0[0], p0[1]); mx.lineTo(p1[0], p1[1]); mx.stroke(); };
+    // muro ao longo da rua (u) ou de lado (v), em pedaços que acompanham o terreno
+    const wallU = (u0, u1, v, h, c, c2, th = 0.1) => { const n = Math.max(1, Math.ceil((u1 - u0) / 3.5)); for (let k = 0; k < n; k++) { const a = u0 + (u1 - u0) * k / n, b = u0 + (u1 - u0) * (k + 1) / n; box(B, at(0, 0, gmin(a, b, v, v)), a, b, -0.6, h, v - th, v + th, c, c2 || c); } maskRect(T0, u0, u1, v - th - 0.05, v + th + 0.05); mline(u0, v, u1, v); };
+    const wallV = (u, v0, v1, h, c, c2, th = 0.1) => { const n = Math.max(1, Math.ceil((v1 - v0) / 3.5)); for (let k = 0; k < n; k++) { const a = v0 + (v1 - v0) * k / n, b = v0 + (v1 - v0) * (k + 1) / n; box(B, at(0, 0, gmin(u, u, a, b)), u - th, u + th, -0.6, h, a, b, c, c2 || c); } maskRect(T0, u - th - 0.05, u + th + 0.05, v0, v1); mline(u, v0, u, v1); };
+    const win = (T, u0, u1, y0, y1, v, sg, grille) => {   // janela na face v (sg = lado de fora)
+      wallFeat(B, T, u0 - 0.08, u1 + 0.08, y0 - 0.08, y1 + 0.08, v, sg, hex('#f2efe6')); wallFeat(B, T, u0, u1, y0, y1, v + sg * 0.01, sg, hex('#2d3a46'));
+      if (grille) for (let gu = u0 + 0.12; gu < u1 - 0.05; gu += 0.16) wallFeat(B, T, gu, gu + 0.035, y0, y1, v + sg * 0.02, sg, hex('#eef0ec'));
+      wallFeat(B, T, u0 - 0.12, u1 + 0.12, y0 - 0.14, y0 - 0.06, v + sg * 0.02, sg, hex('#f4f1ea'));
+    };
+    const winS = (T, v0, v1, y0, y1, u, sg) => { sideFeat(B, T, v0 - 0.08, v1 + 0.08, y0 - 0.08, y1 + 0.08, u, sg, hex('#f2efe6')); sideFeat(B, T, v0, v1, y0, y1, u + sg * 0.01, sg, hex('#2d3a46')); };
+    const body = (u0, u1, v0, v1, h, wc) => { const g = gmin(u0, u1, v0, v1), T = at(0, 0, g); box(B, T, u0, u1, -0.6, h + (gmax(u0, u1, v0, v1) - g), v0, v1, wc, wc); maskRect(T0, u0, u1, v0, v1); return { T, g, top: h + (gmax(u0, u1, v0, v1) - g) }; };
+    const TILE = hex('#b4573b'), TILE2 = hex('#c0663f');
+    if (lm.id === '84') {   // casa térrea comprida na esquina com a Cel. Bruno, muro branco-acinzentado manchado
+      const WL = hex('#d3cfc6'), WL2 = hex('#c4c0b6'), GR = hex('#a29e95');
+      wallU(-27, -6.6, MV, 1.9, WL, WL2);
+      for (let k = 0; k < 9; k++) { const u0 = -26 + r() * 19, y0 = 0.2 + r() * 1.2; wallFeat(B, at(0, 0, gp(u0, MV)), u0, u0 + 0.4 + r() * 1.4, y0, y0 + 0.2 + r() * 0.5, MV - 0.1, -1, r() < 0.5 ? GR : hex('#b9b5ab')); }   // manchas de mofo
+      for (let u = -27; u < -6.6; u += 3.5) wallFeat(B, at(0, 0, gp(u, MV)), u, Math.min(-6.6, u + 3.5), 0, 0.3, MV - 0.1, -1, hex('#9a968d'));
+      { const g = gp(-6.1, MV), T = at(0, 0, g); box(B, T, -6.6, -5.0, -0.6, 2.15, MV - 0.18, MV + 0.18, hex('#bdbab3'), hex('#b2afa8'));   // pilar da esquina
+        box(B, T, -6.3, -5.85, 1.05, 1.6, MV - 0.26, MV - 0.18, hex('#8b8c89'), hex('#7c7d7a')); box(B, T, -5.75, -5.35, 1.2, 1.5, MV - 0.24, MV - 0.18, hex('#6f706d'), hex('#6f706d')); maskRect(T0, -6.6, -5.0, MV - 0.3, MV + 0.2); }
+      // lado da Cel. Bruno: um trecho de muro e depois grade marrom sobre mureta, com o jardim de grama
+      wallV(-5.1, MV, 6.6, 1.9, WL, WL2);
+      { const FE = hex('#6a4a38'), LW = hex('#cbc6bc');
+        wallV(-5.1, 6.6, 22, 0.45, LW, LW, 0.12);
+        for (let v = 6.6; v < 22; v += 0.16) { const g = gp(-5.1, v), T = at(0, 0, g); box(B, T, -5.13, -5.07, 0.45, 1.75, v, v + 0.035, FE, FE); }
+        for (let v = 6.6; v <= 22.01; v += 2.2) { const g = gp(-5.1, v), T = at(0, 0, g); box(B, T, -5.17, -5.03, 0, 1.85, v - 0.07, v + 0.07, FE, FE); }
+        for (const y of [0.55, 1.7]) { const g = gmin(-5.1, -5.1, 6.6, 22); box(B, at(0, 0, g), -5.14, -5.06, y, y + 0.05, 6.6, 22, FE, FE); } }
+      wallV(-5.1, 22, 24, 1.9, WL, WL2); wallU(-27, -5.1, 24, 1.9, hex('#c9c5bb')); wallV(-27, MV, 24, 1.9, hex('#c9c5bb'));
+      // casa: bloco principal + ala virada para a Cel. Bruno, telhado de quatro águas
+      const CW = hex('#eadfc2');
+      const M = body(-24.5, -11, 9, 18.5, 3.0, CW), Mc = at((-24.5 - 11) / 2, (9 + 18.5) / 2, M.g);
+      hipRoof(B, Mc, 13.5, 9.5, M.top, 1.7, 0.7, TILE);
+      const E = body(-11, -7.2, 10.5, 18.5, 3.0, CW), Ec = at((-11 - 7.2) / 2, 14.5, E.g);
+      hipRoof(B, { o: Ec.o, ax: AZ, ay: [0, 1, 0], az: AZ2 }, 8, 3.8, E.top, 1.3, 0.6, TILE2);
+      for (const [a, b] of [[-23, -21.6], [-19.5, -18.1], [-15.5, -14.1]]) win(M.T, a, b, 1.0, 2.2, 9, -1, true);
+      wallFeat(B, M.T, -17.4, -16.4, 0, 2.2, 9, -1, hex('#7a4b2a'));                                                // porta
+      for (const [a, b] of [[11.5, 12.7], [15, 16.2]]) { winS(E.T, a, b, 0.9, 2.1, -7.2, 1); sideFeat(B, E.T, a + 0.15, b - 0.15, 2.1, 2.35, -7.19, 1, hex('#2d3a46')); sideFeat(B, E.T, a + 0.35, b - 0.35, 2.35, 2.5, -7.19, 1, hex('#2d3a46')); }   // janelas em arco
+      // varanda com colunas na frente do bloco principal
+      { const g = M.g, T = at(0, 0, g); box(B, T, -22.5, -12.5, 2.75, 2.95, 7.0, 9.0, TILE, TILE); box(B, T, -22.6, -12.4, 2.95, 3.05, 7.6, 9.0, TILE2, TILE2);
+        for (const u of [-22.2, -19, -16, -12.8]) box(B, T, u - 0.12, u + 0.12, -0.3, 2.75, 7.1, 7.35, hex('#f3ede0'), hex('#e6dfd0'));
+        const q = [[-22.5, 7.0], [-12.5, 7.0], [-12.5, 9], [-22.5, 9]].map(([u, v]) => { const p = WP(u, v); return [p[0], g + 0.06, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#b8a48d'), F_TEX); }
+      for (const [u, v] of [[-9, 6.5], [-6.5, 20], [-26, 21]]) { const S = at(u, v); box(B, S, -0.6, 0.6, 0, 0.9, -0.6, 0.6, hex('#4c8f3d'), hex('#3f7c33'), F_TEX); }
+    } else if (lm.id === '369') {   // muro de blocos sem reboco, portão azul descascado, casa creme recuada
+      const BL = hex('#b4a58f'), BL2 = hex('#a99a84'), PIL = hex('#cbc4b7'), CAP = hex('#a85537');
+      const pillar = u => { const g = gp(u, MV), T = at(0, 0, g); box(B, T, u - 0.2, u + 0.2, -0.6, 2.15, MV - 0.18, MV + 0.18, PIL, PIL); box(B, T, u - 0.26, u + 0.26, 2.15, 2.27, MV - 0.24, MV + 0.24, CAP, CAP); };
+      wallU(-7, -6.1, MV, 2.0, PIL); pillar(-7);
+      { const g = gp(-5.6, MV), T = at(0, 0, g); box(B, T, -6.1, -5.15, -0.6, 2.0, MV - 0.05, MV + 0.05, hex('#5d8fb4'), hex('#4f7fa3')); maskRect(T0, -6.1, -5.15, MV - 0.1, MV + 0.1); }   // portinha azul
+      wallU(-5.15, -1.35, MV, 2.0, BL, BL2);
+      for (let u = -5.15; u < -1.35; u += 0.4) for (let y = 0.0; y < 2.0; y += 0.2) { const k = Math.round(y / 0.2) % 2; const T = at(0, 0, gp(u, MV)); wallFeat(B, T, u + k * 0.2, Math.min(-1.35, u + k * 0.2 + 0.015), y, y + 0.2, MV - 0.1, -1, hex('#958873')); wallFeat(B, T, u, Math.min(-1.35, u + 0.4), y, y + 0.015, MV - 0.1, -1, hex('#958873')); }
+      for (const u of [-5.15, -3.25, -1.35]) pillar(u);
+      { const g = gp(0.5, MV), T = at(0, 0, g), BLU = hex('#5f93b6');                     // portão de garagem azul, tinta descascando
+        box(B, T, -1.35, 2.45, -0.6, 2.0, MV - 0.06, MV + 0.06, BLU, hex('#4f80a2')); maskRect(T0, -1.35, 2.45, MV - 0.1, MV + 0.1);
+        for (let k = 0; k < 14; k++) { const u0 = -1.2 + r() * 3.3, y0 = 0.15 + r() * 1.6; wallFeat(B, T, u0, Math.min(2.4, u0 + 0.1 + r() * 0.35), y0, y0 + 0.08 + r() * 0.3, MV - 0.06, -1, r() < 0.6 ? hex('#a9c8dc') : hex('#8a7a66')); }
+        for (let u = -1.1; u < 2.4; u += 0.45) wallFeat(B, T, u, u + 0.03, 0.1, 1.95, MV - 0.065, -1, hex('#4a7896')); }
+      pillar(2.45);
+      wallU(2.65, 7, MV, 2.1, hex('#bab7af'), hex('#aeaba3'));
+      { const T = at(0, 0, gp(4.5, MV)); wallFeat(B, T, 4.0, 4.9, 0, 2.0, MV - 0.1, -1, hex('#6b4a2e')); wallFeat(B, T, 3.0, 3.5, 1.1, 1.6, MV - 0.1, -1, hex('#8c8d8a')); wallFeat(B, T, 3.3, 3.8, 0.2, 0.5, MV - 0.1, -1, hex('#a8483b'));
+        wallFeat(B, T, 2.65, 7, 0, 0.3, MV - 0.11, -1, hex('#9c9990')); }
+      wallV(-7, MV, 26, 2.0, hex('#c9c5bb')); wallV(7, MV, 26, 2.0, hex('#c9c5bb')); wallU(-7, 7, 26, 2.0, hex('#c9c5bb'));
+      // casa creme: corpo com telhado de duas águas paralelo à rua + volume da frente com a empena virada para a rua
+      const CW = hex('#efe3c8');
+      const M = body(-6, 6, 10, 19, 3.0, CW); gableRoof(B, at(0, 14.5, M.g), 12, 9, M.top, 1.6, 0.6, TILE, CW);
+      const F = body(-6, -1.2, 7.5, 10, 3.0, CW); gableRoof(B, atR(-3.6, 8.75, F.g), 2.5, 4.8, F.top, 1.3, 0.5, TILE2, CW);
+      win(F.T, -4.6, -2.6, 1.0, 2.2, 7.5, -1, true); win(M.T, 1.0, 2.6, 1.0, 2.2, 10, -1, true); wallFeat(B, M.T, 3.6, 4.6, 0, 2.2, 10, -1, hex('#7a4b2a'));
+      { const q = [[-1.35, MV + 0.1], [2.45, MV + 0.1], [2.45, 10], [-1.35, 10]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.07, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#aaa79e'), F_TEX); }   // garagem
+      { const p = WP(3.2, 3.4); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 0.85, true); }                     // abacateiro na calçada
+    } else if (lm.id === '489') {   // sobrado verde-claro: grade branca à esquerda, muro verde alto à direita
+      const LW = hex('#c9cbc6'), RAIL = hex('#e9ece9'), GW = hex('#a9c2a8'), GW2 = hex('#9db69c');
+      wallU(-6.5, 0.6, MV, 0.5, LW, LW, 0.14);
+      for (let u = -6.5; u < 0.6; u += 0.13) { const T = at(0, 0, gp(u, MV)); box(B, T, u, u + 0.03, 0.5, 1.8, MV - 0.02, MV + 0.02, RAIL, RAIL); }
+      for (let u = -6.5; u <= 0.61; u += 1.42) { const T = at(0, 0, gp(u, MV)); box(B, T, u - 0.09, u + 0.09, 0, 1.95, MV - 0.09, MV + 0.09, hex('#d8dbd8'), hex('#cfd2cf')); }
+      for (const y of [0.62, 1.15, 1.78]) { const T = at(0, 0, gmin(-6.5, 0.6, MV, MV)); box(B, T, -6.5, 0.6, y, y + 0.05, MV - 0.03, MV + 0.03, RAIL, RAIL); }
+      for (let u = -6.4; u < 0.5; u += 0.26) { const T = at(0, 0, gp(u, MV)); box(B, T, u, u + 0.08, 1.8, 1.95, MV - 0.02, MV + 0.02, RAIL, RAIL); }   // pontinhas da grade
+      wallU(0.6, 6.5, MV, 2.4, GW, GW2, 0.12);
+      { const T = at(0, 0, gp(3, MV)); wallFeat(B, T, 1.1, 1.6, 1.3, 1.8, MV - 0.12, -1, hex('#5e625f')); wallFeat(B, T, 0.6, 6.5, 0, 0.4, MV - 0.13, -1, hex('#879c86'));
+        for (let k = 0; k < 6; k++) { const u0 = 0.8 + r() * 5, y0 = 0.4 + r() * 1.5; wallFeat(B, T, u0, u0 + 0.3 + r() * 0.8, y0, y0 + 0.2 + r() * 0.4, MV - 0.13, -1, hex('#93ab92')); } }
+      wallV(-6.5, MV, 24, 2.0, hex('#c9c5bb')); wallV(6.5, MV, 24, 2.0, hex('#c9c5bb')); wallU(-6.5, 6.5, 24, 2.0, hex('#c9c5bb'));
+      // sobrado
+      const HW_ = hex('#bccdb8');
+      const M = body(-5, 5.5, 9, 17.5, 5.8, HW_), Mc = at(0.25, 13.25, M.g);
+      hipRoof(B, Mc, 10.5, 8.5, M.top, 1.6, 0.55, TILE);
+      box(B, M.T, -5.05, 5.55, 2.85, 2.98, 8.95, 17.55, hex('#a7b9a3'), hex('#a7b9a3'));   // faixa entre os andares
+      for (const [a, b] of [[-3.8, -1.9], [0.2, 2.1]]) win(M.T, a, b, 3.7, 4.9, 9, -1, true);
+      win(M.T, 3.2, 4.9, 3.6, 4.6, 9, -1, true);
+      win(M.T, -1.3, 0.5, 0.9, 2.1, 9, -1, false); wallFeat(B, M.T, -4.2, -3.2, 0, 2.2, 9, -1, hex('#7a4b2a'));
+      { const g = M.g, T = at(0, 0, g); box(B, T, -5.2, 1.6, 2.55, 2.75, 6.6, 9.0, TILE, TILE); box(B, T, -5.3, 1.7, 2.75, 2.85, 7.3, 9.0, TILE2, TILE2);   // varandinha coberta do térreo
+        for (const u of [-5.0, 1.4]) box(B, T, u - 0.1, u + 0.1, -0.3, 2.55, 6.7, 6.9, hex('#f3f1ea'), hex('#e3e1da')); }
+      { const q = [[-6.3, MV + 0.15], [0.5, MV + 0.15], [0.5, 8.9], [-6.3, 8.9]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.05, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#5f9c45'), F_TEX); }   // gramadinho atrás da grade
+      { const p = WP(3.8, 3.6), T = at(3.8, 3.6); box(B, T, -0.03, 0.03, 0, 0.9, -0.03, 0.03, hex('#3b6b45'), hex('#3b6b45')); box(B, T, -0.2, 0.2, 0.9, 1.25, -0.16, 0.16, hex('#3f8a4a'), hex('#357a3f')); maskCircle(p[0], p[1], 0.15); PROPS.push({ k: 'lixeira', x: p[0], z: p[1], a: Math.atan2(uz, ux) }); }   // lixeira verde no poste
+      { const p = WP(-3.6, 3.3), T = at(-3.6, 3.3), LF = hex('#8fae5a'), LF2 = hex('#7f9e4d');   // aroeira-salsa (galhos caídos)
+        box(B, T, -0.15, 0.15, 0, 2.6, -0.15, 0.15, hex('#6b5238'), hex('#6b5238')); box(B, T, -1.6, 1.6, 2.4, 3.6, -1.4, 1.4, LF, LF2);
+        for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, rr = 1.3 + r() * 0.4, du = Math.cos(a) * rr, dv = Math.sin(a) * rr; box(B, T, du - 0.18, du + 0.18, 1.0 + r() * 0.6, 2.6, dv - 0.18, dv + 0.18, k % 2 ? LF : LF2, LF2); }
+        maskCircle(p[0], p[1], 0.25); }
+      { const p = WP(6.0, 3.3); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 0.9, true); }
+    }
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'casa127') { // casa 127 da R. Albert Sabin (Street View 10/2024)
     const [ux, uz] = lm.u, [vx, vz] = lm.v;
