@@ -1291,7 +1291,7 @@ for (const h of W.houses) {
   }
   { // fim da R. Silvio Mageste da Silva (borda oeste, no alto): árvore grande à direita e o túmulo do Balu
     const r = W.roads.find(r => r.n === 'Rua Silvio Mageste da Silva');
-    if (r) { let best = null; for (let i = 0; i < r.pts.length - 1; i++) { const a = r.pts[i], b = r.pts[i + 1]; for (let t = 0; t <= 1; t += 0.02) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t; if (z > 0 && x > BX0 + 7 && (!best || x < best.x)) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); best = { x, z, fx: (b[0] - a[0]) / L, fz: (b[1] - a[1]) / L }; } } }
+    if (r) { let best = null; for (let i = 0; i < r.pts.length - 1; i++) { const a = r.pts[i], b = r.pts[i + 1]; for (let t = 0; t <= 1; t += 0.02) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t; if (z > 0 && x > EX0 + 9 && (!best || x < best.x)) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); best = { x, z, fx: (b[0] - a[0]) / L, fz: (b[1] - a[1]) / L }; } } }
       if (best) { const rx = -best.fz, rz = best.fx, tx = best.x + rx * 7.5, tz = best.z + rz * 7.5;   // direita de quem chega pela rua
         const Bt = chunkB(tx, tz), T = frame(tx, groundAt(tx, tz) - 0.2, tz, 0.4), TR = hex('#5d4128'), L1 = hex('#3f7a2e'), L2 = hex('#4d8c36'), L3 = hex('#356b27');
         box(Bt, T, -0.6, 0.6, 0, 4.2, -0.6, 0.6, TR, TR);
@@ -4241,7 +4241,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119024927";
+  const BUILD = "v20261119025319";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
