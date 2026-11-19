@@ -3115,23 +3115,34 @@ function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
     const tat = ['.XXXX', 'X.X.X', 'XXXXX', 'X.X..'];
     tat.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === 'X') put(-5 + j, 6 - i, 2, i % 2 ? INK2 : INK); }));
   });
-  const head = vxPart('hdLucas2', (b, put) => {
-    b(-3, 3, 0, 7, -3, 3, LS); b(-4, -4, 2, 4, -1, 1, LS2); b(4, 4, 2, 4, -1, 1, LS2); b(-2, 2, -1, -1, -2, 2, LS);   // rosto oval, maxilar forte, orelhas
-    put(5, 1, 0, hex('#2a2a2e')); put(5, 0, 0, hex('#2a2a2e'));   // brinco de argola na orelha esquerda
-    // barba rala no queixo e no maxilar
-    for (let x = -3; x <= 3; x++) for (let y = -1; y <= 2; y++) for (let z = -2; z <= 3; z++) { const edge = Math.abs(x) === 3 || z === 3 || y === -1; if (edge && (y <= 1 || Math.abs(x) === 3) && !(z === 3 && y >= 1 && Math.abs(x) <= 2)) put(x, y, z, (x + y + z) & 1 ? STB : STB2); }
-    b(-2, 2, 2, 2, 3, 3, HB); put(-3, 1, 3, HB); put(3, 1, 3, HB); put(-2, 1, 3, HB); put(2, 1, 3, HB); b(-1, 1, 2, 2, 4, 4, HB);   // bigodão grosso descendo nos cantos
-    b(-1, 1, 1, 1, 3, 3, hex('#9a6253'));   // boca
-    b(-1, 1, 3, 3, 4, 4, LS); put(0, 4, 4, LS); put(0, 3, 5, LS2);   // nariz
-    for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#2a1c14')); put(ex + (ex < 0 ? 0 : 1), 4, 3, WH); b(ex, ex + 1, 5, 5, 3, 3, LS2); b(ex - (ex < 0 ? 1 : 0), ex + 1 + (ex < 0 ? 0 : 1), 6, 6, 3, 3, HB); }   // olhos escuros olhando baixo, sobrancelhas grossas
-    // cabeça raspada quase careca: só uma sombra de cabelo na pele, sem volume
-    const SH0 = hex('#a88068'), SH1 = hex('#b88c72');
-    b(-2, 2, 8, 8, -2, 2, LS);   // topo arredondado
-    for (let x = -3; x <= 3; x++) for (let y = 5; y <= 8; y++) for (let z = -3; z <= 3; z++) {
-      const top = y === 8 ? Math.abs(x) <= 2 && Math.abs(z) <= 2 : y === 7 || Math.abs(x) === 3 || z === -3;
-      if (!top || (z >= 3 && y < 8) || (z === 2 && y === 7 && Math.abs(x) >= 2)) continue;   // testa livre, entradas
-      put(x, y, z, (x * 3 + y + z * 5) % 3 ? SH0 : SH1);
+  const head = vxPart('hdLucas7', (b, put) => {   // rosto da foto: cabeça raspada, óculos retangulares, sobrancelhas grossas, bigodão, barba rala grisalha, brinco
+    const ST = hex('#8a7466'), ST2 = hex('#a48d7d'), MU = hex('#2b211c'), MU2 = hex('#3d3029'), GL = hex('#6a5248'), SC = hex('#a07a64');
+    b(-3, 3, 0, 7, -3, 3, LS); b(-2, 2, -1, -1, -2, 2, LS); b(-2, 2, 8, 8, -2, 2, LS);   // rosto oval, testa alta, topo arredondado
+    b(-4, -4, 2, 4, -1, 0, LS2); b(4, 4, 2, 4, -1, 0, LS2);   // orelhas
+    put(5, 1, 0, hex('#b9bcc2')); put(5, 0, 0, hex('#8d9096'));   // argola prateada
+    // cabeça raspada: só pontinhos de cabelo nas laterais, na nuca e no alto
+    for (let x = -3; x <= 3; x++) for (let y = 4; y <= 8; y++) for (let z = -3; z <= 3; z++) {
+      const shell = y === 8 ? Math.abs(x) <= 2 && Math.abs(z) <= 2 : (Math.abs(x) === 3 || z === -3 || y === 7);
+      if (!shell || z >= 2) continue;
+      if ((x * 7 + y * 3 + z * 5 + 99) % 4 === 0 || (Math.abs(x) === 3 && y <= 6 && z <= 0)) put(x, y, z, SC);
     }
+    // barba rala grisalha no maxilar, queixo e bochecha de baixo
+    for (let x = -3; x <= 3; x++) for (let y = -1; y <= 3; y++) for (let z = -2; z <= 3; z++) {
+      const out = Math.abs(x) === 3 || z === 3 || y === -1 || (y === 0 && z >= 1);
+      if (!out) continue;
+      if (z === 3 && y >= 1 && Math.abs(x) <= 2) continue;   // boca e bigode
+      if (y >= 2 && Math.abs(x) < 3) continue;
+      if (Math.abs(x) === 3 && y === 3 && z < 1) continue;
+      put(x, y, z, [ST, ST2, LS2][(x * 5 + y * 3 + z + 30) % 3]);
+    }
+    b(-3, 3, 2, 2, 3, 3, MU); b(-1, 1, 2, 2, 4, 4, MU2); put(-3, 1, 3, MU); put(3, 1, 3, MU); put(-3, 0, 3, MU2); put(3, 0, 3, MU2);   // bigodão largo descendo nos cantos
+    b(-2, 2, 1, 1, 3, 3, hex('#c08378')); put(0, 1, 4, hex('#cf958a'));   // lábios rosados
+    b(-1, 1, 3, 3, 4, 4, LS); put(0, 3, 5, LS2); put(0, 2, 4, LS2);   // nariz
+    for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#4a3020')); put(ex + (ex < 0 ? 0 : 1), 4, 3, WH); }   // olhos castanhos
+    b(-3, -1, 6, 6, 3, 3, MU2); b(1, 3, 6, 6, 3, 3, MU2); put(-1, 6, 3, LS); put(1, 6, 3, LS);   // sobrancelhas grossas
+    // óculos de armação retangular marrom-escura, à frente dos olhos
+    for (const [x0, x1] of [[-3, -1], [1, 3]]) { b(x0, x1, 5, 5, 4, 4, GL); b(x0, x1, 3, 3, 4, 4, GL); put(x0 < 0 ? -4 : 4, 4, 4, GL); }
+    put(0, 4, 4, GL); b(-4, -4, 4, 5, 0, 3, GL); b(4, 4, 4, 5, 0, 3, GL);   // ponte e hastes até a orelha
   });
   const uArm = vxPart('uaL', b => b(-1, 1, -4, 0, -1, 1, (x, y) => y === 0 ? LS2 : LS));   // braço grosso, ombro redondo
   const fArmR = vxPart('faLr', b => { b(-1, 0, -4, -1, -1, 0, LS); b(-1, 0, -5, -5, -1, 0, LS2); });
@@ -4711,7 +4722,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119215350";
+  const BUILD = "v20261119220104";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
