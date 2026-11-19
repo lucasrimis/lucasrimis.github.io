@@ -941,11 +941,13 @@ for (const h of W.houses) {
     box(B, T, 2.42, 2.98, 7.52, 7.58, -0.18, 0.18, hex('#e9e4d0'), hex('#e9e4d0'));   // difusor (acende à noite)
     maskCircle(x, z, 0.2); PROPS.push({ k: 'poste', x, z, a: ra }); return [x, y, z]; });
   // liga cada poste ao vizinho mais próximo para cada lado da sua rua (antes só ligava postes seguidos na lista e alguns ficavam sem fio)
+  const cross = (ax, az, bx, bz, cx, cz, dx, dz) => { const d1 = (bx - ax) * (cz - az) - (bz - az) * (cx - ax), d2 = (bx - ax) * (dz - az) - (bz - az) * (dx - ax), d3 = (dx - cx) * (az - cz) - (dz - cz) * (ax - cx), d4 = (dx - cx) * (bz - cz) - (dz - cz) * (bx - cx); return d1 * d2 < 0 && d3 * d4 < 0; };
+  const crossesRoad = (ax, az, bx, bz) => SEGS.some(sg => sg.t !== 'footway' && cross(ax, az, bx, bz, sg.a[0], sg.a[1], sg.b[0], sg.b[1]));   // fio não passa por cima de rua
   const links = new Set(), pairs = [];
   PL.forEach(([x, z, pa], i) => {
     const sa = (pa !== undefined ? pa : 0) + Math.PI / 2, sx = Math.cos(sa), sz = Math.sin(sa);
     for (const dir of [1, -1]) { let best = -1, bd = 62;
-      PL.forEach(([x2, z2], j) => { if (j === i) return; const dx = x2 - x, dz = z2 - z, d = Math.hypot(dx, dz); if (d < 4 || d >= bd) return; const c = (dx * sx + dz * sz) * dir / d; if (c > 0.82) { bd = d; best = j; } });
+      PL.forEach(([x2, z2], j) => { if (j === i) return; const dx = x2 - x, dz = z2 - z, d = Math.hypot(dx, dz); if (d < 4 || d >= bd) return; const c = (dx * sx + dz * sz) * dir / d; if (c > 0.82 && !crossesRoad(x, z, x2, z2)) { bd = d; best = j; } });
       if (best >= 0) { const k = Math.min(i, best) + ',' + Math.max(i, best); if (!links.has(k)) { links.add(k); pairs.push([i, best]); } } }
   });
   for (const [ia, ib] of pairs) {
@@ -4391,7 +4393,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119121352";
+  const BUILD = "v20261119122017";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
