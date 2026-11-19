@@ -2584,6 +2584,7 @@ try { if (localStorage.getItem('mdc_fp') === '1') setTimeout(() => setFP(true), 
   document.getElementById('gearClose').addEventListener('click', () => G.classList.remove('on'));
   G.querySelectorAll('[data-px]').forEach(b => b.addEventListener('click', () => { pixel = +b.dataset.px; try { localStorage.setItem('mdc_px', String(pixel)); } catch (e) {} resize(); mark(); }));
   for (const el of [btn, G]) el.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); }
+{ if (matchMedia('(pointer:coarse)').matches) document.getElementById('online').appendChild(document.getElementById('btnGear')); }   // celular: engrenagem ao lado do botão ENTRAR
 let helpTimer = null;
 function hideHelpSoon() { if (helpTimer) return; helpTimer = setTimeout(() => document.getElementById('help').classList.add('hide'), 6000); }
 
