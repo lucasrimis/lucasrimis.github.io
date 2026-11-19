@@ -2929,6 +2929,7 @@ const SKIN = hex('#c98d62'), HAIR = hex('#2a1d14'), SHIRT = hex('#f2c230'), SHIR
 function skinOf(name) {
   const f = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().split(/\s+/)[0];
   if (f === 'bruno' || f === 'mendes') return 'biblia';
+  if (f === 'lucas' || f === 'rimis') return 'lucas';
   return ['carlos', 'kiko', 'miguel', 'manoel'].includes(f) ? f : null;
 }
 const PSC = 0.84;   // escala das pessoas (~1,70 m), proporcional às casas e portas
@@ -2971,6 +2972,8 @@ function vxHash(s) { let h = 7; for (const ch of String(s || '')) h = (h * 31 + 
 function buildPlayerVox(B, p, look, sk, SKN) {
   const SH = look.shirt, SH2 = shade(SH, 0.8), JE = SHORTS, JE2 = shade(SHORTS, 0.82), SK2 = shade(SKN, 0.85), HR = HAIR, WH = hex('#ffffff'), PU = hex('#1a1a1a'), BR = shade(HAIR, 0.8), MO = hex('#6a3424');
   const style = sk === 'carlos' || sk === 'kiko' ? 0 : vxHash(p === player ? player.n : p.n) % 3, F = sk === 'kiko' ? 4 : 0, kS = SKN.join('.') + '|' + SH.join('.');
+  const LS = hex('#cf9c78'), LS2 = hex('#b9876a'), LSH = hex('#3d4148'), LSH2 = hex('#2c2f35'), INK = hex('#4a4440'), INK2 = hex('#665c55');   // Lucas: pele, short cinza-chumbo, tinta das tatuagens
+  if (sk === 'lucas') return buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2);
   const pelvis = vxPart('pel' + (sk === 'manoel' ? 'M' : ''), (b, put) => { b(-3, 3, 0, 1, -1, 1, JE); b(-3, 3, 2, 2, -1, 1, x => x === 0 ? hex('#c9b46a') : hex('#3b2a1e'));
     if (sk === 'manoel') { b(0, 0, 0, 0, 2, 3, hex('#efe6d2')); b(-1, 1, -1, 1, 4, 4, hex('#d23a2e')); b(-1, 1, 0, 0, 5, 5, hex('#d23a2e')); put(-1, 1, 5, WH); put(1, -1, 5, WH); put(0, 0, 5, WH); } });
   const torso = sk === 'manoel' ? vxPart('torManoel' + SKN.join('.'), (b, put) => { const BK = hex('#1c1c1f'), BK2 = hex('#141416'), LF = hex('#3fae3a'), LF2 = hex('#2f8a2c');
@@ -3097,11 +3100,75 @@ function buildPlayerVox(B, p, look, sk, SKN) {
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
   vxDraw(B, T, out);
 }
+// ================= Lucas / Rimis: musculoso, sem camisa, short e chinelo; cabeça raspada, bigodão, barba rala, brinco, tatuagens =================
+function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
+  const HB = hex('#1e1813'), STB = hex('#8f6f5a'), STB2 = hex('#a07c64'), WH = hex('#f2ece4');
+  const pelvis = vxPart('pelL', (b, put) => { b(-3, 3, 0, 1, -1, 1, LSH); b(-3, 3, 2, 2, -1, 1, LSH2); put(0, 2, 2, hex('#d9d4cc')); put(-1, 1, 2, hex('#d9d4cc')); });   // short cinza com cordão
+  const torso = vxPart('torL', (b, put) => {   // tronco em V: cintura estreita, peito largo, peitoral e abdômen marcados
+    b(-3, 3, 0, 2, -1, 1, LS); b(-4, 4, 3, 6, -2, 1, LS); b(-3, 3, 7, 7, -2, 1, LS);   // cintura, peito/costas, trapézio
+    b(-4, -1, 4, 6, 2, 2, LS); b(1, 4, 4, 6, 2, 2, LS); b(-4, 4, 3, 3, 2, 2, LS2);   // peitorais (com sombra embaixo)
+    put(-2, 4, 3, LS2); put(2, 4, 3, LS2);   // mamilos
+    for (const y of [0, 1, 2]) { put(-1, y, 2, LS); put(1, y, 2, LS); put(0, y, 2, LS2); }   // gomos do abdômen com a linha no meio
+    put(0, 0, 2, hex('#8a6450'));   // umbigo
+    b(-1, 1, 8, 8, -1, 1, LS);   // pescoço
+    // tatuagem: crânio de dinossauro desenhado no peitoral direito
+    const tat = ['.XXXX', 'X.X.X', 'XXXXX', 'X.X..'];
+    tat.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === 'X') put(-5 + j, 6 - i, 2, i % 2 ? INK2 : INK); }));
+  });
+  const head = vxPart('hdLucas', (b, put) => {
+    b(-3, 3, 0, 7, -3, 3, LS); b(-4, -4, 2, 4, -1, 1, LS2); b(4, 4, 2, 4, -1, 1, LS2); b(-2, 2, -1, -1, -2, 2, LS);   // rosto oval, maxilar forte, orelhas
+    put(5, 1, 0, hex('#2a2a2e')); put(5, 0, 0, hex('#2a2a2e'));   // brinco de argola na orelha esquerda
+    // barba rala no queixo e no maxilar
+    for (let x = -3; x <= 3; x++) for (let y = -1; y <= 2; y++) for (let z = -2; z <= 3; z++) { const edge = Math.abs(x) === 3 || z === 3 || y === -1; if (edge && (y <= 1 || Math.abs(x) === 3) && !(z === 3 && y >= 1 && Math.abs(x) <= 2)) put(x, y, z, (x + y + z) & 1 ? STB : STB2); }
+    b(-2, 2, 2, 2, 3, 3, HB); put(-3, 1, 3, HB); put(3, 1, 3, HB); put(-2, 1, 3, HB); put(2, 1, 3, HB); b(-1, 1, 2, 2, 4, 4, HB);   // bigodão grosso descendo nos cantos
+    b(-1, 1, 1, 1, 3, 3, hex('#9a6253'));   // boca
+    b(-1, 1, 3, 3, 4, 4, LS); put(0, 4, 4, LS); put(0, 3, 5, LS2);   // nariz
+    for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#2a1c14')); put(ex + (ex < 0 ? 0 : 1), 4, 3, WH); b(ex, ex + 1, 5, 5, 3, 3, LS2); b(ex - (ex < 0 ? 1 : 0), ex + 1 + (ex < 0 ? 0 : 1), 6, 6, 3, 3, HB); }   // olhos escuros olhando baixo, sobrancelhas grossas
+    // cabelo raspado (máquina), bem rente: uma camada só, com entradas na testa
+    for (let x = -4; x <= 4; x++) for (let z = -4; z <= 3; z++) { put(x, 8, z, (x * 3 + z) % 4 ? HB : hex('#3a2e26')); }
+    b(-4, -4, 5, 7, -4, 1, HB); b(4, 4, 5, 7, -4, 1, HB); b(-3, 3, 2, 7, -4, -4, HB);
+    for (const x of [-3, -2, -1, 0, 1, 2, 3]) put(x, 7, 3, Math.abs(x) === 3 ? LS : HB);   // linha do cabelo com entradas
+  });
+  const uArm = vxPart('uaL', b => b(-1, 1, -4, 0, -1, 1, (x, y) => y === 0 ? LS2 : LS));   // braço grosso, ombro redondo
+  const fArmR = vxPart('faLr', b => { b(-1, 0, -4, -1, -1, 0, LS); b(-1, 0, -5, -5, -1, 0, LS2); });
+  const fArmL = vxPart('faLl', (b, put) => { b(-1, 0, -4, -1, -1, 0, LS); b(-1, 0, -5, -5, -1, 0, LS2);   // antebraço esquerdo tatuado: lua e pinheiros
+    put(0, -1, 0, INK2); put(-1, -3, 0, INK); put(-1, -4, 0, INK2); put(0, -4, -1, INK); put(-1, -2, -1, INK2); });
+  const fArmGun = vxPart('fgL', b => { b(-1, 0, -4, -1, -1, 0, LS); b(-1, 0, -5, -5, -1, 0, LS2); b(-1, 0, -11, -6, 0, 0, hex('#26282c')); b(-1, 0, -7, -6, 1, 2, hex('#3a3d42')); b(-1, 0, -11, -11, -1, -1, hex('#e8e4d6')); });
+  const thigh = vxPart('thL', b => { b(-1, 1, -3, -1, -1, 1, LSH); b(-1, 1, -4, -4, -1, 1, LSH2); b(-1, 1, -6, -5, -1, 1, LS); });   // short até o meio da coxa
+  const shin = vxPart('shL', b => b(-1, 1, -3, -1, -1, 1, (x, y, z) => z === 1 && y === -1 ? LS2 : LS));
+  const foot = vxPart('ftL', (b, put) => { b(-1, 1, -3, -3, -2, 3, hex('#1d1d20')); b(-1, 1, -2, -2, -1, 3, LS); put(0, -2, 2, hex('#1d1d20')); b(-1, 1, -2, -2, 1, 1, hex('#1d1d20')); b(-1, 1, -1, -1, -1, 0, LS2); });   // chinelo de dedo
+  // animação (mesma do modelo padrão)
+  const t = performance.now() / 1000, w = p.sit ? 0 : Math.min(1, (p.speed || 0) / 3), ph = p.walk || 0, s_ = Math.sin(ph), c_ = Math.cos(ph), br = Math.sin(t * 1.8 + (p.x || 0)) * (1 - w);
+  const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08;
+  const root = { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
+  const out = [[pelvis, root]];
+  const tor = vX(root, [0, 3, 0], vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.02)));
+  out.push([torso, tor]);
+  out.push([head, vX(tor, [0, 9, 0], vMM(vRy(w * s_ * 0.12), vRx(0.04 * w * Math.abs(c_) - br * 0.02)))]);
+  for (const sd of [-1, 1]) {
+    const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
+    let hip, knee, ank;
+    if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
+    else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
+    const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
+    out.push([thigh, th], [shin, shn], [foot, ft]);
+    const armed = p.gun !== undefined && sd < 0;
+    let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.22 + w * (0.25 + 0.3 * Math.max(0, -ls));
+    if (p.sit) { sw = 0.35; el = 0.6; }
+    if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
+    const ua = vX(tor, [sd * 5.5, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : 0.14 + 0.02 * br))));   // braços um pouco abertos (dorsais largas)
+    const fa = vX(ua, [0, -4.5, 0], vRx(el));
+    const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
+    out.push([uArm, off(ua)], [armed ? fArmGun : sd > 0 ? fArmL : fArmR, off(fa)]);
+  }
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
+  vxDraw(B, T, out);
+}
 function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
-  const SHIRT_ = look.shirt, CAR_ = look.car;
+  let SHIRT_ = look.shirt; const CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
-  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : sk === 'biblia' ? hex('#b98563') : SKIN;
+  const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : sk === 'biblia' ? hex('#b98563') : sk === 'lucas' ? hex('#cf9c78') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
@@ -3116,17 +3183,19 @@ function buildPlayer(B, p, look) {
   } else
   for (const [v, ph] of [[-0.17, sw], [0.17, -sw]]) {
     const L = swing(Tb, 0, 0.85, v, ph);
+    if (sk === 'lucas') { box(B, L, -0.13, 0.13, -0.3, 0.02, -0.12, 0.12, hex('#3d4148'), hex('#3d4148')); box(B, L, -0.11, 0.11, -0.84, -0.3, -0.1, 0.1, SKN, SKN); box(B, L, -0.12, 0.24, -0.88, -0.84, -0.11, 0.11, hex('#1d1d20'), hex('#1d1d20')); continue; }   // short, perna de fora, chinelo
     box(B, L, -0.12, 0.12, -0.78, 0.02, -0.11, 0.11, SHORTS, SHORTS);      // calça até o tornozelo
     box(B, L, -0.125, 0.125, -0.78, -0.7, -0.115, 0.115, hex('#1f3a6e'), hex('#1f3a6e')); // barra da calça
     box(B, L, -0.13, 0.22, -0.88, -0.76, -0.12, 0.12, SHOE, SHOE);
   }
+  if (sk === 'lucas') SHIRT_ = SKN;   // sem camisa
   box(B, Tb, -0.18, 0.18, 0.8, 1.45, -0.3, 0.3, SHIRT_, SHIRT_);
-  box(B, Tb, 0.181, 0.19, 1.05, 1.3, -0.12, 0.12, SHIRT2, SHIRT2);
+  if (sk !== 'lucas') box(B, Tb, 0.181, 0.19, 1.05, 1.3, -0.12, 0.12, SHIRT2, SHIRT2);
   for (const [v, ph] of [[-0.39, -sw], [0.39, sw]]) {
     const armed = p.gun !== undefined && v > 0;   // pegador: braço direito aponta para a mira com a arma
     const bib = sk === 'biblia' && v < 0;   // Bruno / Mendes: bíblia na mão esquerda, junto ao peito
     const A = swing(Tb, 0, 1.42, v, armed ? Math.PI / 2 + p.gun : bib ? 0.85 + ph * 0.1 : ph * 0.9);
-    box(B, A, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, SHIRT_, SHIRT_);
+    box(B, A, -0.09, 0.09, -0.3, 0.03, -0.09, 0.09, sk === 'lucas' ? SKN : SHIRT_, sk === 'lucas' ? SKN : SHIRT_);
     box(B, A, -0.08, 0.08, -0.62, -0.3, -0.08, 0.08, SKN, SKN);
     if (bib) {
       const BK = hex('#1c1714'), BK2 = hex('#2a211c'), PG = hex('#f1ead6'), GD = hex('#d8b24a');
@@ -4638,7 +4707,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119211708";
+  const BUILD = "v20261119215246";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
