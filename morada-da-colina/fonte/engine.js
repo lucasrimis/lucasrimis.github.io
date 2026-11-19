@@ -1053,6 +1053,76 @@ for (const h of W.houses) {
       { const p = WP(-6.9, 6.5); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.3, true); }   // palmeira do vizinho à esquerda
     }
   }
+  for (const lm of (W.landmarks || [])) if (lm.type === 'padaria') {   // Padaria do Jorge (no lugar da Padaria Colina da R. Agenor Lopes Siqueira)
+    const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz], VF = lm.vf;
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const B = chunkB(...WP(0, 10)), T0 = at(0, 0, 0);
+    const gp = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); };
+    const g = Math.min(gp(-5.5, VF), gp(5.5, VF), gp(-5.5, VF + 11), gp(5.5, VF + 11)), T = at(0, 0, g);
+    const WOOD = hex('#5a3b26'), WOOD2 = hex('#4a3020'), TILE = hex('#c0603e'), WALL = hex('#e7ded0'), WALL2 = hex('#d8cfc0'), PINK = hex('#e2a596');
+    const v0 = VF + 0.1, vB = VF + 4.2, v1 = VF + 11;           // frente aberta, parede da loja, fundo
+    // piso da varanda (cerâmica) e calçada rebaixada
+    box(B, T, -5.5, 5.5, -0.6, 0.12, v0, vB, hex('#a59e94'), hex('#99928a'));
+    for (let u = -5.5; u < 5.5; u += 0.5) for (let v = v0; v < vB; v += 0.5) if (((u + v) * 2 | 0) % 2) { const q = [[u, v], [u + 0.5, v], [u + 0.5, v + 0.5], [u, v + 0.5]].map(([a, b]) => P(T, a, 0.125, b)); B.quad(q[0], q[1], q[2], q[3], UP, hex('#b2aba1'), F_PLAIN); }
+    // loja: paredes laterais e fundo, porta e vitrine
+    box(B, T, -5.5, 5.5, -0.6, 2.7, vB, v1, WALL, WALL2); maskRect(T0, -5.5, 5.5, vB, v1);
+    box(B, T, -5.5, -5.3, -0.6, 2.6, v0, vB, PINK, PINK); maskRect(T0, -5.5, -5.3, v0, vB);   // parede da casa rosa ao lado
+    wallFeat(B, T, -5.3, 5.5, 0, 0.9, vB, -1, hex('#cfc7b8'));                                    // barrado
+    wallFeat(B, T, -4.6, -2.6, 0.9, 2.3, vB, -1, hex('#3d3a36'));                                // grade da janela da cozinha
+    for (let u = -4.5; u < -2.6; u += 0.16) wallFeat(B, T, u, u + 0.04, 0.9, 2.3, vB - 0.01, -1, hex('#d9d6cf'));
+    wallFeat(B, T, -1.9, -0.6, 0, 2.3, vB, -1, hex('#2f2a26'));                                   // porta da loja
+    wallFeat(B, T, 0.2, 4.8, 0.9, 2.3, vB, -1, hex('#3a3633'));                                   // interior escuro com prateleiras
+    for (const y of [1.25, 1.65, 2.05]) wallFeat(B, T, 0.3, 4.7, y, y + 0.05, vB - 0.01, -1, hex('#8a6a48'));
+    for (let k = 0; k < 18; k++) { const u = 0.4 + (k % 9) * 0.48, y = k < 9 ? 1.3 : 1.7; wallFeat(B, T, u, u + 0.28, y, y + 0.22, vB - 0.02, -1, [hex('#d9a35a'), hex('#c47a3a'), hex('#e8d2a0')][k % 3]); }   // pães
+    box(B, T, 0.4, 4.6, 0, 1.0, vB - 0.7, vB, hex('#d4ccbd'), hex('#c5bdae')); box(B, T, 0.4, 4.6, 1.0, 1.08, vB - 0.7, vB, hex('#bfe0ea'), hex('#bfe0ea'));   // balcão com tampo de vidro
+    maskRect(T0, 0.4, 4.6, vB - 0.7, vB);
+    box(B, T, 4.9, 5.3, 1.2, 1.7, vB - 0.12, vB, hex('#f1f1ee'), hex('#e0e0dc'));                     // quadro de luz
+    // pilares de madeira e viga
+    const pil = [-5.15, -2.0, 1.4, 5.15];
+    for (const u of pil) { box(B, T, u - 0.11, u + 0.11, 0.1, 2.5, v0 + 0.15, v0 + 0.37, WOOD, WOOD2); const p = P(T, u, 0, v0 + 0.26); maskCircle(p[0], p[2], 0.15); }
+    box(B, T, -5.5, 5.5, 2.45, 2.62, v0 + 0.12, v0 + 0.4, WOOD, WOOD2);
+    for (let u = -5.2; u < 5.4; u += 0.9) box(B, T, u - 0.05, u + 0.05, 2.55, 2.68, v0 + 0.3, vB, WOOD2, WOOD2);   // caibros
+    // telhado de barro: água comprida caindo para a rua + platibanda verde atrás
+    { const yE = 2.62, yR = 4.3, vR = VF + 6.5, o = 0.5;
+      const qa = [P(T, -5.5 - o, yE, v0 - o), P(T, 5.5 + o, yE, v0 - o), P(T, 5.5 + o, yR, vR), P(T, -5.5 - o, yR, vR)];
+      B.quad(qa[0], qa[1], qa[2], qa[3], faceN(qa[0], qa[1], qa[2], true), TILE, F_TEX);
+      const qb = [P(T, -5.5 - o, yR, vR), P(T, 5.5 + o, yR, vR), P(T, 5.5 + o, 3.0, v1 + o), P(T, -5.5 - o, 3.0, v1 + o)];
+      B.quad(qb[0], qb[1], qb[2], qb[3], faceN(qb[0], qb[1], qb[2], true), TILE, F_TEX);
+      for (const e of [-1, 1]) { const uE = e * 5.5; B.tri(P(T, uE, 2.62, v0), P(T, uE, yR, vR), P(T, uE, 2.7, v1), N(T, e, 0, 0), WALL, F_PLAIN); }
+      for (let k = 0; k < 9; k++) { const t = k / 9, y = yE + (yR - yE) * t, v = v0 - o + (vR - v0 + o) * t; box(B, T, -5.5 - o, 5.5 + o, y - 0.02, y + 0.05, v - 0.04, v + 0.04, hex('#a9502f'), hex('#a9502f')); }   // fiadas de telha
+      box(B, T, -1.8, 3.4, 2.7, 5.3, vR + 0.2, vR + 0.5, hex('#aac07a'), hex('#9bb06c')); box(B, T, -1.85, 3.45, 5.3, 5.42, vR + 0.15, vR + 0.55, TILE, TILE); }
+    // faixa "Padaria do Jorge" presa na beirada do telhado
+    { const bu0 = -0.8, bu1 = 5.6, by0 = 2.75, by1 = 4.1, bv = v0 - 0.35, Tb = T;
+      box(B, Tb, bu0, bu1, by0, by1, bv - 0.04, bv, hex('#1f1a17'), hex('#1f1a17'));
+      for (const u of [bu0 + 0.15, bu1 - 0.15]) box(B, Tb, u - 0.04, u + 0.04, 2.55, by0, bv - 0.02, bv + 0.05, hex('#3a3a3a'), hex('#3a3a3a'));
+      const Wc = 128, Hc = 27, c2 = document.createElement('canvas'); c2.width = Wc; c2.height = Hc; const gx = c2.getContext('2d');
+      gx.textAlign = 'center'; gx.textBaseline = 'middle';
+      gx.font = "bold 13px 'VT323', monospace"; gx.fillStyle = '#e8892e'; gx.fillText('Padaria', Wc / 2, 7);
+      gx.font = "bold 13px 'VT323', monospace"; gx.fillStyle = '#f4f1e8'; gx.fillText('do Jorge', Wc / 2, 19);
+      gx.fillStyle = '#e8c35a'; for (const x of [10, 118]) for (let k = 0; k < 5; k++) { gx.fillRect(x - 1, 6 + k * 3, 2, 2); gx.fillRect(x - 4 + (k % 2) * 6, 7 + k * 3, 2, 2); }   // espiguinhas de trigo
+      const d = gx.getImageData(0, 0, Wc, Hc).data, px = (bu1 - bu0) / Wc, py = (by1 - by0) / Hc;
+      for (let y = 0; y < Hc; y++) { let x0 = -1, col = null; for (let x = 0; x <= Wc; x++) { const i = (y * Wc + x) * 4, on = x < Wc && d[i + 3] > 120, c = on ? [d[i], d[i + 1], d[i + 2]] : null;
+        const same = on && col && Math.abs(c[0] - col[0]) + Math.abs(c[1] - col[1]) < 60;
+        if (x0 >= 0 && !same) { const a = bu0 + x0 * px, b = bu0 + x * px, yy = by1 - y * py; const q = [P(Tb, a, yy, bv - 0.05), P(Tb, b, yy, bv - 0.05), P(Tb, b, yy - py, bv - 0.05), P(Tb, a, yy - py, bv - 0.05)]; B.quad(q[0], q[1], q[2], q[3], N(Tb, 0, 0, -1), col, F_GLOW); x0 = -1; col = null; }
+        if (on && x0 < 0) { x0 = x; col = c; } } } }
+    // mesinhas e cadeiras na varanda
+    const mesa = (u, v, n) => { const Tm = at(0, 0, g + 0.12), MT = hex('#2b2b2d'), CH = hex('#1d1d1f');
+      box(B, Tm, u - 0.35, u + 0.35, 0.72, 0.76, v - 0.35, v + 0.35, hex('#3a3a3c'), MT); box(B, Tm, u - 0.04, u + 0.04, 0, 0.72, v - 0.04, v + 0.04, MT, MT); box(B, Tm, u - 0.25, u + 0.25, 0, 0.03, v - 0.25, v + 0.25, MT, MT);
+      const p = P(Tm, u, 0, v); maskCircle(p[0], p[2], 0.4);
+      [[0, -0.6, 0], [0, 0.6, 1], [-0.6, 0, 2], [0.6, 0, 3]].slice(0, n).forEach(([du, dv, k]) => { const cu = u + du, cv = v + dv;
+        box(B, Tm, cu - 0.2, cu + 0.2, 0.43, 0.47, cv - 0.2, cv + 0.2, CH, CH);
+        for (const [lu, lv] of [[-0.17, -0.17], [0.17, -0.17], [-0.17, 0.17], [0.17, 0.17]]) box(B, Tm, cu + lu - 0.02, cu + lu + 0.02, 0, 0.43, cv + lv - 0.02, cv + lv + 0.02, CH, CH);
+        const bu = k === 2 ? -0.2 : k === 3 ? 0.2 : 0, bv = k === 0 ? -0.2 : k === 1 ? 0.2 : 0;
+        if (k < 2) box(B, Tm, cu - 0.2, cu + 0.2, 0.47, 0.92, cv + bv - 0.02, cv + bv + 0.02, CH, CH); else box(B, Tm, cu + bu - 0.02, cu + bu + 0.02, 0.47, 0.92, cv - 0.2, cv + 0.2, CH, CH); }); };
+    mesa(-3.6, VF + 1.6, 3); mesa(-0.4, VF + 2.3, 4); mesa(3.1, VF + 1.5, 2);
+    // banner em pé de promoção e lixeira de cesto com sacolas na calçada
+    { const Tm = at(0, 0, g + 0.12); box(B, Tm, 4.55, 4.6, 0, 1.9, v0 + 0.5, v0 + 0.55, hex('#333'), hex('#333')); box(B, Tm, 4.2, 4.9, 0.9, 1.85, v0 + 0.46, v0 + 0.5, hex('#d8b23a'), hex('#c49f2c')); box(B, Tm, 4.3, 4.8, 1.0, 1.3, v0 + 0.44, v0 + 0.46, hex('#b5321f'), hex('#b5321f')); }
+    { const p = WP(2.2, VF - 1.4), Tl = at(2.2, VF - 1.4), LX = hex('#3a3d40'); box(B, Tl, -0.03, 0.03, 0, 0.95, -0.03, 0.03, LX, LX); box(B, Tl, -0.32, 0.32, 0.95, 1.25, -0.22, 0.22, LX, LX);
+      for (const [a, b, c] of [[-0.25, 0, 0], [0.05, 0.3, 0.05], [-0.1, 0.15, -0.1]]) box(B, Tl, a, b, 1.2 + c * 0.5, 1.5 + c, -0.15, 0.15, hex('#9fd6b0'), hex('#86c49b'));
+      maskCircle(p[0], p[1], 0.2); PROPS.push({ k: 'lixeira', x: p[0], z: p[1], a: Math.atan2(uz, ux) }); }
+    LATE_NOTES.push({ name: '', style: 'note', x: WP(0, VF + 2)[0], z: WP(0, VF + 2)[1], y: g + 1.4, base: 0, look: 0, t: 0, r: 2.6, says: ['Padaria do Jorge: um bom dia começa com um pão quentinho.'] });
+  }
   for (const lm of (W.landmarks || [])) if (lm.type === 'casa127') { // casa 127 da R. Albert Sabin (Street View 10/2024)
     const [ux, uz] = lm.u, [vx, vz] = lm.v;
     const WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];

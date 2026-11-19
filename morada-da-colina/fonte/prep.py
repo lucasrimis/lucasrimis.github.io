@@ -738,6 +738,20 @@ for _id, _pin, _u0, _u1, _dep in AS2011:
     trees = [t for t in trees if not _in(t[0], t[1], 1)]
     landmarks.append({'type': 'as2011', 'id': _id, 'x': round(_q[0], 2), 'z': round(_q[1], 2), 'u': [round(_d[0], 4), round(_d[1], 4)], 'v': [round(_vn[0], 4), round(_vn[1], 4)], 'u0': _u0, 'u1': _u1, 'dep': _dep})
     print('as2011', _id, [round(c, 1) for c in _q], 'removed houses', _nb - len(houses))
+# ---- Padaria (R. Agenor Lopes Siqueira, onde no Google aparece a Padaria Colina): substitui o sobrado genérico do lote ----
+_ag = next(r for r in roads if r['n'] == 'Rua Agenor Lopes Siqueira')
+_a, _b = _ag['pts'][1], _ag['pts'][2]; _L = math.hypot(_b[0] - _a[0], _b[1] - _a[1]); _d = ((_b[0] - _a[0]) / _L, (_b[1] - _a[1]) / _L)
+_vn = (_d[1], -_d[0]); _pin = proj(-22.4842336, -44.4750916)
+if (_pin[0] - _a[0]) * _vn[0] + (_pin[1] - _a[1]) * _vn[1] < 0: _vn = (-_vn[0], -_vn[1])
+_t = (222.2 - _a[0]) * _d[0] + (-299.6 - _a[1]) * _d[1]; _q = (_a[0] + _d[0] * _t, _a[1] + _d[1] * _t)
+def _inpd(x, z, m=0):
+    dx, dz = x - _q[0], z - _q[1]; uu = dx * _d[0] + dz * _d[1]; vv = dx * _vn[0] + dz * _vn[1]
+    return -5.6 - m < uu < 5.6 + m and 4.0 - m < vv < 20 + m
+_nb = len(houses)
+houses = [h for h in houses if not (_inpd(h[0], h[1], 0) and abs(((h[0] - _q[0]) * _d[0] + (h[1] - _q[1]) * _d[1])) < 3)]
+trees = [t for t in trees if not _inpd(t[0], t[1], 1)]
+landmarks.append({'type': 'padaria', 'x': round(_q[0], 2), 'z': round(_q[1], 2), 'u': [round(_d[0], 4), round(_d[1], 4)], 'v': [round(_vn[0], 4), round(_vn[1], 4)], 'vf': round(_ag['h'] + _ag['sw'], 2)})
+print('padaria', [round(c, 1) for c in _q], 'removed houses', _nb - len(houses))
 trees = [t for t in trees if math.hypot(t[0] - corner_c[0], t[1] - corner_c[1]) > 17 and math.hypot(t[0] - grass_bank[0], t[1] - grass_bank[1]) > 13]
 R = lambda pts: [[round(p[0], 1), round(p[1], 1)] for p in pts]
 data = {
