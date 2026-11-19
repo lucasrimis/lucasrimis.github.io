@@ -3115,17 +3115,21 @@ function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
     const tat = ['.XXXX', 'X.X.X', 'XXXXX', 'X.X..'];
     tat.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === 'X') put(-5 + j, 6 - i, 2, i % 2 ? INK2 : INK); }));
   });
-  const head = vxPart('hdLucas7', (b, put) => {   // rosto da foto: cabeça raspada, óculos retangulares, sobrancelhas grossas, bigodão, barba rala grisalha, brinco
+  const head = vxPart('hdLucas9', (b, put) => {   // rosto da foto: cabeça raspada, óculos retangulares, sobrancelhas grossas, bigodão, barba rala grisalha, brinco
     const ST = hex('#8a7466'), ST2 = hex('#a48d7d'), MU = hex('#2b211c'), MU2 = hex('#3d3029'), GL = hex('#6a5248'), SC = hex('#a07a64');
     b(-3, 3, 0, 7, -3, 3, LS); b(-2, 2, -1, -1, -2, 2, LS); b(-2, 2, 8, 8, -2, 2, LS);   // rosto oval, testa alta, topo arredondado
     b(-4, -4, 2, 4, -1, 0, LS2); b(4, 4, 2, 4, -1, 0, LS2);   // orelhas
     put(5, 1, 0, hex('#b9bcc2')); put(5, 0, 0, hex('#8d9096'));   // argola prateada
-    // cabeça raspada: só pontinhos de cabelo nas laterais, na nuca e no alto
+    // cabelo raspado bem baixinho (máquina zero): só a cor do cabelo rente na pele, sem volume; testa alta livre
+    const HA = hex('#3e332c'), HA2 = hex('#56463b'), HA3 = hex('#6d5646');
     for (let x = -3; x <= 3; x++) for (let y = 4; y <= 8; y++) for (let z = -3; z <= 3; z++) {
       const shell = y === 8 ? Math.abs(x) <= 2 && Math.abs(z) <= 2 : (Math.abs(x) === 3 || z === -3 || y === 7);
-      if (!shell || z >= 2) continue;
-      if ((x * 7 + y * 3 + z * 5 + 99) % 4 === 0 || (Math.abs(x) === 3 && y <= 6 && z <= 0)) put(x, y, z, SC);
+      if (!shell) continue;
+      if (y < 8 && z >= 2) continue;   // testa e têmporas na frente
+      if (Math.abs(x) === 3 && y < 6 && z >= 0) continue;   // costeleta curta acima da orelha
+      put(x, y, z, [HA, HA2, HA, HA3][(x * 7 + y * 3 + z * 5 + 99) % 4]);
     }
+    b(-2, 2, 2, 6, -3, -3, HA); for (let x = -2; x <= 2; x++) put(x, 3, -3, HA2);   // nuca
     // barba rala grisalha no maxilar, queixo e bochecha de baixo
     for (let x = -3; x <= 3; x++) for (let y = -1; y <= 3; y++) for (let z = -2; z <= 3; z++) {
       const out = Math.abs(x) === 3 || z === 3 || y === -1 || (y === 0 && z >= 1);
@@ -3139,10 +3143,14 @@ function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
     b(-2, 2, 1, 1, 3, 3, hex('#c08378')); put(0, 1, 4, hex('#cf958a'));   // lábios rosados
     b(-1, 1, 3, 3, 4, 4, LS); put(0, 3, 5, LS2); put(0, 2, 4, LS2);   // nariz
     for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#4a3020')); put(ex + (ex < 0 ? 0 : 1), 4, 3, WH); }   // olhos castanhos
-    b(-3, -1, 6, 6, 3, 3, MU2); b(1, 3, 6, 6, 3, 3, MU2); put(-1, 6, 3, LS); put(1, 6, 3, LS);   // sobrancelhas grossas
-    // óculos de armação retangular marrom-escura, à frente dos olhos
-    for (const [x0, x1] of [[-3, -1], [1, 3]]) { b(x0, x1, 5, 5, 4, 4, GL); b(x0, x1, 3, 3, 4, 4, GL); put(x0 < 0 ? -4 : 4, 4, 4, GL); }
-    put(0, 4, 4, GL); b(-4, -4, 4, 5, 0, 3, GL); b(4, 4, 4, 5, 0, 3, GL);   // ponte e hastes até a orelha
+       // sobrancelhas grossas
+  });
+  const glasses = vxPart('glL2', b => {   // óculos em meia escala: armação retangular fina (meio cubinho)
+    const G = hex('#3b2e29');
+    for (const sg of [-1, 1]) { b(sg < 0 ? -7 : 1, sg < 0 ? -1 : 7, 7, 7, 8, 8, G); b(sg < 0 ? -7 : 1, sg < 0 ? -1 : 7, 10, 10, 8, 8, G); b(sg * 7, sg * 7, 8, 9, 8, 8, G); b(sg, sg, 8, 9, 8, 8, G);   // aro
+      b(sg * 8, sg * 8, 10, 10, 0, 8, G); }   // hastes até a orelha
+    b(0, 0, 9, 9, 8, 8, G);   // ponte
+    const SB = hex('#2b211c'); b(-7, -2, 11, 11, 7, 7, SB); b(-6, -3, 12, 12, 7, 7, SB); b(2, 7, 11, 11, 7, 7, SB); b(3, 6, 12, 12, 7, 7, SB);   // sobrancelhas grossas logo acima da armação
   });
   const uArm = vxPart('uaL', b => b(-1, 1, -4, 0, -1, 1, (x, y) => y === 0 ? LS2 : LS));   // braço grosso, ombro redondo
   const fArmR = vxPart('faLr', b => { b(-1, 0, -4, -1, -1, 0, LS); b(-1, 0, -5, -5, -1, 0, LS2); });
@@ -3159,7 +3167,8 @@ function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
   const out = [[pelvis, root]];
   const tor = vX(root, [0, 3, 0], vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.02)));
   out.push([torso, tor]);
-  out.push([head, vX(tor, [0, 9, 0], vMM(vRy(w * s_ * 0.12), vRx(0.04 * w * Math.abs(c_) - br * 0.02)))]);
+  const hdM = vX(tor, [0, 9, 0], vMM(vRy(w * s_ * 0.12), vRx(0.04 * w * Math.abs(c_) - br * 0.02)));
+  out.push([head, hdM], [glasses, { R: hdM.R.map(v => v * 0.5), t: hdM.t }]);
   for (const sd of [-1, 1]) {
     const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
     let hip, knee, ank;
@@ -4722,7 +4731,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119220104";
+  const BUILD = "v20261119220434";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
