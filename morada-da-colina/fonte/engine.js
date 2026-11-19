@@ -2012,7 +2012,7 @@ document.addEventListener('mousemove', e => {
   if (document.pointerLockElement !== cv) return;
   cam.yaw -= e.movementX * 0.0035; cam.pitch = Math.max(-1.35, Math.min(1.45, cam.pitch + e.movementY * 0.0035)); cam.follow = 1.5;
 });
-cv.addEventListener('pointermove', e => { if (!drag) return; cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = Math.max(cam.fp ? -1.35 : 0.12, Math.min(1.45, cam.pitch + (e.clientY - drag.y) * 0.005)); drag = { x: e.clientX, y: e.clientY }; cam.follow = 1.5; });
+cv.addEventListener('pointermove', e => { if (!drag) return; cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = Math.max(cam.fp ? -1.35 : -1.1, Math.min(1.45, cam.pitch + (e.clientY - drag.y) * 0.005)); drag = { x: e.clientX, y: e.clientY }; cam.follow = 1.5; });
 cv.addEventListener('pointerup', () => { drag = null; });
 cv.addEventListener('wheel', e => { e.preventDefault(); if (cam.fp) { if (e.deltaY > 0) setFP(false); return; } cam.dist = Math.max(7, Math.min(260, cam.dist * Math.exp(e.deltaY * 0.0012))); }, { passive: false });
 function toggleCar() {
@@ -2043,7 +2043,7 @@ cv.addEventListener('touchmove', e => {
     else if (t.identifier === look.id) {
       const t2 = [...e.touches].find(q => q.identifier === pinch.id2);
       if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) { if (cam.fp) { if (d < pinch.d * 0.7) setFP(false); } else cam.dist = Math.max(7, Math.min(260, cam.dist * pinch.d / d)); } if (!cam.fp || !pinch.d) pinch.d = d; }
-      else { cam.yaw -= (t.clientX - look.x) * 0.008; cam.pitch = Math.max(cam.fp ? -1.35 : 0.12, Math.min(1.45, cam.pitch + (t.clientY - look.y) * 0.006)); cam.follow = 1.5; }
+      else { cam.yaw -= (t.clientX - look.x) * 0.008; cam.pitch = Math.max(cam.fp ? -1.35 : -1.1, Math.min(1.45, cam.pitch + (t.clientY - look.y) * 0.006)); cam.follow = 1.5; }
       look.x = t.clientX; look.y = t.clientY;
     }
   }
@@ -2548,6 +2548,38 @@ function benchFrame() {
 function benchSit() { const s_ = BENCH && BENCH.near; if (!s_) return; player.sit = { x: s_.x, z: s_.z, a: s_.a, sx: s_.sx, sz: s_.sz, y: BENCH.seatY }; player.speed = 0; BENCH.near = null; }
 document.getElementById('btnSit').addEventListener('click', e => { e.stopPropagation(); benchSit(); });
 document.getElementById('btnSit').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+// ---------------- mensagem do criador no céu: duas nuvens 3D se abrem e um pergaminho desenrola ----------------
+let SKYMSG = null;
+function skyMsgAnchor(S) { const gy = surfAt(player.x, player.z); return [player.x + S.fx * 42, gy + 26, player.z + S.fz * 42]; }
+function skyMsgPt(S, u, y, v = 0) { const c = skyMsgAnchor(S), rx = -S.fz, rz = S.fx; return [c[0] + rx * u - S.fx * v, c[1] + y, c[2] + rz * u - S.fz * v]; }   // v > 0 = mais perto do jogador
+function skyMsgFrame(B, t) {
+  const S = SKYMSG; if (!S) return;
+  const now = performance.now(), el = S.seen ? (now - S.seen) / 1000 : 0, life = (24000 + S.m.length * 120) / 1000;
+  const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+  const part = ease(el / 2.8), unroll = ease((el - 1.6) / 2.2), fade = S.seen && el > life ? ease((el - life) / 2.5) : 0;
+  S.open = unroll; S.h = 0.6 + 10.4 * unroll;
+  const c = skyMsgAnchor(S), a = Math.atan2(S.fx, -S.fz), T = frame(c[0], c[1], c[2], a);   // ax = direita de quem olha, az = em direção ao jogador
+  if (Math.hypot(T.ax[0] + S.fz, T.ax[2] - S.fx) > 0.01) { T.ax = T.ax.map(x => -x); }
+  T.az = [-S.fx, 0, -S.fz];
+  // pergaminho (atrás das nuvens): papel + dois rolos de madeira
+  if (fade < 1) {
+    const h = S.h / 2, PAP = [244, 226, 180], PAP2 = [222, 196, 140], ROD = [122, 77, 34], ROD2 = [90, 54, 22], KNOB = [70, 40, 14], dy = -fade * 6;
+    if (unroll > 0.02) box(B, T, -9.6, 9.6, -h + 0.3 + dy, h - 0.3 + dy, -0.08, 0.08, PAP, PAP2, F_GLOW);
+    for (const sg of [-1, 1]) {
+      const y = sg * h + dy;
+      box(B, T, -10.2, 10.2, y - 0.38, y + 0.38, -0.38, 0.38, ROD, ROD2, F_GLOW);
+      for (const e of [-1, 1]) box(B, T, e * 10.2 - 0.35, e * 10.2 + 0.35, y - 0.55, y + 0.55, -0.55, 0.55, KNOB, KNOB, F_GLOW);
+    }
+  }
+  // nuvens 3D (blocos como as do jogo), na frente do pergaminho; começam juntas e se afastam
+  const off = 6 + part * 20 + fade * 30, WC = hex('#ffffff'), SC = hex('#e8eef5');
+  const r = rngFor(7, 7, 99);
+  const lumps = []; for (let j = 0; j < 6; j++) lumps.push([(r() - 0.5) * 11, (r() - 0.5) * 4, 3.2 + r() * 4, 2.6 + r() * 3]);
+  for (const sg of [-1, 1]) for (const [u, y, sz, hy] of lumps) {
+    const uu = sg * off + u * sg;
+    box(B, T, uu - sz, uu + sz, y - hy, y + hy, 2.5 - sz * 0.6, 2.5 + sz * 0.6, WC, SC, F_SKY);
+  }
+}
 function beaglePet() { if (BEAGLE.near && BEAGLE.scratch <= 0) { BEAGLE.scratch = 3.5; const d = BEAGLE.d; d.a = Math.atan2(d.z - player.z, d.x - player.x); } }
 document.getElementById('btnPet').addEventListener('click', e => { e.stopPropagation(); beaglePet(); });
 document.getElementById('btnPet').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
@@ -2845,26 +2877,35 @@ window.__net = (function () {
   const TG = 'https://morada-da-colina.pages.dev/mdc-tg/';
   N.tg = o => { try { fetch(TG + 'notify', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(o), keepalive: true }).catch(() => {}); } catch (e) {} };
   N.badName = n => /^\s*criador\s*$/i.test(String(n).normalize('NFD').replace(/[̀-ͯ]/g, ''));
-  function creatorMsg(m) {
+  function creatorChat(m) {
     pushHist({ who: 'CRIADOR', m, cr: true, t: Date.now() });
     const d = document.createElement('div'); d.className = 'cr'; d.innerHTML = '<b class="cr">CRIADOR:</b> ' + esc(m); chatLog.appendChild(d);
     while (chatLog.children.length > 7) chatLog.firstChild.remove(); setTimeout(() => d.classList.add('old'), 20000);
-    // aviso na tela; a mensagem fica no céu, na direção para onde a câmera olhava, entre duas nuvens que se abrem
-    const el = $('skyScroll'), note = $('skyNote');
-    el.querySelector('.txt').textContent = m; el.classList.remove('open', 'bye'); el.style.display = 'none';
-    note.classList.add('on');
-    N.sky = { m, fx: -Math.sin(cam.yaw), fz: -Math.cos(cam.yaw), seen: 0, until: 0 };
-    clearTimeout(N.noteT); N.noteT = setTimeout(() => note.classList.remove('on'), 45000);
+  }
+  function creatorMsg(m) {
+    // primeiro só o aviso; a mensagem fica no céu (direção para onde a câmera olhava), escondida entre duas nuvens 3D
+    if (SKYMSG && !SKYMSG.chat) creatorChat(SKYMSG.m);
+    $('skyNote').classList.add('on');
+    SKYMSG = { m, fx: -Math.sin(cam.yaw), fz: -Math.cos(cam.yaw), seen: 0, born: performance.now(), chat: false };
+    const el = $('skyText'); el.querySelector('.txt').textContent = m; el.style.display = 'none';
   }
   window.__skyProj = VP => {
-    const S = N.sky, el = $('skyScroll'); if (!S) return;
-    const now = performance.now();
-    if (S.until && now > S.until) { el.classList.add('bye'); if (now > S.until + 1500) { el.style.display = 'none'; N.sky = null; } }
-    const gy = surfAt(player.x, player.z), q = xform(VP, [player.x + S.fx * 90, gy + 15, player.z + S.fz * 90]);
-    const on = q[3] > 0 && Math.abs(q[0]) < 0.9 && q[1] < 0.75 && q[1] > -0.5;
-    if (q[3] <= 0) { el.style.display = 'none'; return; }
-    el.style.display = 'block'; el.style.transform = `translate(${(q[0] * 0.5 + 0.5) * innerWidth}px,${(-q[1] * 0.5 + 0.5) * innerHeight}px) translate(-50%,-50%)`;
-    if (on && !S.seen) { S.seen = now; S.until = now + 22000 + S.m.length * 120; el.classList.add('open'); $('skyNote').classList.remove('on'); }
+    const S = SKYMSG, el = $('skyText'); if (!S) { el.style.display = 'none'; return; }
+    const now = performance.now(), note = $('skyNote');
+    if (!S.seen && now - S.born > 60000) { note.classList.remove('on'); if (!S.chat) { S.chat = true; creatorChat(S.m); } SKYMSG = null; return; }   // ninguém olhou: vai para o chat
+    const c = skyMsgAnchor(S), q = xform(VP, c);
+    if (!S.seen && q[3] > 0 && Math.abs(q[0]) < 0.7 && Math.abs(q[1]) < 0.7) { S.seen = now; note.classList.remove('on'); }
+    if (S.seen && !S.chat && now - S.seen > 4500) { S.chat = true; creatorChat(S.m); }
+    const life = 24000 + S.m.length * 120;
+    if (S.seen && now - S.seen > life + 2500) { SKYMSG = null; el.style.display = 'none'; return; }
+    // texto em cima do papel 3D: projeta os cantos do pergaminho
+    const k = S.open || 0; if (k < 0.85 || q[3] <= 0) { el.style.display = 'none'; return; }
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const [u, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = xform(VP, skyMsgPt(S, u * 9.2, y * S.h * 0.46)); if (p[3] <= 0) { el.style.display = 'none'; return; } const sx = (p[0] * 0.5 + 0.5) * innerWidth, sy = (-p[1] * 0.5 + 0.5) * innerHeight; x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy); }
+    el.style.display = 'flex'; el.style.left = x0 + 'px'; el.style.top = y0 + 'px'; el.style.width = (x1 - x0) + 'px'; el.style.height = (y1 - y0) + 'px';
+    const w = (x1 - x0) * 0.9, hh = (y1 - y0) * 0.8, fs = Math.max(9, Math.min(hh / 2.2, Math.sqrt(hh * w / (Math.max(8, S.m.length) * 0.55))));
+    let f = fs; el.style.fontSize = f + 'px'; const tx = el.firstChild;
+    for (let k = 0; k < 8 && f > 9 && tx.offsetHeight > (y1 - y0) * 0.88; k++) { f *= 0.88; el.style.fontSize = f + 'px'; }   // encolhe até caber no papel el.style.opacity = Math.min(1, (k - 0.85) / 0.15) * (S.seen && now - S.seen > life ? Math.max(0, 1 - (now - S.seen - life) / 2000) : 1);
   };
   N.creatorMsg = creatorMsg;
   const crSeen = new Set(); let crFirst = true;
@@ -3281,7 +3322,7 @@ function step(dt) {
   if (keys.KeyQ) cam.yaw += dt * 1.8;
   if (keys.KeyE) cam.yaw -= dt * 1.8;
   if (keys.KeyR) cam.pitch = Math.min(1.45, cam.pitch + dt);
-  if (keys.KeyF) cam.pitch = Math.max(cam.fp ? -1.35 : 0.12, cam.pitch - dt);
+  if (keys.KeyF) cam.pitch = Math.max(cam.fp ? -1.35 : -1.1, cam.pitch - dt);
   if (keys.Equal || keys.NumpadAdd) cam.dist = Math.max(7, cam.dist * (1 - dt));
   if (keys.Minus || keys.NumpadSubtract) cam.dist = Math.min(260, cam.dist * (1 + dt));
   const jl = joy.id !== null ? Math.min(1, Math.hypot(joy.dx, joy.dy)) : 0;
@@ -3385,6 +3426,7 @@ function frame_() {
   gateFrame(dynB, dt);
   vhsFrame(dynB, t);
   beagleFrame(dynB, dt, t);
+  skyMsgFrame(dynB, t);
   benchFrame();
   dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
@@ -3412,8 +3454,11 @@ function frame_() {
   } else {
     tgt = [player.x, camY + (player.car ? 1.2 : 1.3), player.z];
     if (window.__hunt && window.__hunt.shoulder()) { tgt[0] += Math.cos(cam.yaw) * 0.9; tgt[2] -= Math.sin(cam.yaw) * 0.9; tgt[1] += 0.35; }   // mira por cima do ombro
-    eye = [tgt[0] + Math.sin(cam.yaw) * cp * cam.dist, tgt[1] + sp * cam.dist, tgt[2] + Math.cos(cam.yaw) * cp * cam.dist];
+    // olhando para cima: a câmera para de descer (fica baixa, atrás do jogador, mais perto) e só o olhar sobe
+    const PL = 0.14, up = Math.max(0, PL - cam.pitch), pe = Math.max(cam.pitch, PL), de = cam.dist * (1 - 0.55 * Math.min(1, up / 0.7));
+    eye = [tgt[0] + Math.sin(cam.yaw) * Math.cos(pe) * de, tgt[1] + Math.sin(pe) * de, tgt[2] + Math.cos(cam.yaw) * Math.cos(pe) * de];
     eye[1] = Math.max(eye[1], groundAt(eye[0], eye[2]) + 1.5);
+    if (up > 0) { const L = Math.hypot(tgt[0] - eye[0], tgt[1] - eye[1], tgt[2] - eye[2]); tgt = [eye[0] - Math.sin(cam.yaw) * cp * L, eye[1] - sp * L, eye[2] - Math.cos(cam.yaw) * cp * L]; }
   }
   if (window.__net && window.__net.setCam) window.__net.setCam(eye, tgt);
   const proj = persp(cam.fp ? 0.95 : cam.dist > 60 ? 0.6 : 0.75, cv.width / cv.height, cam.fp ? 0.3 : 1.0, 2600);
