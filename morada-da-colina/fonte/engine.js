@@ -916,17 +916,59 @@ for (const h of W.houses) {
         for (let k = 0; k < 14; k++) { const u0 = -1.2 + r() * 3.3, y0 = 0.15 + r() * 1.6; wallFeat(B, T, u0, Math.min(2.4, u0 + 0.1 + r() * 0.35), y0, y0 + 0.08 + r() * 0.3, MV - 0.06, -1, r() < 0.6 ? hex('#a9c8dc') : hex('#8a7a66')); }
         for (let u = -1.1; u < 2.4; u += 0.45) wallFeat(B, T, u, u + 0.03, 0.1, 1.95, MV - 0.065, -1, hex('#4a7896')); }
       pillar(2.45);
-      wallU(2.65, 7, MV, 2.1, hex('#bab7af'), hex('#aeaba3'));
-      { const T = at(0, 0, gp(4.5, MV)); wallFeat(B, T, 4.0, 4.9, 0, 2.0, MV - 0.1, -1, hex('#6b4a2e')); wallFeat(B, T, 3.0, 3.5, 1.1, 1.6, MV - 0.1, -1, hex('#8c8d8a')); wallFeat(B, T, 3.3, 3.8, 0.2, 0.5, MV - 0.1, -1, hex('#a8483b'));
-        wallFeat(B, T, 2.65, 7, 0, 0.3, MV - 0.11, -1, hex('#9c9990')); }
-      wallV(-7, MV, 26, 2.0, hex('#c9c5bb')); wallV(7, MV, 26, 2.0, hex('#c9c5bb')); wallU(-7, 7, 26, 2.0, hex('#c9c5bb'));
+      wallV(-7, MV, 26, 2.0, hex('#c9c5bb')); wallV(2.6, MV, 26, 2.0, hex('#c9c5bb')); wallU(-7, 2.6, 26, 2.0, hex('#c9c5bb'));
       // casa creme: corpo com telhado de duas águas paralelo à rua + volume da frente com a empena virada para a rua
       const CW = hex('#efe3c8');
-      const M = body(-6, 6, 10, 19, 3.0, CW); gableRoof(B, at(0, 14.5, M.g), 12, 9, M.top, 1.6, 0.6, TILE, CW);
+      const M = body(-6, 1.9, 10, 19, 3.0, CW); gableRoof(B, at(-2.05, 14.5, M.g), 7.9, 9, M.top, 1.6, 0.6, TILE, CW);
       const F = body(-6, -1.2, 7.5, 10, 3.0, CW); gableRoof(B, atR(-3.6, 8.75, F.g), 2.5, 4.8, F.top, 1.3, 0.5, TILE2, CW);
-      win(F.T, -4.6, -2.6, 1.0, 2.2, 7.5, -1, true); win(M.T, 1.0, 2.6, 1.0, 2.2, 10, -1, true); wallFeat(B, M.T, 3.6, 4.6, 0, 2.2, 10, -1, hex('#7a4b2a'));
+      win(F.T, -4.6, -2.6, 1.0, 2.2, 7.5, -1, true); win(M.T, -0.2, 1.4, 1.0, 2.2, 10, -1, true);
       { const q = [[-1.35, MV + 0.1], [2.45, MV + 0.1], [2.45, 10], [-1.35, 10]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.07, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#aaa79e'), F_TEX); }   // garagem
-      { const p = WP(3.2, 3.4); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 0.85, true); }                     // abacateiro na calçada
+
+    } else if (lm.id === '389') {   // fachada do print de 2026: muro bege frisado, número 389, porta recuada com degraus, portão de madeira marrom
+      const BG = hex('#dcc89c'), BG2 = hex('#cdb98e'), FR = hex('#b9a57c'), CAPC = hex('#c9b78f'), STAIN = hex('#a99e83'), WD = hex('#5b3a27'), WD2 = hex('#4a2f1f'), WD3 = hex('#6b4630');
+      const frisos = (T, u0, u1, y1, v) => { for (let y = 0.35; y < y1 - 0.1; y += 0.36) wallFeat(B, T, u0, u1, y, y + 0.025, v, -1, FR); };
+      const seg = (u0, u1, h, th = 0.12) => { const T = at(0, 0, gmin(u0, u1, MV, MV)); box(B, T, u0, u1, -0.6, h, MV - th, MV + th, BG, BG2); maskRect(T0, u0, u1, MV - th - 0.05, MV + th + 0.05); mline(u0, MV, u1, MV); frisos(T, u0, u1, h, MV - th); wallFeat(B, T, u0, u1, 0, 0.3, MV - th - 0.005, -1, STAIN); return T; };
+      const cap = (T, u0, u1, y, o = 0.06) => box(B, T, u0 - o, u1 + o, y, y + 0.12, MV - 0.2, MV + 0.16, CAPC, BG2);
+      const pilar = (u0, u1, h) => { const T = at(0, 0, gmin(u0, u1, MV, MV)); box(B, T, u0, u1, -0.6, h, MV - 0.2, MV + 0.16, BG, BG2); maskRect(T0, u0, u1, MV - 0.25, MV + 0.2); for (let y = 0.35; y < h - 0.1; y += 0.36) wallFeat(B, T, u0, u1, y, y + 0.025, MV - 0.2, -1, FR); return T; };
+      // trecho esquerdo com o número, a caixa de correio preta e a caixinha cinza
+      const TA = seg(2.6, 4.75, 2.25); cap(TA, 2.6, 4.75, 2.25, 0.02);
+      wallFeat(B, TA, 3.6, 4.4, 1.15, 1.55, MV - 0.12, -1, hex('#2b2d30'));                  // caixa de correio
+      wallFeat(B, TA, 3.0, 3.2, 1.25, 1.55, MV - 0.12, -1, hex('#8d8a82'));
+      wallFeat(B, TA, 3.05, 3.35, 0.28, 0.48, MV - 0.12, -1, hex('#55524c'));                  // respiro
+      { // "389" em relevo escuro, em segmentos
+        const D = hex('#6e675a'), x0 = 3.55, y0 = 1.72, w = 0.13, h = 0.24, t = 0.025;
+        const segs = { 3: 'abcdg', 8: 'abcdefg', 9: 'abcdfg' };
+        [3, 8, 9].forEach((dg, i) => { const ux = x0 + i * (w + 0.06); for (const c of segs[dg]) {
+          const r_ = { a: [0, w, h - t, h], b: [w - t, w, h / 2, h], c: [w - t, w, 0, h / 2], d: [0, w, 0, t], e: [0, t, 0, h / 2], f: [0, t, h / 2, h], g: [0, w, h / 2 - t / 2, h / 2 + t / 2] }[c];
+          wallFeat(B, TA, ux + r_[0], ux + r_[1], y0 + r_[2], y0 + r_[3], MV - 0.125, -1, D); } }); }
+      // porta de madeira recuada, com dois degraus na frente
+      { const u0 = 4.75, u1 = 5.85, g = gmin(u0, u1, MV, MV), T = at(0, 0, g);
+        box(B, T, u0, u1, 2.15, 2.5, MV - 0.12, MV + 0.12, BG, BG2);                            // verga
+        for (const [a, b] of [[u0, u0 + 0.12], [u1 - 0.12, u1]]) box(B, T, a, b, -0.6, 2.15, MV - 0.12, MV + 0.45, BG, BG2);
+        box(B, T, u0 + 0.12, u1 - 0.12, 0.25, 2.15, MV + 0.4, MV + 0.48, WD, WD2);              // porta
+        box(B, T, u0 + 0.2, u1 - 0.2, 1.2, 2.0, MV + 0.38, MV + 0.4, hex('#6a2a26'), hex('#6a2a26'));   // pano vermelho atrás do vidro
+        box(B, T, u0 + 0.85, u0 + 0.9, 1.0, 1.15, MV + 0.36, MV + 0.4, hex('#c9c3b2'), hex('#c9c3b2'));
+        box(B, T, u0 - 0.1, u1 + 0.1, -0.6, 0.13, MV - 0.55, MV + 0.4, hex('#b9b4a8'), hex('#a9a498'));   // degraus
+        box(B, T, u0 + 0.05, u1 - 0.05, 0.13, 0.25, MV - 0.25, MV + 0.4, hex('#b9b4a8'), hex('#a9a498'));
+        maskRect(T0, u0, u1, MV - 0.55, MV + 0.5); }
+      // trecho mais alto à direita da porta (frontão), terminando em rampa até o pilar do portão
+      const TB = seg(5.85, 8.25, 2.45); cap(TB, 4.75, 7.75, 2.5, 0.02);
+      { const T = TB; for (let k = 0; k < 6; k++) { const a = 7.75 + k * 0.083, y = 2.5 - k * 0.06; box(B, T, a, a + 0.09, y - 0.1, y + 0.12, MV - 0.2, MV + 0.16, CAPC, BG2); }   // capa descendo em rampa
+        box(B, T, 7.75, 8.25, 2.45, 2.5, MV - 0.12, MV + 0.12, BG, BG2);
+        for (let k = 0; k < 7; k++) { const u0 = 6 + r() * 2, y0 = 0.4 + r() * 1.4; wallFeat(B, T, u0, u0 + 0.2 + r() * 0.5, y0, y0 + 0.1 + r() * 0.3, MV - 0.125, -1, r() < 0.5 ? STAIN : hex('#ddd3b8')); } }
+      // pilares + viga sobre o portão de madeira de correr (tábuas na diagonal)
+      const TP1 = pilar(8.3, 8.85, 2.35), TP2 = pilar(12.45, 13.4, 2.35);
+      { const T = at(0, 0, gmin(8.3, 13.4, MV, MV)); box(B, T, 8.2, 13.5, 2.35, 2.62, MV - 0.28, MV + 0.16, CAPC, BG2); }
+      { const u0 = 8.85, u1 = 12.45, T = at(0, 0, gmin(u0, u1, MV, MV)), h = 2.3;
+        box(B, T, u0, u1, 0.03, h, MV - 0.04, MV + 0.06, WD, WD2); maskRect(T0, u0, u1, MV - 0.1, MV + 0.1);
+        box(B, T, u0, u1, h - 0.28, h - 0.24, MV - 0.06, MV - 0.04, WD2, WD2);                    // tábua de cima
+        for (let y = 0.05; y < h - 0.3; y += 0.09) for (let k = -12; k < 30; k++) { const a = u0 + k * 0.3 + y * 1.1; if (a < u0 || a + 0.05 > u1) continue; wallFeat(B, T, a, a + 0.05, y, y + 0.09, MV - 0.04, -1, (k % 3) ? WD2 : WD3); }
+        const q = [[u0, MV + 0.1], [u1, MV + 0.1], [u1, 9], [u0, 9]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[1]) + 0.07, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, hex('#aaa79e'), F_TEX); }
+      wallV(13.4, MV, 26, 2.0, hex('#c9c5bb')); wallU(2.6, 13.6, 26, 2.0, hex('#c9c5bb'));
+      // casa térrea creme, telhado de quatro águas, aparecendo por cima do muro
+      { const CW = hex('#eadcbc'); const M = body(3.2, 12.8, 9.5, 19, 3.1, CW); hipRoof(B, at(8.0, 14.25, M.g), 9.6, 9.5, M.top, 1.7, 0.7, TILE);
+        win(M.T, 4.2, 5.6, 1.0, 2.2, 9.5, -1, true); wallFeat(B, M.T, 6.4, 7.4, 0, 2.2, 9.5, -1, hex('#7a4b2a')); }
+      { const p = WP(3.2, 3.4); tree(chunkB(p[0], p[1]), p[0], p[1], 0, 0.85, true); }       // árvore na calçada, à esquerda
     } else if (lm.id === '489') {   // sobrado verde-menta (prints 2022/2024): garagem com quarto aberto em cima à esquerda, varanda elevada, grade branca
       const MT = hex('#b5d1c2'), MT2 = hex('#a6c3b4'), MTD = hex('#94b2a3'), RAIL = hex('#eef0ec'), RAIL2 = hex('#dfe2de'), DK = hex('#33393d');
       const pil = (u, w, h) => { const T = at(0, 0, gp(u, MV)); box(B, T, u - w, u + w, -0.6, h, MV - w, MV + w, MT, MT2); box(B, T, u - w - 0.04, u + w + 0.04, h, h + 0.08, MV - w - 0.04, MV + w + 0.04, MTD, MTD); box(B, T, u - 0.05, u + 0.05, h + 0.08, h + 0.3, MV - 0.05, MV + 0.05, RAIL, RAIL); maskRect(T0, u - w, u + w, MV - w, MV + w); };
