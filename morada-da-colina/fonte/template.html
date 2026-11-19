@@ -29,6 +29,15 @@
   #fps{position:fixed;right:12px;top:12px;font-size:16px;color:#ffffffaa;text-shadow:1px 1px 0 #000;pointer-events:none}
   #mini{position:fixed;right:12px;bottom:12px;width:200px;height:auto;image-rendering:pixelated;border:3px solid #0d1018;box-shadow:inset 0 0 0 2px #39415a,4px 4px 0 rgba(0,0,0,.35);background:#6fa64a;transition:width .2s}
   #mini.big{width:min(70vw,70vh)}
+  #mini{cursor:pointer}
+  #btnGear{position:fixed;right:12px;top:40px;z-index:8;font-size:22px;padding:6px 10px;line-height:1}
+  #gearPanel{position:fixed;right:12px;top:86px;z-index:9;display:none;width:min(320px,88vw);padding:10px 12px}
+  #gearPanel.on{display:block}
+  #gearPanel .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  #gearPanel .gl{font-family:'Silkscreen',monospace;font-size:12px;color:#ffd84a;margin:10px 0 6px}
+  #gearPanel .gopts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  #gearPanel .gopts .tbtn.sel{background:#2f8f4c;color:#fff}
+  #gearPanel .gn{font-size:14px;opacity:.8;margin-top:6px;line-height:1.2}
   #help{position:fixed;left:12px;bottom:12px;font-size:19px;line-height:1.15;max-width:330px;transition:opacity .4s}
   #help.hide{opacity:0;pointer-events:none}
   #help b{color:#ffd84a;font-weight:normal}
@@ -160,7 +169,7 @@
   .tbtn.rb.big2.on{background:rgba(47,127,74,.9);box-shadow:inset 0 0 0 3px #ffd84a}
   #joy{width:140px!important;height:140px!important}
   #joy.run{border-color:#ffb347!important;background:rgba(255,160,60,.18)!important}
-  @media (pointer:coarse){ #touch{display:block} #help .kb{display:none} #mini{width:118px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom))} #mini.big{width:min(86vw,60vh)} #hud{min-width:0;transform:scale(.85);transform-origin:0 0} #street{font-size:20px} #fps{display:none} #online{top:112px} #chatLog{bottom:calc(14px + env(safe-area-inset-bottom));max-width:calc(100vw - 160px)} #chatBox{bottom:auto;top:12px} #room{top:8px;width:min(236px,58vw)} #roomList{max-height:22vh;font-size:16px} #roomCode{font-size:20px;letter-spacing:2px} #roomMsg{font-size:15px} body.hunting #hud{display:none} body.inroom #hud{display:none} body.hunting #online,body.inroom #online{top:10px} #room{top:62px} #huntHud{top:4px} #huntHud{top:6px;transform:translateX(-50%) scale(.85);transform-origin:50% 0} #blind .b2{font-size:72px} #chatHist{bottom:calc(12px + env(safe-area-inset-bottom));max-height:52vh} }
+  @media (pointer:coarse){ #touch{display:block} #help .kb{display:none} #mini{width:118px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom))} #mini.big{width:min(86vw,60vh)} #hud{min-width:0;transform:scale(.85);transform-origin:0 0} #street{font-size:20px} #fps{display:none} #online{top:112px} #chatLog{bottom:calc(14px + env(safe-area-inset-bottom));max-width:calc(100vw - 160px)} #chatBox{bottom:auto;top:12px} #btnGear{top:auto;bottom:calc(150px + env(safe-area-inset-bottom));right:14px} #room{top:8px;width:min(236px,58vw)} #roomList{max-height:22vh;font-size:16px} #roomCode{font-size:20px;letter-spacing:2px} #roomMsg{font-size:15px} body.hunting #hud{display:none} body.inroom #hud{display:none} body.hunting #online,body.inroom #online{top:10px} #room{top:62px} #huntHud{top:4px} #huntHud{top:6px;transform:translateX(-50%) scale(.85);transform-origin:50% 0} #blind .b2{font-size:72px} #chatHist{bottom:calc(12px + env(safe-area-inset-bottom));max-height:52vh} }
   @media (pointer:fine){ #help .tc{display:none} }
 </style>
 </head>
@@ -175,14 +184,21 @@
 </div>
 <div id="fps"></div>
 <canvas id="mini"></canvas>
+<button id="btnGear" class="tbtn" aria-label="Configurações">⚙</button>
+<div id="gearPanel" class="panel"><div class="hd"><span>⚙ CONFIGURAÇÕES</span><button class="tbtn" id="gearClose">✕</button></div>
+  <div class="gl">ALTERAR GRÁFICO</div>
+  <div class="gopts"><button class="tbtn" data-px="4">PIXELADO</button><button class="tbtn" data-px="3">NORMAL</button><button class="tbtn" data-px="2">NÍTIDO</button><button class="tbtn" data-px="1.5">MÁXIMO</button></div>
+  <div class="gn">Mais nítido deixa o jogo mais pesado em celulares simples.</div>
+  <div class="gl">VISÃO</div><div class="gn">Aproxime a câmera ao máximo (pinça ou roda do mouse) para entrar em 1ª pessoa; afaste para voltar.</div>
+</div>
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
-  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (afaste para ver o bairro)<br><b>M</b> mapa grande · <b>P</b> tamanho do pixel<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle · <b>X</b> sentar no banco<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (aproxime ao máximo para 1ª pessoa)<br><b>M</b> ou clique no mapa: mapa grande · <b>⚙</b> alterar gráfico<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle · <b>X</b> sentar no banco<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
   <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)<br>Botão <b>👁</b> primeira/terceira pessoa</div>
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnView">👁<span>3ª PESSOA</span></button><button class="tbtn rb" id="btnMap">🗺<span>MAPA</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
+  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
 </div>
 <div id="online" class="panel" style="display:none"><span id="onlineTxt"></span><button id="btnLeave">SAIR</button></div>
 <div id="chatLog"></div>

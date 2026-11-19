@@ -2446,7 +2446,7 @@ function setFP(on) {
   try { localStorage.setItem('mdc_fp', cam.fp ? '1' : '0'); } catch (e) {}
 }
 cam.yaw = Math.atan2(-Math.cos(player.a), -Math.sin(player.a));
-let pixel = 3, shadowsOn = shadowOK;
+let pixel = (() => { try { const v = parseFloat(localStorage.getItem('mdc_px')); if (v) return v; } catch (e) {} return matchMedia('(pointer:coarse)').matches ? 2 : 3; })(), shadowsOn = shadowOK;   // celular começa mais nítido
 const keys = {};
 function segDist(x, z, s) {
   const ax = s.a[0], az = s.a[1], dx = s.b[0] - ax, dz = s.b[1] - az, L = dx * dx + dz * dz;
@@ -2507,7 +2507,7 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'KeyC') toggleCar();
   if (e.code === 'KeyV') setFP(!cam.fp);
-  if (e.code === 'KeyP') { pixel = pixel === 2 ? 3 : pixel === 3 ? 4 : 2; resize(); }
+  if (e.code === 'KeyP') { pixel = pixel === 2 ? 3 : pixel === 3 ? 4 : 2; try { localStorage.setItem('mdc_px', String(pixel)); } catch (er) {} resize(); }
   if (e.code === 'KeyM') document.getElementById('mini').classList.toggle('big');
   if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hide');
   if (e.code === 'KeyL') shadowsOn = !shadowsOn && shadowOK;
@@ -2531,7 +2531,7 @@ document.addEventListener('mousemove', e => {
 });
 cv.addEventListener('pointermove', e => { if (!drag) return; cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = Math.max(cam.fp ? -1.35 : -1.1, Math.min(1.45, cam.pitch + (e.clientY - drag.y) * 0.005)); drag = { x: e.clientX, y: e.clientY }; cam.follow = 1.5; });
 cv.addEventListener('pointerup', () => { drag = null; });
-cv.addEventListener('wheel', e => { e.preventDefault(); if (cam.fp) { if (e.deltaY > 0) setFP(false); return; } cam.dist = Math.max(7, Math.min(260, cam.dist * Math.exp(e.deltaY * 0.0012))); }, { passive: false });
+cv.addEventListener('wheel', e => { e.preventDefault(); if (cam.fp) { if (e.deltaY > 0) { setFP(false); cam.dist = 7.5; } return; } if (e.deltaY < 0 && cam.dist <= 7.05) { cam.zin = (cam.zin || 0) - e.deltaY; if (cam.zin > 120) { cam.zin = 0; setFP(true); } return; } cam.zin = 0; cam.dist = Math.max(7, Math.min(260, cam.dist * Math.exp(e.deltaY * 0.0012))); }, { passive: false });   // zoom: aproximar ao máximo entra em 1ª pessoa
 function toggleCar() {
   if (window.__hunt && window.__hunt.active() && !player.car) return;   // sem carro no esconde-esconde
   if (player.car) { // step out to the side
@@ -2559,7 +2559,7 @@ cv.addEventListener('touchmove', e => {
     if (t.identifier === joy.id) { let dx = t.clientX - joy.x, dy = t.clientY - joy.y; const l = Math.hypot(dx, dy); const R = 60; if (l > R) { dx *= R / l; dy *= R / l; } joy.dx = dx / R; joy.dy = dy / R; jKnob.style.transform = `translate(${dx}px,${dy}px)`; jEl.classList.toggle('run', Math.hypot(joy.dx, joy.dy) > 0.82); }
     else if (t.identifier === look.id) {
       const t2 = [...e.touches].find(q => q.identifier === pinch.id2);
-      if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) { if (cam.fp) { if (d < pinch.d * 0.7) setFP(false); } else cam.dist = Math.max(7, Math.min(260, cam.dist * pinch.d / d)); } if (!cam.fp || !pinch.d) pinch.d = d; }
+      if (t2) { const d = Math.hypot(t.clientX - t2.clientX, t.clientY - t2.clientY); if (pinch.d) { if (cam.fp) { if (d < pinch.d * 0.75) { setFP(false); cam.dist = 7.5; pinch.d = d; } } else { const nd = cam.dist * pinch.d / d; if (nd < 7 && cam.dist <= 7.05) { pinch.zin = (pinch.zin || 1) * pinch.d / d; if (pinch.zin > 1.35) { pinch.zin = 1; setFP(true); } } else pinch.zin = 1; cam.dist = Math.max(7, Math.min(260, nd)); } } if (!cam.fp || !pinch.d) pinch.d = d; }
       else { cam.yaw -= (t.clientX - look.x) * 0.008; cam.pitch = Math.max(cam.fp ? -1.35 : -1.1, Math.min(1.45, cam.pitch + (t.clientY - look.y) * 0.006)); cam.follow = 1.5; }
       look.x = t.clientX; look.y = t.clientY;
     }
@@ -2574,9 +2574,16 @@ cv.addEventListener('touchend', e => {
   }
 });
 document.getElementById('btnCar').addEventListener('click', toggleCar);
-document.getElementById('btnView').addEventListener('click', () => setFP(!cam.fp));
+
 try { if (localStorage.getItem('mdc_fp') === '1') setTimeout(() => setFP(true), 0); } catch (e) {}
-document.getElementById('btnMap').addEventListener('click', () => document.getElementById('mini').classList.toggle('big'));
+{ const m = document.getElementById('mini'); m.addEventListener('click', e => { e.stopPropagation(); m.classList.toggle('big'); }); m.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); }
+// engrenagem: configurações (gráfico)
+{ const G = document.getElementById('gearPanel'), btn = document.getElementById('btnGear');
+  const mark = () => G.querySelectorAll('[data-px]').forEach(b => b.classList.toggle('sel', +b.dataset.px === pixel));
+  btn.addEventListener('click', e => { e.stopPropagation(); G.classList.toggle('on'); mark(); });
+  document.getElementById('gearClose').addEventListener('click', () => G.classList.remove('on'));
+  G.querySelectorAll('[data-px]').forEach(b => b.addEventListener('click', () => { pixel = +b.dataset.px; try { localStorage.setItem('mdc_px', String(pixel)); } catch (e) {} resize(); mark(); }));
+  for (const el of [btn, G]) el.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); }
 let helpTimer = null;
 function hideHelpSoon() { if (helpTimer) return; helpTimer = setTimeout(() => document.getElementById('help').classList.add('hide'), 6000); }
 
