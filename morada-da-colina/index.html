@@ -3115,7 +3115,7 @@ function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
     const tat = ['.XXXX', 'X.X.X', 'XXXXX', 'X.X..'];
     tat.forEach((row, i) => [...row].forEach((ch, j) => { if (ch === 'X') put(-5 + j, 6 - i, 2, i % 2 ? INK2 : INK); }));
   });
-  const head = vxPart('hdLucas', (b, put) => {
+  const head = vxPart('hdLucas2', (b, put) => {
     b(-3, 3, 0, 7, -3, 3, LS); b(-4, -4, 2, 4, -1, 1, LS2); b(4, 4, 2, 4, -1, 1, LS2); b(-2, 2, -1, -1, -2, 2, LS);   // rosto oval, maxilar forte, orelhas
     put(5, 1, 0, hex('#2a2a2e')); put(5, 0, 0, hex('#2a2a2e'));   // brinco de argola na orelha esquerda
     // barba rala no queixo e no maxilar
@@ -3124,10 +3124,14 @@ function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
     b(-1, 1, 1, 1, 3, 3, hex('#9a6253'));   // boca
     b(-1, 1, 3, 3, 4, 4, LS); put(0, 4, 4, LS); put(0, 3, 5, LS2);   // nariz
     for (const ex of [-2, 1]) { put(ex + (ex < 0 ? 1 : 0), 4, 3, hex('#2a1c14')); put(ex + (ex < 0 ? 0 : 1), 4, 3, WH); b(ex, ex + 1, 5, 5, 3, 3, LS2); b(ex - (ex < 0 ? 1 : 0), ex + 1 + (ex < 0 ? 0 : 1), 6, 6, 3, 3, HB); }   // olhos escuros olhando baixo, sobrancelhas grossas
-    // cabelo raspado (máquina), bem rente: uma camada só, com entradas na testa
-    for (let x = -4; x <= 4; x++) for (let z = -4; z <= 3; z++) { put(x, 8, z, (x * 3 + z) % 4 ? HB : hex('#3a2e26')); }
-    b(-4, -4, 5, 7, -4, 1, HB); b(4, 4, 5, 7, -4, 1, HB); b(-3, 3, 2, 7, -4, -4, HB);
-    for (const x of [-3, -2, -1, 0, 1, 2, 3]) put(x, 7, 3, Math.abs(x) === 3 ? LS : HB);   // linha do cabelo com entradas
+    // cabeça raspada quase careca: só uma sombra de cabelo na pele, sem volume
+    const SH0 = hex('#a88068'), SH1 = hex('#b88c72');
+    b(-2, 2, 8, 8, -2, 2, LS);   // topo arredondado
+    for (let x = -3; x <= 3; x++) for (let y = 5; y <= 8; y++) for (let z = -3; z <= 3; z++) {
+      const top = y === 8 ? Math.abs(x) <= 2 && Math.abs(z) <= 2 : y === 7 || Math.abs(x) === 3 || z === -3;
+      if (!top || (z >= 3 && y < 8) || (z === 2 && y === 7 && Math.abs(x) >= 2)) continue;   // testa livre, entradas
+      put(x, y, z, (x * 3 + y + z * 5) % 3 ? SH0 : SH1);
+    }
   });
   const uArm = vxPart('uaL', b => b(-1, 1, -4, 0, -1, 1, (x, y) => y === 0 ? LS2 : LS));   // braço grosso, ombro redondo
   const fArmR = vxPart('faLr', b => { b(-1, 0, -4, -1, -1, 0, LS); b(-1, 0, -5, -5, -1, 0, LS2); });
@@ -4707,7 +4711,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119215246";
+  const BUILD = "v20261119215350";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
