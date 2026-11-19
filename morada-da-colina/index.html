@@ -1313,9 +1313,11 @@ for (const h of W.houses) {
     const vF = 9.0, vR = 12.6, v1 = 21.0, aL = 3.8, aM = 7.0, aR = 11.5, H = 2.9;
     bx(aL, aR, LB, H, vR, v1, YL, YL2); bx(aM, aR, LB, H, vF, vR, YL, YL2); maskRect(T0, U(aR), U(aL), vR, v1); maskRect(T0, U(aR), U(aM), vF, vR);
     bx(aL - 0.3, aR + 0.3, LB, 0.15, vF - 0.3, v1, hex('#b5b0a5'), hex('#a7a297'));   // calçadinha / piso da varanda
-    hipRoof(B, at(U((aL + aR) / 2), (vF + v1) / 2, g), aR - aL, v1 - vF, H + 0.05, 2.0, 0.6, TILE);   // telhado cobre também o recuo (varanda)
+    hipRoof(B, at(U((0.35 + aR) / 2), (vF + v1) / 2, g), aR - 0.35, v1 - vF, H + 0.05, 2.2, 0.6, TILE);   // telhado cobre também o recuo (varanda) e a garagem
     bx(aL, aL + 0.25, 0.15, H, vF + 0.05, vF + 0.3, YL, YL2); { const p = P(T, U(aL + 0.12), 0, vF + 0.17); maskCircle(p[0], p[2], 0.2); }   // pilar da varanda
-    bx(aL, aM, H - 0.25, H, vF - 0.1, vF + 0.1, YL, YL2);                                   // viga
+    bx(0.35, aM, H - 0.25, H, vF - 0.1, vF + 0.1, YL, YL2);                                 // viga
+    bx(0.35, 0.6, 0.15, H, vF + 0.05, vF + 0.3, YL, YL2); { const p = P(T, U(0.47), 0, vF + 0.17); maskCircle(p[0], p[2], 0.2); }   // pilar da frente da garagem
+    bx(0.35, aL, H - 0.25, H, v1 - 0.2, v1, YL, YL2); bx(0.35, 0.6, 0.15, H, v1 - 0.3, v1, YL, YL2);   // fundo da garagem
     // óculo redondo com grade e porta branca, na parede recuada
     { const cA = 4.9, cy = 1.75, R = 0.38; for (let k = 0; k < 10; k++) { const y = cy - R + (k + 0.5) * 2 * R / 10, w = Math.sqrt(Math.max(0, R * R - (y - cy) ** 2)); wf(cA - w, cA + w, y - R / 10, y + R / 10, vR, hex('#2f343a')); }
       for (const d of [-0.2, 0, 0.2]) wf(cA + d - 0.02, cA + d + 0.02, cy - 0.35, cy + 0.35, vR - 0.01, WH); wf(cA - 0.36, cA + 0.36, cy - 0.02, cy + 0.02, vR - 0.01, WH); }
@@ -4194,7 +4196,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119021726";
+  const BUILD = "v20261119021956";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
