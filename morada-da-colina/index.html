@@ -3384,20 +3384,26 @@ let SKYMSG = null;
 function skyMsgAnchor(S) { const gy = surfAt(player.x, player.z); return [player.x + S.fx * 42, gy + 26, player.z + S.fz * 42]; }
 function skyMsgPt(S, u, y, v = 0) { const c = skyMsgAnchor(S), rx = -S.fz, rz = S.fx; return [c[0] + rx * u - S.fx * v, c[1] + y, c[2] + rz * u - S.fz * v]; }   // u = direita de quem olha, v > 0 = mais perto do jogador
 // texto em pixels de verdade (3D, atrás das árvores): desenha num canvas pequeno e vira faixas de blocos
-function skyMsgRuns(m) {
-  const Wc = 184, Hc = 96, cv2 = document.createElement('canvas'); cv2.width = Wc; cv2.height = Hc; const g = cv2.getContext('2d');
-  const words = m.split(/\s+/); let lines = [], size = 44;
-  for (; size >= 9; size -= 1) {
-    g.font = size + "px 'VT323', monospace"; lines = []; let cur = '';
-    for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width <= Wc - 8 || !cur) cur = t; else { lines.push(cur); cur = w; } }
+function skyMsgRuns(m) {   // texto (com emojis coloridos) desenhado em alta resolução e convertido em faixas de pixels 3D
+  const SC = 3, Wc = 184 * SC, Hc = 96 * SC, PX = 0.1 / SC, cv2 = document.createElement('canvas'); cv2.width = Wc; cv2.height = Hc; const g = cv2.getContext('2d');
+  const FONT = s_ => "bold " + s_ + "px 'Trebuchet MS', 'Segoe UI', Roboto, Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+  const words = m.split(/\s+/); let lines = [], size = 44 * SC;
+  for (; size >= 10 * SC; size -= SC) {
+    g.font = FONT(size); lines = []; let cur = '';
+    for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width <= Wc - 8 * SC || !cur) cur = t; else { lines.push(cur); cur = w; } }
     if (cur) lines.push(cur);
-    if (lines.length * size * 0.92 <= Hc - 6 && lines.every(l => g.measureText(l).width <= Wc - 4)) break;
+    if (lines.length * size * 1.1 <= Hc - 6 * SC && lines.every(l => g.measureText(l).width <= Wc - 4 * SC)) break;
   }
-  g.fillStyle = '#000'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const lh = size * 0.92, y0 = Hc / 2 - (lines.length - 1) * lh / 2;
+  g.font = FONT(size); g.fillStyle = '#3a200b'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const lh = size * 1.1, y0 = Hc / 2 - (lines.length - 1) * lh / 2;
   lines.forEach((l, k) => g.fillText(l, Wc / 2, y0 + k * lh));
   const d = g.getImageData(0, 0, Wc, Hc).data, runs = [];
-  for (let y = 0; y < Hc; y++) { let x0 = -1; for (let x = 0; x <= Wc; x++) { const on = x < Wc && d[(y * Wc + x) * 4 + 3] > 110; if (on && x0 < 0) x0 = x; else if (!on && x0 >= 0) { runs.push([(x0 - Wc / 2) * 0.1, (x - Wc / 2) * 0.1, (Hc / 2 - y) * 0.1]); x0 = -1; } } }
+  const col = i => { const a = d[i + 3] / 255; return [Math.round(d[i] * a + 244 * (1 - a)), Math.round(d[i + 1] * a + 226 * (1 - a)), Math.round(d[i + 2] * a + 180 * (1 - a))]; };   // mistura com a cor do papel
+  for (let y = 0; y < Hc; y++) { let x0 = -1, c0 = null;
+    for (let x = 0; x <= Wc; x++) { const i = (y * Wc + x) * 4, on = x < Wc && d[i + 3] > 70, c = on ? col(i) : null, same = on && c0 && Math.abs(c[0] - c0[0]) + Math.abs(c[1] - c0[1]) + Math.abs(c[2] - c0[2]) < 40;
+      if (x0 >= 0 && !same) { runs.push([(x0 - Wc / 2) * PX, (x - Wc / 2) * PX, (Hc / 2 - y) * PX, c0]); x0 = -1; c0 = null; }
+      if (on && x0 < 0) { x0 = x; c0 = c; } } }
+  runs.px = PX;
   return runs;
 }
 function skyMsgFrame(B, t) {
@@ -3415,7 +3421,7 @@ function skyMsgFrame(B, t) {
     if (unroll > 0.02) {
       box(B, T, -9.6, 9.6, -h + 0.3, h - 0.3, -0.08, 0.08, PAP, PAP2, F_GLOW);
       const lim = h - 0.4, n = [-S.fx, 0, -S.fz];
-      for (const [u0, u1, y] of S.runs) if (Math.abs(y) < lim) { const q = (u, yy) => skyMsgPt(S, u, yy, 0.1); B.quad(q(u0, y), q(u1, y), q(u1, y - 0.1), q(u0, y - 0.1), n, INK, F_GLOW); }
+      const px = S.runs.px || 0.1; for (const [u0, u1, y, c] of S.runs) if (Math.abs(y) < lim) { const q = (u, yy) => skyMsgPt(S, u, yy, 0.1); B.quad(q(u0, y), q(u1, y), q(u1, y - px), q(u0, y - px), n, c || INK, F_GLOW); }
     }
     for (const sg of [-1, 1]) {
       box(B, T, -10.2, 10.2, sg * h - 0.38, sg * h + 0.38, -0.38, 0.38, ROD, ROD2, F_GLOW);
@@ -3749,7 +3755,7 @@ window.__net = (function () {
   async function crPoll() {
     try {
       const r = await fetch(TG + 'criador', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json();
-      for (const x of j.msgs || []) { if (crSeen.has(x.id)) continue; crSeen.add(x.id); if (crFirst && j.now - x.d > 90 || !N.online) continue; creatorMsg(String(x.m).slice(0, 200)); }
+      for (const x of j.msgs || []) { if (crSeen.has(x.id)) continue; crSeen.add(x.id); if (crFirst && j.now - x.d > 90 || !N.online) continue; creatorMsg(Array.from(String(x.m)).slice(0, 200).join('')); }
       crFirst = false;
     } catch (e) {}
   }
@@ -4393,7 +4399,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119122017";
+  const BUILD = "v20261119123303";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
