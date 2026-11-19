@@ -292,7 +292,7 @@ function frame(x, y, z, ang) { const c = Math.cos(ang), s = Math.sin(ang); retur
 const PROPS = [];
 const LATE_NOTES = [];   // mensagens criadas antes da lista de NPCs existir
 const DOGS = [];
-const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa' };         // cachorros soltos em quintais (andam sozinhos)
+const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa', labrador: 'Balu', pastor: 'Zatara' };         // cachorros soltos em quintais (andam sozinhos)
 // relógio do jogo: 1 hora do jogo = 1 minuto real (o dia inteiro dura 24 minutos), igual para todos os jogadores
 const DAY_SEC = 24 * 60;
 function gameClock() { const sec = Date.now() / 1000 + (window.__timeShift || 0); const day = Math.floor(sec / DAY_SEC); return { day, h: (sec - day * DAY_SEC) / 60, sec, dayStart: day * DAY_SEC }; }
@@ -1285,7 +1285,31 @@ for (const h of W.houses) {
         box(B, T2, -0.25, 0.25, 0.95, 0.98, -0.2, 0.2, LX, LX); maskCircle(p[0], p[1], 0.15); PROPS.push({ k: 'lixeira', x: p[0], z: p[1], a: Math.atan2(uz, ux) }); }
       { const T2 = at(-0.5, 5.6); for (let k = 0; k < 6; k++) { const a = k * 1.05; box(B, T2, Math.cos(a) * 0.2 - 0.05, Math.cos(a) * 0.2 + 0.05, 0, 0.6 + (k % 3) * 0.15, Math.sin(a) * 0.2 - 0.12, Math.sin(a) * 0.2 + 0.12, hex('#5f9443'), hex('#4e7f37')); } }   // plantinha atrás da grade (como no print de 2024)
       { const p = WP(-6.9, 6.5); tree(chunkB(p[0], p[1]), p[0], p[1], 3, 1.3, true); }   // palmeira do vizinho à esquerda
+      { const yard = { x: lm.x, z: lm.z, u: lm.u, v: lm.v, u0: -6.0, u1: 6.0, v0: 18.5, v1: 23.6, nu0: 0, nu1: 0, nv: -1 };   // quintal dos fundos: Balu e Zatara
+        for (const [kind, du, dv] of [['labrador', -3, 21], ['pastor', 3, 21.5]]) { const p = WP(du, dv); DOGS.push({ kind, x: p[0], z: p[1], a: Math.random() * 6.28, yard, tx: p[0], tz: p[1], wait: Math.random() * 3, ph: Math.random() * 6, wag: 0, spd: 0 }); } }
     }
+  }
+  { // fim da R. Silvio Mageste da Silva (borda oeste, no alto): árvore grande à direita e o túmulo do Balu
+    const r = W.roads.find(r => r.n === 'Rua Silvio Mageste da Silva');
+    if (r) { let best = null; for (let i = 0; i < r.pts.length - 1; i++) { const a = r.pts[i], b = r.pts[i + 1]; for (let t = 0; t <= 1; t += 0.02) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t; if (z > 0 && x > BX0 + 18 && (!best || x < best.x)) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); best = { x, z, fx: (b[0] - a[0]) / L, fz: (b[1] - a[1]) / L }; } } }
+      if (best) { const rx = -best.fz, rz = best.fx, tx = best.x + rx * 9 + best.fx * 7, tz = best.z + rz * 9 + best.fz * 7;   // direita de quem chega pela rua
+        const Bt = chunkB(tx, tz), T = frame(tx, groundAt(tx, tz) - 0.2, tz, 0.4), TR = hex('#5d4128'), L1 = hex('#3f7a2e'), L2 = hex('#4d8c36'), L3 = hex('#356b27');
+        box(Bt, T, -0.6, 0.6, 0, 4.2, -0.6, 0.6, TR, TR);
+        for (const [a, h] of [[0, 3.6], [2.1, 3.3], [4.2, 3.8]]) { const c = Math.cos(a), s_ = Math.sin(a); beam(Bt, P(T, 0, 3.4, 0), P(T, c * 2.6, h + 1.2, s_ * 2.6), 0.35, TR); }
+        box(Bt, T, -5.2, 5.2, 4.2, 6.6, -4.8, 4.8, L1, L3); box(Bt, T, -4.2, 4.6, 6.6, 8.4, -3.8, 4.2, L2, L1); box(Bt, T, -2.8, 2.6, 8.4, 9.6, -2.4, 2.8, L1, L1);
+        for (const [u, v] of [[-5.8, 1], [5.6, -1.5], [1, 5.2], [-1.5, -5.4]]) box(Bt, T, u - 1.6, u + 1.6, 4.6, 6.2, v - 1.6, v + 1.6, L2, L3);
+        maskCircle(tx, tz, 0.7);
+        // túmulo: monte de terra com cruz de galhos amarrados, entre a árvore e a rua
+        const gx = tx - rx * 3.2 + best.fx * 0.5, gz = tz - rz * 3.2 + best.fz * 0.5, G = frame(gx, groundAt(gx, gz), gz, Math.atan2(rz, rx)), DIRT = hex('#6b4a2e'), DIRT2 = hex('#5c3f27'), BR = hex('#6e5134');
+        box(Bt, G, -0.55, 0.55, -0.2, 0.18, -0.9, 0.9, DIRT, DIRT2); box(Bt, G, -0.4, 0.4, 0.18, 0.32, -0.7, 0.7, DIRT2, DIRT2); box(Bt, G, -0.2, 0.2, 0.32, 0.38, -0.4, 0.4, DIRT, DIRT);
+        for (const [u, v] of [[0.3, 0.5], [-0.25, -0.4], [0.1, -0.7]]) box(Bt, G, u - 0.06, u + 0.06, 0.2, 0.3, v - 0.05, v + 0.05, hex('#8a8478'), hex('#7a7468'));   // pedrinhas
+        beam(Bt, P(G, 0.48, 0.1, 0.0), P(G, 0.5, 1.05, 0.03), 0.07, BR);                       // galho de pé
+        beam(Bt, P(G, 0.49, 0.75, -0.3), P(G, 0.49, 0.78, 0.32), 0.06, BR);                     // travessa
+        box(Bt, G, 0.43, 0.56, 0.7, 0.83, -0.05, 0.05, hex('#c9b98a'), hex('#c9b98a'));          // amarração de barbante
+        box(Bt, G, 0.32, 0.44, 0.33, 0.4, 0.15, 0.3, hex('#d8c54a'), hex('#c23a2a'));             // florzinhas
+        maskCircle(gx, gz, 0.5);
+        LATE_NOTES.push({ name: '', style: 'note', x: gx, z: gz, y: groundAt(gx, gz) + 0.9, base: 0, look: 0, t: 0, r: 3.2, says: ['R.I.P. Balu'] });
+        window.__grave = [gx, gz]; } }
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'wandir1') {   // casa amarela da R. Wandir de Carvalho (Street View): grade branca sobre mureta cinza, varanda à esquerda, óculo redondo
     const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
@@ -2859,6 +2883,8 @@ const DOGDEF = {
   yorkie:      { L: 0.44, W: 0.2, lh: 0.14, bh: 0.19, s: 1.0, body: '#1f1c1e', dark: '#141214', spd: 1.9 },
   yorkieRoupa: { L: 0.44, W: 0.21, lh: 0.14, bh: 0.2, s: 1.0, body: '#cfe6f0', dark: '#b9d6e2', spd: 1.7 },
   beagle:      { L: 0.62, W: 0.27, lh: 0.24, bh: 0.26, s: 1.0, body: '#f3eee6', dark: '#e4ddd1', spd: 1.1 },
+  labrador:    { L: 0.8, W: 0.33, lh: 0.33, bh: 0.3, s: 1.0, body: '#ecd7a8', dark: '#dcc490', spd: 1.3 },
+  pastor:      { L: 0.86, W: 0.32, lh: 0.36, bh: 0.3, s: 1.0, body: '#b9783a', dark: '#a5682f', spd: 1.5 },
 };
 function buildDog(B, d, t) {
   const D = DOGDEF[d.kind], y0 = surfAt(d.x, d.z) + 0.02, T = frame(d.x, y0, d.z, d.a);
@@ -2866,7 +2892,7 @@ function buildDog(B, d, t) {
   const walk = Math.min(1, d.spd / 0.6), sw = Math.sin(d.ph) * 0.55 * walk;
   const TAN = hex('#b5702c'), TAN2 = hex('#a3612a'), WHITE = hex('#f3efe8'), PINK = hex('#e8a2a8'), NOSE = hex('#151313'), EYE = hex('#1a1414');
   // pernas (balançam ao andar)
-  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : (d.kind === 'bull' || d.kind === 'beagle') ? [BODY, BODY] : [TAN, TAN];
+  const legC = (front) => d.kind === 'pitbull' ? [front ? WHITE : BODY, WHITE] : (d.kind === 'bull' || d.kind === 'beagle' || d.kind === 'labrador') ? [BODY, BODY] : [TAN, TAN];
   for (const [lu, lv, ph] of [[L * 0.36, -W * 0.3, sw], [L * 0.36, W * 0.3, -sw], [-L * 0.36, -W * 0.3, -sw], [-L * 0.36, W * 0.3, sw]]) {
     const thump = d.thump && lu < 0 && lv > 0, A = swing(T, lu, lh, lv, thump ? -0.5 + Math.sin(t * 32) * 0.55 : ph), lw = W * 0.17, [c1, c2] = legC(lu > 0);   // beagle: pata de trás batendo no chão
     box(B, A, -lw, lw, -lh, 0, -lw, lw, c1, c1);
@@ -2878,6 +2904,10 @@ function buildDog(B, d, t) {
   if (d.kind === 'pitbull') { box(B, T, L * 0.1, L / 2 + 0.01, yb - 0.01, yb + bh * 0.75, -W * 0.3, W * 0.3, WHITE, WHITE); box(B, T, -L * 0.2, L * 0.2, yb - 0.012, yb + 0.03, -W * 0.35, W * 0.35, WHITE, WHITE); }
   if (d.kind === 'bull') for (const [pu, pv, py] of [[0.1, W / 2, 0.15], [-0.18, -W / 2, 0.1], [0.22, W / 2, 0.06]]) box(B, T, pu - 0.04, pu + 0.03, yb + py, yb + py + 0.05, pv - 0.005, pv + 0.005, PINK, PINK);
   if (d.kind === 'yorkie') { box(B, T, -L / 2, L / 2, yb - 0.07, yb + 0.02, -W / 2 - 0.02, W / 2 + 0.02, DARK, DARK); box(B, T, L * 0.25, L / 2 + 0.02, yb - 0.04, yb + bh * 0.8, -W / 2 - 0.01, W / 2 + 0.01, TAN, TAN); }   // pelo comprido e peito caramelo
+  if (d.kind === 'pastor') {   // capa preta nas costas
+    const BK = hex('#1e1b19'), BK2 = hex('#2a2522');
+    box(B, T, -L * 0.45, L * 0.32, yb + bh * 0.45, yb + bh + 0.012, -W / 2 - 0.01, W / 2 + 0.01, BK, BK2);
+  }
   if (d.kind === 'beagle') {   // manta marrom nas costas e lados, barriga e peito brancos
     const BR = hex('#7a4a2a'), BR2 = hex('#6b3f23');
     box(B, T, -L * 0.42, L * 0.3, yb + bh * 0.35, yb + bh + 0.012, -W / 2 - 0.01, W / 2 + 0.01, BR, BR2);
@@ -2890,7 +2920,7 @@ function buildDog(B, d, t) {
   // rabo (abana)
   { const wg = Math.sin(t * 14 + d.ph) * 0.6 * d.wag, up = d.kind === 'pitbull' || d.kind === 'bull' ? 0.5 : 1.1;
     const Tt = { o: P(T, -L / 2, yb + bh * 0.8, 0), ax: N(T, -Math.cos(up) * Math.cos(wg), Math.sin(up), -Math.cos(up) * Math.sin(wg)), ay: T.ay, az: T.az };
-    const tl = d.kind.startsWith('yorkie') ? 0.13 : 0.24, tw = d.kind.startsWith('yorkie') ? 0.035 : 0.025, tc = d.kind === 'yorkie' ? BODY : d.kind === 'yorkieRoupa' ? TAN2 : d.kind === 'beagle' ? hex('#7a4a2a') : BODY;
+    const tl = d.kind.startsWith('yorkie') ? 0.13 : 0.24, tw = d.kind.startsWith('yorkie') ? 0.035 : 0.025, tc = d.kind === 'yorkie' ? BODY : d.kind === 'yorkieRoupa' ? TAN2 : d.kind === 'beagle' ? hex('#7a4a2a') : d.kind === 'pastor' ? hex('#3a2a1e') : BODY;
     beam(B, Tt.o, [Tt.o[0] + Tt.ax[0] * tl, Tt.o[1] + Tt.ax[1] * tl, Tt.o[2] + Tt.ax[2] * tl], tw, tc);
     if (d.kind === 'beagle') beam(B, [Tt.o[0] + Tt.ax[0] * tl * 0.75, Tt.o[1] + Tt.ax[1] * tl * 0.75, Tt.o[2] + Tt.ax[2] * tl * 0.75], [Tt.o[0] + Tt.ax[0] * tl * 1.05, Tt.o[1] + Tt.ax[1] * tl * 1.05, Tt.o[2] + Tt.ax[2] * tl * 1.05], tw * 1.2, WHITE); }
   // cabeça (vira um pouco para quem olha)
@@ -2898,7 +2928,7 @@ function buildDog(B, d, t) {
   const H = { o: P(T, L / 2 - 0.02 + sn * 0.3, yb + bh * 0.55 - sn, 0), ax: [0, 0, 0], ay: [0, 1, 0], az: [0, 0, 0] };
   { const ha = d.a + (d.look || 0); H.ax = [Math.cos(ha), 0, Math.sin(ha)]; H.az = [-Math.sin(ha), 0, Math.cos(ha)]; }
   { // auréola dourada flutuando em cima da cabeça
-    const small = d.kind.startsWith('yorkie'), up = { beagle: 0.36, pitbull: 0.46, bull: 0.46 }[d.kind] || 0.38, R = small ? 0.085 : 0.12, GOLD = [255, 214, 90];
+    const small = d.kind.startsWith('yorkie'), up = { beagle: 0.36, pitbull: 0.46, bull: 0.46, labrador: 0.42, pastor: 0.5 }[d.kind] || 0.38, R = small ? 0.085 : 0.12, GOLD = [255, 214, 90];
     const c = P(H, small ? 0.06 : 0.1, up + Math.sin(t * 2.4 + d.x) * 0.02, 0); d.hy = c[1]; d.hc = c;
     for (let i = 0; i < 14; i++) { const a0 = i / 14 * Math.PI * 2, a1 = (i + 1) / 14 * Math.PI * 2, p0 = [c[0] + Math.cos(a0) * R, c[1], c[2] + Math.sin(a0) * R], p1 = [c[0] + Math.cos(a1) * R, c[1], c[2] + Math.sin(a1) * R];
       beam(B, p0, p1, 0.016, GOLD, F_GLOW); }
@@ -2913,6 +2943,21 @@ function buildDog(B, d, t) {
       box(B, H, 0.165, 0.172, 0.13, 0.16, sv * 0.05 - 0.016, sv * 0.05 + 0.016, EYE, EYE);
       box(B, H, -0.02, 0.09, -0.12, 0.19, sv * 0.1 - 0.008 + sv * 0.012, sv * 0.1 + 0.022 + sv * 0.012, hex('#8a5229'), hex('#7a4824'));   // orelhas compridas caídas
     }
+  } else if (d.kind === 'labrador') {
+    box(B, H, -0.01, 0.2, 0.02, 0.26, -0.12, 0.12, BODY, BODY);                       // cabeça larga
+    box(B, H, 0.2, 0.36, 0.02, 0.16, -0.085, 0.085, BODY, DARK);                       // focinho
+    box(B, H, 0.355, 0.385, 0.1, 0.16, -0.045, 0.045, hex('#5a3d2b'), hex('#5a3d2b'));   // nariz marrom
+    box(B, H, 0.24, 0.34, 0.03, 0.05, -0.06, 0.06, PINK, PINK);
+    for (const sv of [-1, 1]) { box(B, H, 0.2, 0.21, 0.17, 0.2, sv * 0.065 - 0.016, sv * 0.065 + 0.016, EYE, EYE);
+      box(B, H, 0.0, 0.1, 0.05, 0.24, sv * 0.125 - 0.02, sv * 0.125 + 0.025 * sv, DARK, DARK); }   // orelhas caídas
+  } else if (d.kind === 'pastor') {
+    const BK = hex('#1e1b19');
+    box(B, H, -0.01, 0.18, 0.03, 0.25, -0.1, 0.1, BODY, BODY);
+    box(B, H, 0.18, 0.4, 0.03, 0.15, -0.07, 0.07, BK, BK);                            // focinho comprido escuro
+    box(B, H, 0.4, 0.425, 0.09, 0.15, -0.035, 0.035, NOSE, NOSE);
+    box(B, H, 0.08, 0.18, 0.2, 0.26, -0.06, 0.06, BK, BK);                             // máscara
+    for (const sv of [-1, 1]) { box(B, H, 0.17, 0.18, 0.17, 0.2, sv * 0.06 - 0.015, sv * 0.06 + 0.015, EYE, EYE);
+      box(B, H, 0.0, 0.09, 0.25, 0.44, sv * 0.07 - 0.03, sv * 0.07 + 0.03, BODY, BODY); box(B, H, 0.088, 0.094, 0.27, 0.42, sv * 0.07 - 0.02, sv * 0.07 + 0.02, BK, BK); }   // orelhas em pé
   } else if (d.kind === 'pitbull') {
     box(B, H, 0, 0.26, 0.02, 0.3, -0.15, 0.15, BODY, BODY);                       // cabeça larga
     box(B, H, 0.24, 0.38, 0.03, 0.17, -0.11, 0.11, WHITE, WHITE);                 // focinho branco
@@ -4196,7 +4241,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119022502";
+  const BUILD = "v20261119024442";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
