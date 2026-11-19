@@ -2933,11 +2933,101 @@ function skinOf(name) {
 }
 const PSC = 0.84;   // escala das pessoas (~1,70 m), proporcional às casas e portas
 function scaleT(T, k) { T.ax = T.ax.map(x => x * k); T.ay = T.ay.map(x => x * k); T.az = T.az.map(x => x * k); return T; }
+// ================= personagem em voxels articulado (cubinhos de ~6 cm; partes com quadril, joelho, tornozelo, ombro, cotovelo e pescoço) =================
+const VX = 1.95 / 31;                                   // tamanho do cubinho antes da escala das pessoas
+const VXCACHE = new Map();
+function vxPart(key, fill) {   // constrói a parte e junta cubinhos iguais em blocos maiores (poucas caixas por parte)
+  let r = VXCACHE.get(key); if (r) return r;
+  const V = new Map(), put = (x, y, z, c) => V.set(x + ',' + y + ',' + z, c);
+  const b = (x0, x1, y0, y1, z0, z1, c) => { for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) put(x, y, z, typeof c === 'function' ? c(x, y, z) : c); };
+  fill(b, put);
+  const ck = c => c.join(','), rows = new Map();
+  for (const [k, c] of V) { const [x, y, z] = k.split(',').map(Number), rk = y + ',' + z; if (!rows.has(rk)) rows.set(rk, []); rows.get(rk).push([x, c]); }
+  let runs = [];
+  for (const [rk, list] of rows) { const [y, z] = rk.split(',').map(Number); list.sort((p, q) => p[0] - q[0]); let s0 = null;
+    for (const [x, c] of list) { if (s0 && s0.x1 === x - 1 && ck(s0.c) === ck(c)) s0.x1 = x; else { if (s0) runs.push(s0); s0 = { x0: x, x1: x, y0: y, y1: y, z0: z, z1: z, c }; } } if (s0) runs.push(s0); }
+  const mergeAxis = (A0, A1, keyf) => { const g = new Map(); for (const q of runs) { const k = keyf(q); if (!g.has(k)) g.set(k, []); g.get(k).push(q); } const out = [];
+    for (const list of g.values()) { list.sort((p, q) => p[A0] - q[A0]); let cur = null; for (const q of list) { if (cur && cur[A1] === q[A0] - 1) cur[A1] = q[A1]; else { if (cur) out.push(cur); cur = { ...q }; } } if (cur) out.push(cur); } runs = out; };
+  mergeAxis('y0', 'y1', q => [q.x0, q.x1, q.z0, q.z1, ck(q.c)].join('|'));
+  mergeAxis('z0', 'z1', q => [q.x0, q.x1, q.y0, q.y1, ck(q.c)].join('|'));
+  VXCACHE.set(key, runs); return runs;
+}
+const shade = (c, k) => c.map(v => Math.max(0, Math.min(255, Math.round(v * k))));
+const vRx = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, c, s, 0, -s, c]; };   // + leva o que está abaixo do eixo para a frente (z+)
+const vRy = a => { const c = Math.cos(a), s = Math.sin(a); return [c, 0, s, 0, 1, 0, -s, 0, c]; };
+const vRz = a => { const c = Math.cos(a), s = Math.sin(a); return [c, -s, 0, s, c, 0, 0, 0, 1]; };
+const vMM = (A, B) => [0, 1, 2].flatMap(r => [0, 1, 2].map(c => A[r * 3] * B[c] + A[r * 3 + 1] * B[3 + c] + A[r * 3 + 2] * B[6 + c]));
+const vMV = (A, v) => [A[0] * v[0] + A[1] * v[1] + A[2] * v[2], A[3] * v[0] + A[4] * v[1] + A[5] * v[2], A[6] * v[0] + A[7] * v[1] + A[8] * v[2]];
+const vX = (P_, t, R) => ({ R: vMM(P_.R, R), t: vMV(P_.R, t).map((x, i) => x + P_.t[i]) });
+function vxDraw(B, Tb, parts) {   // espaço do modelo: x = esquerda do personagem, y = cima, z = frente  →  frame do jogo: u = z, y, v = -x
+  const W = (x, y, z) => [Tb.ax[0] * z + Tb.ay[0] * y - Tb.az[0] * x, Tb.ax[1] * z + Tb.ay[1] * y - Tb.az[1] * x, Tb.ax[2] * z + Tb.ay[2] * y - Tb.az[2] * x];
+  for (const [runs, M] of parts) {
+    const cx = [M.R[0], M.R[3], M.R[6]], cy = [M.R[1], M.R[4], M.R[7]], cz = [M.R[2], M.R[5], M.R[8]], o = W(...M.t.map(v => v * VX));
+    const T = { o: [Tb.o[0] + o[0], Tb.o[1] + o[1], Tb.o[2] + o[2]], ax: W(...cz).map(v => v * VX), ay: W(...cy).map(v => v * VX), az: W(...cx).map(v => -v * VX) };
+    for (const q of runs) box(B, T, q.z0 - 0.5, q.z1 + 0.5, q.y0, q.y1 + 1, -q.x1 - 0.5, -q.x0 + 0.5, q.c, q.c);
+  }
+}
+function vxHash(s) { let h = 7; for (const ch of String(s || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; }
+function buildPlayerVox(B, p, look, sk, SKN) {
+  const SH = look.shirt, SH2 = shade(SH, 0.8), JE = SHORTS, JE2 = shade(SHORTS, 0.82), SK2 = shade(SKN, 0.85), HR = HAIR, WH = hex('#ffffff'), PU = hex('#1a1a1a'), BR = shade(HAIR, 0.8), MO = hex('#6a3424');
+  const style = sk === 'carlos' || sk === 'kiko' ? 0 : vxHash(p === player ? player.n : p.n) % 3, F = sk === 'kiko' ? 4 : 0, kS = SKN.join('.') + '|' + SH.join('.');
+  const pelvis = vxPart('pel' + (sk === 'manoel' ? 'M' : ''), (b, put) => { b(-3, 3, 0, 1, -1, 1, JE); b(-3, 3, 2, 2, -1, 1, x => x === 0 ? hex('#c9b46a') : hex('#3b2a1e'));
+    if (sk === 'manoel') { b(0, 0, 0, 0, 2, 3, hex('#efe6d2')); b(-1, 1, -1, 1, 4, 4, hex('#d23a2e')); b(-1, 1, 0, 0, 5, 5, hex('#d23a2e')); put(-1, 1, 5, WH); put(1, -1, 5, WH); put(0, 0, 5, WH); } });
+  const torso = vxPart('tor' + kS, (b, put) => { b(-3, 3, 0, 6, -1, 1, (x, y) => y === 0 ? SH2 : SH); b(-1, 1, 6, 6, 1, 1, SKN); put(0, 5, 1, SKN); b(-1, 1, 7, 7, -1, 1, SKN); });
+  const head = vxPart('hd' + style + sk + SKN.join('.'), (b, put) => {
+    b(-3, 3, 0, 6 + F, -3, 3, SKN); b(-4, -4, 2, 3, -1, 0, SK2); b(4, 4, 2, 3, -1, 0, SK2);
+    for (const ex of [-2, 1]) { const droop = sk === 'miguel' && ex < 0 ? 1 : 0; put(ex, 3 - droop, 3, WH); put(ex + 1, 3 - droop, 3, PU); b(ex, ex + 1, 4, 4, 3, 3, droop ? SK2 : BR); }
+    put(0, 2, 4, SK2); b(-1, 1, 1, 1, 3, 3, MO);
+    if (F) b(-2, 2, 6, 6, 3, 3, shade(SKN, 0.9));
+    const y = F;
+    if (style === 0) { b(-3, 3, 6 + y, 7 + y, -3, 3, HR); b(-3, 3, 4 + y, 5 + y, -3, -3, HR); b(-4, -4, 4 + y, 6 + y, -3, 2, HR); b(4, 4, 4 + y, 6 + y, -3, 2, HR); b(-3, 3, 5 + y, 5 + y, 3, 3, HR); }
+    if (style === 1) { const CP = hex('#c23a2a'); b(-4, 4, 6, 8, -4, 3, CP); b(-3, 3, 6, 6, 4, 6, CP); b(-4, -4, 3, 5, -3, 1, HR); b(4, 4, 3, 5, -3, 1, HR); put(0, 8, -1, WH); }
+    if (style === 2) for (let x = -4; x <= 4; x++) for (let z = -4; z <= 3; z++) for (let yy = 5; yy <= 9; yy++) { const d = x * x / 20 + (z + 0.5) * (z + 0.5) / 16 + (yy - 6) * (yy - 6) / 10; if (d < 1.15 && !(z === 3 && yy < 6) && ((x * 7 + yy * 3 + z * 5) % 4 !== 0 || d < 0.8)) put(x, yy, z, (x + yy + z) % 3 ? HR : shade(HR, 1.25)); }
+  });
+  const uArm = vxPart('ua' + kS, b => { b(-1, 0, -2, 0, -1, 1, SH2); b(-1, 0, -4, -3, -1, 1, SKN); });
+  const fArm = vxPart('fa' + SKN.join('.'), b => { b(-1, 0, -4, -1, -1, 0, SKN); b(-1, 0, -5, -5, -1, 0, SK2); });
+  const fArmGun = vxPart('fg' + SKN.join('.'), b => { b(-1, 0, -4, -1, -1, 0, SKN); b(-1, 0, -5, -5, -1, 0, SK2); b(-1, 0, -11, -6, 0, 0, hex('#26282c')); b(-1, 0, -7, -6, 1, 2, hex('#3a3d42')); b(-1, 0, -11, -11, -1, -1, hex('#e8e4d6')); });
+  const fArmBib = vxPart('fb' + SKN.join('.'), (b, put) => { b(-1, 0, -4, -1, -1, 0, SKN); b(-1, 0, -5, -5, -1, 0, SK2);
+    b(-3, 1, -9, -4, 1, 1, hex('#1c1714')); b(-3, 1, -9, -4, 2, 2, hex('#f1ead6')); b(-3, 1, -9, -4, 3, 3, hex('#1c1714')); b(-1, -1, -8, -5, 4, 4, hex('#d8b24a')); b(-2, 0, -7, -7, 4, 4, hex('#d8b24a')); put(-2, -3, 2, hex('#a3262a')); });
+  const thigh = vxPart('th', b => b(-1, 1, -6, -1, -1, 1, (x, y, z) => x === 0 && z === 1 ? JE2 : JE));
+  const shin = vxPart('sh', b => b(-1, 1, -3, -1, -1, 1, (x, y) => y === -3 ? JE2 : JE));
+  const foot = vxPart('ft', b => { b(-1, 1, -3, -3, -2, 3, hex('#3a3a3a')); b(-1, 1, -2, -1, -1, 3, (x, y, z) => z === 3 && y === -1 ? hex('#c8c8c8') : SHOE); });
+  // animação
+  const t = performance.now() / 1000, w = p.sit ? 0 : Math.min(1, (p.speed || 0) / 3), ph = p.walk || 0, s_ = Math.sin(ph), c_ = Math.cos(ph), br = Math.sin(t * 1.8 + (p.x || 0)) * (1 - w);
+  const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08;
+  const root = { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
+  const out = [[pelvis, root]];
+  const tor = vX(root, [0, 3, 0], vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.015)));
+  out.push([torso, tor]);
+  const hd = vX(tor, [0, 8, 0], vMM(vRy(w * s_ * 0.12), vRx(0.04 * w * Math.abs(c_) - br * 0.02)));
+  if (sk === 'carlos') hd.R = hd.R.map(v => v * 2);
+  out.push([head, hd]);
+  for (const sd of [-1, 1]) {   // sd = +1: lado esquerdo do personagem (x+)
+    const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
+    let hip, knee, ank;
+    if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
+    else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
+    const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
+    out.push([thigh, th], [shin, shn], [foot, ft]);
+    const armed = p.gun !== undefined && sd < 0, bib = sk === 'biblia' && sd > 0;
+    let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.18 + w * (0.25 + 0.3 * Math.max(0, -ls));
+    if (p.sit) { sw = 0.35; el = 0.6; }
+    if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
+    if (bib) { sw = 0.45 + br * 0.02; el = 1.25; }
+    const ua = vX(tor, [sd * 4.5, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : 0.06 + 0.02 * br))));
+    const fa = vX(ua, [0, -4.5, 0], vRx(el));
+    const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
+    out.push([uArm, off(ua)], [armed ? fArmGun : bib ? fArmBib : fArm, off(fa)]);
+  }
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
+  vxDraw(B, T, out);
+}
 function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   const SHIRT_ = look.shirt, CAR_ = look.car;
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
   const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#6a4129') : SKIN;
+  if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
   const bob = Math.abs(Math.cos(p.walk)) * 0.06 * Math.min(1, p.speed / 3);
@@ -4473,7 +4563,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119163548";
+  const BUILD = "v20261119203102";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
