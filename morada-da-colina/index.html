@@ -2764,9 +2764,11 @@ function carNext(c) {   // escolhe a próxima rua no cruzamento (sem voltar pela
 }
 {
   const r = rngFor(3, 1, 4);
-  if (RNET.length) for (let i = 0; i < 34; i++) {
-    const a = RNET[Math.floor(r() * RNET.length)], e = a.e[Math.floor(r() * a.e.length)];
-    traffic.push({ id: i, rc: 0, a, b: e.n, L: e.L, h: e.h, t: e.t, s: r() * e.L, vmax0: e.t === 'secondary' ? 11 + r() * 5 : 6 + r() * 4, v: 0, col: jit(pick(CARS, r), r, 0.05), x: 0, z: 0, a_: 0, ad: null });
+  if (RNET.length) for (let i = 0, tries = 0; i < 34 && tries < 400; tries++) {
+    const a = RNET[Math.floor(r() * RNET.length)], e = a.e[Math.floor(r() * a.e.length)], s0 = r() * e.L, f = s0 / (e.L || 1);
+    const px = a.x + (e.n.x - a.x) * f, pz = a.z + (e.n.z - a.z) * f;
+    if (traffic.some(c => { const g = Math.min(1, c.s / (c.L || 1)); return Math.hypot(c.a.x + (c.b.x - c.a.x) * g - px, c.a.z + (c.b.z - c.a.z) * g - pz) < 9; })) continue;   // não nasce em cima de outro carro
+    traffic.push({ id: i++, rc: 0, a, b: e.n, L: e.L, h: e.h, t: e.t, s: s0, vmax0: e.t === 'secondary' ? 11 + r() * 5 : 6 + r() * 4, v: 0, col: jit(pick(CARS, r), r, 0.05), x: 0, z: 0, a_: 0, ad: null });
   }
 }
 function placeCar(c) {
@@ -4690,8 +4692,25 @@ function step(dt) {
     for (const p of allPlayers()) { const dx = p.x - c.x, dz = p.z - c.z; if (dx * dx + dz * dz < 81 && (dx * Math.cos(c.a_) + dz * Math.sin(c.a_)) > 0) { block = true; break; } }
     if (c.corr) { const k = Math.min(1, dt * 3), m = c.corr * k; c.s += m; c.corr -= m; if (Math.abs(c.corr) < 0.01) c.corr = 0; }
     const vmax = c.t === 'secondary' ? c.vmax0 : Math.min(c.vmax0, 10);
-    const tv = block ? 0 : vmax;
+    // não entra no carro da frente: mantém distância de quem está na mesma faixa (ou atravessando logo à frente)
+    let gapV = vmax, queue = false; const fx = Math.cos(c.a_), fz = Math.sin(c.a_);
+    for (const o of traffic) { if (o === c) continue;
+      if (c.ghost > 0 && Math.cos(o.a_ - c.a_) <= 0.3) continue;
+      const dx = o.x - c.x, dz = o.z - c.z; if (dx * dx + dz * dz > 225) continue;
+      const along = dx * fx + dz * fz, lat = Math.abs(dx * fz - dz * fx); if (along <= 0.3) continue;
+      const same = Math.cos(o.a_ - c.a_) > 0.3;
+      if (same) { if (lat < 1.95 + 2.3 * Math.abs(Math.sin(o.a_ - c.a_)) && along < 14) { const g = Math.max(0, (along - 6.2) * 1.3); if (g < gapV) { gapV = g; queue = true; } } continue; }
+      // cruzamento: prevê os próximos 2 s; quem chega depois (o outro está mais à sua frente) espera
+      const ov = Math.max(o.v, 0.5), cv_ = Math.max(c.v, 2), ofx = Math.cos(o.a_), ofz = Math.sin(o.a_);
+      let md = 1e9; for (let tt = 0; tt <= 2; tt += 0.25) { const ex = dx + (ofx * ov - fx * cv_) * tt, ez = dz + (ofz * ov - fz * cv_) * tt; md = Math.min(md, Math.hypot(ex, ez)); }
+      if (md < 3.6 || (lat < 2 && along < 6.5)) { const back = -dx * ofx - dz * ofz;   // eu visto do outro
+        if (along > back + 0.5 || (Math.abs(along - back) <= 0.5 && c.id < o.id)) gapV = Math.min(gapV, Math.max(0, (along - 4.5) * 1.2)); } }
+    c.waitCar = gapV < 0.3 ? (c.waitCar || 0) + dt : 0;
+    if (c.waitCar > 8 && !queue) { c.ghost = 2.5; c.waitCar = 0; }   // trava rara em cruzamento (nunca numa fila): libera e segue
+    if (c.ghost > 0) c.ghost -= dt;
+    const tv = block ? 0 : Math.min(vmax, gapV);
     c.v += (tv - c.v) * Math.min(1, dt * (tv < c.v ? 4 : 1));
+    if (c.v > gapV) c.v = gapV;   // freia de verdade atrás de outro carro (sem encostar)
     c.s += c.v * dt;
     let guard = 0; while (c.s >= c.L && guard++ < 8) { const over = c.s - c.L; carNext(c); c.s = over; }
   }
@@ -4866,7 +4885,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120015748";
+  const BUILD = "v20261120022244";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
