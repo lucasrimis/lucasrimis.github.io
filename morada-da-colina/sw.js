@@ -1,5 +1,5 @@
 // Morada da Colina: abre mesmo sem internet depois da primeira visita (modo sozinho).
-const CACHE = "morada-v20261120132746";
+const CACHE = "morada-v20261120133328";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
