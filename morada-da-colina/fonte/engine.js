@@ -3621,11 +3621,18 @@ const PHOTOS = [
   { pos: [-15.74, 121.89], src: FOTO_PRACA, caption: '' },   // praça redonda do alto do bairro, ao lado da fita do banco
   { pos: SOB9_FOTOS && SOB9_FOTOS[0], src: FOTO_SOBRADO, caption: '' },   // terreno do sobrado da Layca, junto ao muro perto das fitas
   { pos: SOB9_FOTOS && SOB9_FOTOS[1], src: FOTO_CARRO, caption: '' },   // calçada da frente do mesmo sobrado
-  { pos: SOB9_FOTOS && SOB9_FOTOS[2], src: FOTO_PAOQ, back: FOTO_PAOQ, caption: '' },   // porta-retrato de dois lados: dá para girar   // dentro do terreno, no jardim da frente perto das fitas
+  { pos: SOB9_FOTOS && SOB9_FOTOS[2], src: FOTO_PAOQ, backText: 'Existe uma versão proibida dessa foto...', caption: '' },   // porta-retrato de dois lados: dá para girar   // dentro do terreno, no jardim da frente perto das fitas
 ].filter(o => o.pos).map(o => Object.assign(o, { near: false, px: null }));
 const PH = { open: false, cur: null };
 const thumb = (src, cb) => { const im = new Image(); im.onload = () => { const land = im.width > im.height, w = land ? 16 : 12, h = land ? 12 : 16, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h);
   const d = g.getImageData(0, 0, w, h).data, px = { w, h, c: [] }; for (let i = 0; i < w * h; i++) px.c.push([d[i * 4], d[i * 4 + 1], d[i * 4 + 2]].map(v => Math.min(255, v * 1.6 + 20))); cb(px); }; im.src = src; };
+for (const o of PHOTOS) if (o.backText) {   // verso só com texto: um cartão escrito à mão
+  const c = document.createElement('canvas'); c.width = 600; c.height = 900; const g = c.getContext('2d');
+  g.fillStyle = '#f3ead6'; g.fillRect(0, 0, 600, 900); g.strokeStyle = '#c9b48a'; g.lineWidth = 14; g.strokeRect(20, 20, 560, 860);
+  g.fillStyle = '#3a2a1c'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = "bold 58px 'VT323', monospace";
+  const words = o.backText.split(' '), lines = []; let ln = ''; for (const w of words) { const t = ln ? ln + ' ' + w : w; if (g.measureText(t).width > 480) { lines.push(ln); ln = w; } else ln = t; } lines.push(ln);
+  lines.forEach((l, k) => g.fillText(l, 300, 450 + (k - (lines.length - 1) / 2) * 70));
+  o.back = c.toDataURL('image/png'); }
 for (const o of PHOTOS) if (o.back) thumb(o.back, px => { o.pxB = px; });   // verso
 for (const o of PHOTOS) { const im = new Image(); im.onload = () => {   // miniatura em pixels para mostrar no porta-retrato
   const land = im.width > im.height, w = land ? 16 : 12, h = land ? 12 : 16, c = document.createElement('canvas'); o.land = land; c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h);
