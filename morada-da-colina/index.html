@@ -1432,9 +1432,9 @@ for (const h of W.houses) {
       const q = P(Tb, 0, 0, 0); maskCircle(q[0], q[2], 0.3);
     };
     ramp(30, 16, 0.3, 2.2, 0.55, 1.0); ramp(35, 22, -0.4, 1.8, 0.4, 0.9); ramp(26, 25, 2.9, 2.5, 0.7, 1.1);
-    { const p = WP(33, 18.6), g = groundAt(p[0], p[1]), B = chunkB(p[0], p[1]), tl = 0.2, a0 = Math.atan2(AX[2], AX[0]) + 0.5;   // BMX vermelha, apoiada inclinada
+    { const p = WP(33, 18.6), g = groundAt(p[0], p[1]), B = chunkB(p[0], p[1]), tl = 0.2, a0 = Math.atan2(AX[2], AX[0]) + 0.5;   // BMX prateada, apoiada inclinada
       const K = { o: [p[0], g, p[1]], ax: [Math.cos(a0), 0, Math.sin(a0)], ay: [-Math.sin(a0) * Math.sin(tl), Math.cos(tl), Math.cos(a0) * Math.sin(tl)], az: [-Math.sin(a0) * Math.cos(tl), -Math.sin(tl), Math.cos(a0) * Math.cos(tl)] };
-      const tire = hex('#17181b'), fr = hex('#d12f2f'), chrome = hex('#c9cdd2'), rr = 0.25;
+      const tire = hex('#17181b'), fr = hex('#b9bec6'), chrome = hex('#e3e6ea'), rr = 0.25;   // quadro prateado
       const wheel = cu => { for (let q = 0; q < 12; q++) { const b0 = q / 12 * Math.PI * 2, b1 = (q + 1) / 12 * Math.PI * 2; beam(B, P(K, cu + Math.cos(b0) * rr, rr + Math.sin(b0) * rr, 0), P(K, cu + Math.cos(b1) * rr, rr + Math.sin(b1) * rr, 0), 0.07, tire); } for (let q = 0; q < 6; q++) { const b = q / 6 * Math.PI; beam(B, P(K, cu - Math.cos(b) * rr * 0.9, rr - Math.sin(b) * rr * 0.9, 0), P(K, cu + Math.cos(b) * rr * 0.9, rr + Math.sin(b) * rr * 0.9, 0), 0.012, chrome); } };
       wheel(-0.42); wheel(0.42);
       const rear = P(K, -0.42, rr, 0), crank = P(K, -0.05, 0.27, 0), seat = P(K, -0.22, 0.68, 0), head = P(K, 0.3, 0.72, 0), front = P(K, 0.42, rr, 0);
@@ -5011,7 +5011,7 @@ window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, D
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120123707";
+  const BUILD = "v20261120124430";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
