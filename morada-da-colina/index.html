@@ -3295,31 +3295,60 @@ function buildCamilaVox(B, p) {
 }
 
 // ================= bicicleta do jogador (BMX prateada) + pose de quem pedala =================
-const BIKE_PED = [-0.05, 0.27], BIKE_PR = 0.1, BIKE_SEAT = [-0.22, 0.72], BIKE_BAR = [0.26, 0.98, 0.3];
-function bikeMesh(B, p) {
-  const K = frame(p.x, floorAt(p.x, p.z) + 0.02, p.z, p.a), rr = 0.25, tire = hex('#17181b'), fr = hex('#b9bec6'), chrome = hex('#e3e6ea'), wr = p.wr || 0, ped = p.ped || 0;
-  const wheel = cu => { for (let q = 0; q < 12; q++) { const b0 = q / 12 * Math.PI * 2, b1 = (q + 1) / 12 * Math.PI * 2; beam(B, P(K, cu + Math.cos(b0) * rr, rr + Math.sin(b0) * rr, 0), P(K, cu + Math.cos(b1) * rr, rr + Math.sin(b1) * rr, 0), 0.07, tire); }
-    for (let q = 0; q < 4; q++) { const b = q / 4 * Math.PI - wr; beam(B, P(K, cu - Math.cos(b) * rr * 0.9, rr - Math.sin(b) * rr * 0.9, 0), P(K, cu + Math.cos(b) * rr * 0.9, rr + Math.sin(b) * rr * 0.9, 0), 0.014, chrome); } };
-  wheel(-0.42); wheel(0.42);
-  const rear = P(K, -0.42, rr, 0), crank = P(K, BIKE_PED[0], BIKE_PED[1], 0), seat = P(K, BIKE_SEAT[0], BIKE_SEAT[1] - 0.06, 0), head = P(K, 0.3, 0.72, 0), front = P(K, 0.42, rr, 0);
-  beam(B, rear, crank, 0.04, fr); beam(B, rear, seat, 0.04, fr); beam(B, crank, seat, 0.05, fr); beam(B, crank, head, 0.055, fr); beam(B, seat, head, 0.05, fr); beam(B, head, front, 0.04, chrome);
-  box(B, K, BIKE_SEAT[0] - 0.12, BIKE_SEAT[0] + 0.12, BIKE_SEAT[1] - 0.06, BIKE_SEAT[1] - 0.01, -0.06, 0.06, tire, tire);   // selim
-  beam(B, head, P(K, BIKE_BAR[0], BIKE_BAR[1], 0), 0.035, chrome); beam(B, P(K, BIKE_BAR[0], BIKE_BAR[1], -BIKE_BAR[2]), P(K, BIKE_BAR[0], BIKE_BAR[1], BIKE_BAR[2]), 0.035, chrome);
-  for (const sv of [-BIKE_BAR[2], BIKE_BAR[2]]) beam(B, P(K, BIKE_BAR[0], BIKE_BAR[1], sv), P(K, BIKE_BAR[0] - 0.06, BIKE_BAR[1], sv), 0.05, tire);
-  for (const sd of [-1, 1]) { const a = ped + (sd > 0 ? 0 : Math.PI), px = BIKE_PED[0] + Math.cos(a) * BIKE_PR, py = BIKE_PED[1] - Math.sin(a) * BIKE_PR;   // pedivela e pedal girando
-    beam(B, P(K, BIKE_PED[0], BIKE_PED[1], sd * 0.07), P(K, px, py, sd * 0.07), 0.025, chrome); box(B, K, px - 0.06, px + 0.06, py - 0.015, py + 0.015, sd * 0.07 + (sd > 0 ? 0 : -0.1), sd * 0.07 + (sd > 0 ? 0.1 : 0), hex('#2a2a2a'), hex('#2a2a2a')); }
+function firstName(n) { return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().split(/\s+/)[0]; }
+// bike de cada um: o Bruno anda de BMX prateada; os outros numa bicicleta comum igual à do Portela, da cor da camisa
+const BIKE_PSC = PSC / 0.95;   // a do Portela, na escala do jogador
+const BIKES = {
+  bmx: { seat: [-0.22, 0.72], hip: [-0.22, 0.72 + 0.6 * VX * PSC], ped: [-0.05, 0.27], pr: 0.1, bar: [0.26, 0.98, 0.3], lean: 0.32, ank: 2.4, wr: 0.25 },
+  city: { hip: [-0.2 * BIKE_PSC, 0.86 * BIKE_PSC], ped: [-0.05 * BIKE_PSC, 0.33 * BIKE_PSC], pr: 0.17 * BIKE_PSC, bar: [0.38 * BIKE_PSC, 1.12 * BIKE_PSC, 0.28 * BIKE_PSC], lean: 0.42, ank: 2.6, wr: 0.33 * BIKE_PSC }
+};
+function bikeKind(p) { return firstName(p === player ? player.n : p.n) === 'bruno' ? 'bmx' : 'city'; }
+function bikeColor(p, look) {   // cor da camisa que aparece no personagem
+  const sk = skinOf(p === player ? player.n : p.n);
+  return sk === 'lucas' ? hex('#3d4148') : sk === 'camila' ? hex('#f7f7f4') : sk === 'manoel' ? hex('#141416') : (look && look.shirt) || SHIRT;
+}
+function bikeMesh(B, p, look) {
+  const kind = bikeKind(p), S = BIKES[kind], ped = p.ped || 0, wr = p.wr || 0, tire = hex('#17181b'), chrome = hex('#e3e6ea');
+  const K = frame(p.x, floorAt(p.x, p.z) + 0.02, p.z, p.a);
+  const pedals = (cx, cy, pr, sw, fr) => { for (const sd of [-1, 1]) { const a = ped + (sd > 0 ? 0 : Math.PI), px = cx + Math.cos(a) * pr, py = cy - Math.sin(a) * pr;
+    beam(B, P(K, cx, cy, sd * sw), P(K, px, py, sd * sw), 0.025, chrome); box(B, K, px - 0.06, px + 0.06, py - 0.015, py + 0.015, sd * sw + (sd > 0 ? 0 : -0.1), sd * sw + (sd > 0 ? 0.1 : 0), hex('#2a2a2a'), hex('#2a2a2a')); } };
+  if (kind === 'bmx') {   // BMX prateada do Bruno
+    const rr = 0.25, fr = hex('#b9bec6');
+    const wheel = cu => { for (let q = 0; q < 12; q++) { const b0 = q / 12 * Math.PI * 2, b1 = (q + 1) / 12 * Math.PI * 2; beam(B, P(K, cu + Math.cos(b0) * rr, rr + Math.sin(b0) * rr, 0), P(K, cu + Math.cos(b1) * rr, rr + Math.sin(b1) * rr, 0), 0.07, tire); }
+      for (let q = 0; q < 4; q++) { const b = q / 4 * Math.PI - wr; beam(B, P(K, cu - Math.cos(b) * rr * 0.9, rr - Math.sin(b) * rr * 0.9, 0), P(K, cu + Math.cos(b) * rr * 0.9, rr + Math.sin(b) * rr * 0.9, 0), 0.014, chrome); } };
+    wheel(-0.42); wheel(0.42);
+    const rear = P(K, -0.42, rr, 0), crank = P(K, S.ped[0], S.ped[1], 0), seat = P(K, S.seat[0], S.seat[1] - 0.06, 0), head = P(K, 0.3, 0.72, 0), front = P(K, 0.42, rr, 0);
+    beam(B, rear, crank, 0.04, fr); beam(B, rear, seat, 0.04, fr); beam(B, crank, seat, 0.05, fr); beam(B, crank, head, 0.055, fr); beam(B, seat, head, 0.05, fr); beam(B, head, front, 0.04, chrome);
+    box(B, K, S.seat[0] - 0.12, S.seat[0] + 0.12, S.seat[1] - 0.06, S.seat[1] - 0.01, -0.06, 0.06, tire, tire);
+    beam(B, head, P(K, S.bar[0], S.bar[1], 0), 0.035, chrome); beam(B, P(K, S.bar[0], S.bar[1], -S.bar[2]), P(K, S.bar[0], S.bar[1], S.bar[2]), 0.035, chrome);
+    for (const sv of [-S.bar[2], S.bar[2]]) beam(B, P(K, S.bar[0], S.bar[1], sv), P(K, S.bar[0] - 0.06, S.bar[1], sv), 0.05, tire);
+    pedals(S.ped[0], S.ped[1], S.pr, 0.07);
+    return;
+  }
+  // bicicleta comum (como a do Portela), quadro da cor da camisa
+  const k = BIKE_PSC, rr = 0.33 * k, fr = bikeColor(p, look), steel = hex('#9aa0a6');
+  const wheel = cu => { for (let q = 0; q < 12; q++) { const a0 = q / 12 * Math.PI * 2, a1 = (q + 1) / 12 * Math.PI * 2; beam(B, P(K, cu + Math.cos(a0) * rr, rr + Math.sin(a0) * rr, 0), P(K, cu + Math.cos(a1) * rr, rr + Math.sin(a1) * rr, 0), 0.055, tire); }
+    for (let q = 0; q < 4; q++) { const b = q / 4 * Math.PI - wr; beam(B, P(K, cu - Math.cos(b) * rr * 0.92, rr - Math.sin(b) * rr * 0.92, 0), P(K, cu + Math.cos(b) * rr * 0.92, rr + Math.sin(b) * rr * 0.92, 0), 0.012, steel); } };
+  wheel(-0.52 * k); wheel(0.52 * k);
+  const rear = P(K, -0.52 * k, rr, 0), crank = P(K, S.ped[0], S.ped[1], 0), seatP = P(K, -0.18 * k, 0.92 * k, 0), head = P(K, 0.42 * k, 0.95 * k, 0), front = P(K, 0.52 * k, rr, 0);
+  beam(B, rear, crank, 0.04, fr); beam(B, rear, seatP, 0.04, fr); beam(B, crank, seatP, 0.045, fr); beam(B, crank, head, 0.05, fr); beam(B, seatP, head, 0.045, fr); beam(B, head, front, 0.04, fr);
+  box(B, K, -0.32 * k, -0.08 * k, 1.0 * k, 1.06 * k, -0.07, 0.07, tire, tire);
+  beam(B, P(K, 0.42 * k, 0.95 * k, 0), P(K, S.bar[0], S.bar[1], 0), 0.03, steel);
+  beam(B, P(K, S.bar[0], S.bar[1], -S.bar[2]), P(K, S.bar[0], S.bar[1], S.bar[2]), 0.03, steel);
+  for (const sv of [-S.bar[2], S.bar[2]]) beam(B, P(K, S.bar[0], S.bar[1], sv), P(K, S.bar[0] - 0.06, S.bar[1], sv), 0.045, tire);
+  pedals(S.ped[0], S.ped[1], S.pr, 0.08);
 }
 function bikeRig(p) {   // em cubinhos (escala PSC): quadril no selim, pés nos pedais, mãos no guidão
-  const u = 1 / (VX * PSC), hipY = BIKE_SEAT[1] * u + 0.6, hipZ = BIKE_SEAT[0] * u, lean = 0.32, ped = p.ped || 0;
-  const legs = [-1, 1].map(sd => { const a = ped + (sd > 0 ? 0 : Math.PI), py = (BIKE_PED[1] - Math.sin(a) * BIKE_PR) * u + 2.4, pz = (BIKE_PED[0] + Math.cos(a) * BIKE_PR) * u;
+  const S = BIKES[bikeKind(p)], u = 1 / (VX * PSC), hipY = S.hip[1] * u, hipZ = S.hip[0] * u, lean = S.lean, ped = p.ped || 0;
+  const legs = [-1, 1].map(sd => { const a = ped + (sd > 0 ? 0 : Math.PI), py = (S.ped[1] - Math.sin(a) * S.pr) * u + S.ank, pz = (S.ped[0] + Math.cos(a) * S.pr) * u;
     const [th, al, kb] = ik2(6, 3, pz - hipZ, py - hipY); return [th + al, kb, kb - (th + al)]; });
-  const sy = hipY + 3 + 6 * Math.cos(lean), sz = hipZ + 6 * Math.sin(lean), [ath, aal, akb] = ik2(4.5, 5, BIKE_BAR[0] * u - sz, BIKE_BAR[1] * u - sy);
+  const sy = hipY + 3 + 6 * Math.cos(lean), sz = hipZ + 6 * Math.sin(lean), [ath, aal, akb] = ik2(4.5, 5, S.bar[0] * u - sz, S.bar[1] * u - sy);
   return { y: hipY, z: hipZ, lean, legs, sw: ath - aal + lean, el: akb };
 }
 function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   let SHIRT_ = look.shirt; const CAR_ = look.car;
-  if (p.car) bikeMesh(B, p);   // de bicicleta: desenha a bike e o personagem pedalando
+  if (p.car) bikeMesh(B, p, look);   // de bicicleta: desenha a bike e o personagem pedalando
   const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : sk === 'biblia' ? hex('#b98563') : sk === 'lucas' ? hex('#cf9c78') : sk === 'camila' ? hex('#d9a587') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : floorAt(p.x, p.z) + 0.02 + (p.jy || 0) + (p.climbY || 0), p.z, p.a), PSC);
@@ -4373,6 +4402,7 @@ window.__net = (function () {
       let da = o.ta - o.a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; o.a += da * k;
       const v = Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
       o.speed += (v - o.speed) * Math.min(1, dt * 6); o.walk += dt * o.speed * 2.3;
+      if (o.car) { o.ped = (o.ped || 0) + dt * o.speed / 0.25 / 2.2; o.wr = (o.wr || 0) + dt * o.speed / 0.29; }   // de bicicleta: pedais e rodas giram
       { const tj = (serverNow - (o.jt || 0)) / 1000, was = o.jy || 0; o.jy = jumpArc(tj); if (was > 0 && o.jy === 0 && tj < 1.2) o.land = 0.2; if (o.land > 0) o.land -= dt; }
       const vis = H.vis(uid, o);
       o.gun = H.code && H.role(uid) === 'seeker' && H.phase() === 'seek' ? o.ap : undefined;
@@ -4839,7 +4869,7 @@ function step(dt) {
     const nx = player.x + fx * player.cv * dt, nz = player.z + fz * player.cv * dt;
     const f0 = floorAt(player.x, player.z), ok = freeAt(nx, nz, 0.35) && freeAt(nx + fx * 0.7, nz + fz * 0.7, 0.3) && freeAt(nx - fx * 0.6, nz - fz * 0.6, 0.3) && floorAt(nx + fx * 0.7, nz + fz * 0.7) <= f0 + 0.45;
     if (ok) { player.x = nx; player.z = nz; } else player.cv *= -0.2;
-    player.wr = (player.wr || 0) + player.cv * dt / 0.25; player.ped = (player.ped || 0) + player.cv * dt / 0.25 / 2.2;   // rodas e pedais giram com a velocidade
+    player.wr = (player.wr || 0) + player.cv * dt / BIKES[bikeKind(player)].wr; player.ped = (player.ped || 0) + player.cv * dt / 0.25 / 2.2;   // rodas e pedais giram com a velocidade
     // camera auto-follow behind the car
     cam.follow = Math.max(0, cam.follow - dt);
     if (cam.follow <= 0 && Math.abs(player.cv) > 1) {
@@ -4894,7 +4924,7 @@ function frame_() {
   dynB.reset();
   if (!cam.fp && !(window.__net && window.__net.drawMe && window.__net.drawMe(dynB))) buildPlayer(dynB, player, MY_LOOK);
   if (cam.fp && player.car) { const K = frame(player.x, floorAt(player.x, player.z) + 0.02, player.z, player.a), c = hex('#e3e6ea');   // guidão em primeira pessoa
-    beam(dynB, P(K, BIKE_BAR[0], BIKE_BAR[1], -BIKE_BAR[2]), P(K, BIKE_BAR[0], BIKE_BAR[1], BIKE_BAR[2]), 0.035, c); beam(dynB, P(K, 0.3, 0.72, 0), P(K, BIKE_BAR[0], BIKE_BAR[1], 0), 0.035, c); }
+    const S = BIKES[bikeKind(player)]; beam(dynB, P(K, S.bar[0], S.bar[1], -S.bar[2]), P(K, S.bar[0], S.bar[1], S.bar[2]), 0.035, c); }
   if (window.__net) window.__net.frame(dynB, dt);
   for (const f of FLY_SPOTS) for (let k = 0; k < 7; k++) {
     const ph = t * (2.2 + k * 0.37) + k * 1.9, r = 0.25 + 0.18 * Math.sin(t * 1.3 + k);
@@ -5051,7 +5081,7 @@ window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, D
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120130351";
+  const BUILD = "v20261120130836";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
