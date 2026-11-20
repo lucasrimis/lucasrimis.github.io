@@ -315,7 +315,14 @@ const DOGS = [];
 const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa', labrador: 'Balu', pastor: 'Zatara', golden: 'Laica' };         // cachorros soltos em quintais (andam sozinhos)
 // relógio do jogo: 1 hora do jogo = 1 minuto real (o dia inteiro dura 24 minutos), igual para todos os jogadores
 const DAY_SEC = 24 * 60;
-function gameClock() { const sec = Date.now() / 1000 + (window.__timeShift || 0); const day = Math.floor(sec / DAY_SEC); return { day, h: (sec - day * DAY_SEC) / 60, sec, dayStart: day * DAY_SEC }; }
+let CLOCK_OFF = 0;   // diferença para o relógio do servidor quando online: todos veem o mesmo horário e as mesmas animações
+function nowMs() { return Date.now() + CLOCK_OFF; }
+function srand(a, b) { let h = Math.imul((a | 0) + 0x9e3779b9, 2654435761) ^ Math.imul((b | 0) + 0x85ebca6b, 1597334677); h = Math.imul(h ^ h >>> 15, 2246822519); h = Math.imul(h ^ h >>> 13, 3266489917); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+// todos os jogadores que o mundo enxerga (eu + os do online): cães, portões, carros e NPCs reagem ao mais perto
+function allPlayers() { const L = [player], o = window.__net && window.__net.othersList && window.__net.othersList(); if (o) for (const p of o) L.push(p); return L; }
+function nearestP(x, z) { let b = player, bd = 1e9; for (const p of allPlayers()) { const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; b = p; } } return { p: b, d: bd }; }
+let WORLD_PUPPET = false;   // online e outro jogador é o "dono" do mundo: aqui só mostramos o que ele manda
+function gameClock() { const sec = nowMs() / 1000 + (window.__timeShift || 0); const day = Math.floor(sec / DAY_SEC); return { day, h: (sec - day * DAY_SEC) / 60, sec, dayStart: day * DAY_SEC }; }
 let PEAK_A = -Math.PI / 2;   // direção (a partir do centro do mapa) do pico mais alto da serra: o sol nasce e se põe atrás dele
 let PORTELA_PARK = null;     // onde a bicicleta do Portela fica parada
 let GATE116 = null;          // portão de correr da casa 116
@@ -2743,13 +2750,14 @@ const RNET = (() => {
   let changed = true; const live = new Set(nodes.values());
   while (changed) { changed = false; for (const n of live) { const deg = n.e.filter(e => live.has(e.n)).length; if (deg < 2) { live.delete(n); changed = true; } } }
   for (const n of live) n.e = n.e.filter(e => live.has(e.n));
-  return [...live];
+  const arr = [...live]; arr.forEach((n, i) => n.i = i); return arr;
 })();
 function carNext(c) {   // escolhe a próxima rua no cruzamento (sem voltar pela mesma)
   const n = c.b, opts = n.e.filter(e => e.n !== c.a);
   const ain = Math.atan2(c.b.z - c.a.z, c.b.x - c.a.x);
   const w = opts.map(e => { let tr = Math.atan2(e.n.z - n.z, e.n.x - n.x) - ain; while (tr > Math.PI) tr -= 2 * Math.PI; while (tr < -Math.PI) tr += 2 * Math.PI; return Math.abs(tr) < 0.35 ? 3 : Math.abs(tr) < 2.4 ? 1 : 0.05; });
-  let sum = w.reduce((p, q) => p + q, 0), k = Math.random() * sum, e = opts[0];
+  c.rc = (c.rc | 0) + 1;
+  let sum = w.reduce((p, q) => p + q, 0), k = srand(c.id * 131 + 7, c.rc) * sum, e = opts[0];
   for (let i = 0; i < opts.length; i++) { k -= w[i]; if (k <= 0) { e = opts[i]; break; } }
   if (!e) e = n.e[0];
   c.a = n; c.b = e.n; c.L = e.L; c.h = e.h; c.t = e.t; c.s = 0;
@@ -2758,7 +2766,7 @@ function carNext(c) {   // escolhe a próxima rua no cruzamento (sem voltar pela
   const r = rngFor(3, 1, 4);
   if (RNET.length) for (let i = 0; i < 34; i++) {
     const a = RNET[Math.floor(r() * RNET.length)], e = a.e[Math.floor(r() * a.e.length)];
-    traffic.push({ a, b: e.n, L: e.L, h: e.h, t: e.t, s: r() * e.L, vmax0: e.t === 'secondary' ? 11 + r() * 5 : 6 + r() * 4, v: 0, col: jit(pick(CARS, r), r, 0.05), x: 0, z: 0, a_: 0, ad: null });
+    traffic.push({ id: i, rc: 0, a, b: e.n, L: e.L, h: e.h, t: e.t, s: r() * e.L, vmax0: e.t === 'secondary' ? 11 + r() * 5 : 6 + r() * 4, v: 0, col: jit(pick(CARS, r), r, 0.05), x: 0, z: 0, a_: 0, ad: null });
   }
 }
 function placeCar(c) {
@@ -3441,15 +3449,16 @@ function buildDog(B, d, t) {
 // ---------------- portão da casa 116 + fuga dos yorkshires ----------------
 function gateFrame(B, dt) {
   const G = GATE116; if (!G) return;
-  const c = G.WP((G.gA + G.gB) / 2, G.BV), pd = Math.hypot(player.x - c[0], player.z - c[1]);
-  if (pd < 3.4) { G.target = 1; G.farT = 0; }
+  const c = G.WP((G.gA + G.gB) / 2, G.BV), pd = nearestP(c[0], c[1]).d;
+  if (WORLD_PUPPET) G.target = G.open;   // posição vem do dono do mundo
+  else if (pd < 3.4) { G.target = 1; G.farT = 0; }
   else if (G.target === 1) {
     G.farT += dt;
     const dogInGate = DOGS.some(d => { const dx = d.x - G.T.o[0], dz = d.z - G.T.o[2], v = dx * G.T.az[0] + dz * G.T.az[2]; return Math.abs(v - G.BV) < 1.6 && (d.mode === 'escape' || d.mode === 'enter'); });
     if (G.farT > 5 && pd > 5 && !dogInGate) G.target = 0;
   }
-  G.open += Math.max(-dt * 0.55, Math.min(dt * 0.55, G.target - G.open));
-  if (!G.fired && G.open > 0.55) { G.fired = true; yorkieEscape(); }
+  if (!WORLD_PUPPET) G.open += Math.max(-dt * 0.55, Math.min(dt * 0.55, G.target - G.open));
+  if (!WORLD_PUPPET && !G.fired && G.open > 0.55) { G.fired = true; yorkieEscape(); }
   // painel do portão
   const T = G.T, s = G.open * (G.gB - G.gA - 0.15), a = G.gA - s, b = G.gB - s, BV = G.BV, HC = G.HC;
   box(B, T, a, b, -0.1, HC - 0.13, BV - 0.06, BV + 0.06, hex('#d8d6ce'), hex('#cfcdc5'));
@@ -3653,7 +3662,7 @@ function beagleRoute() {
 function beagleAt(s) { const R = BEAGLE; s = ((s % R.len) + R.len) % R.len; let i = 1; while (i < R.cum.length - 1 && R.cum[i] < s) i++; const a = R.path[i - 1], b = R.path[i], f = (s - R.cum[i - 1]) / Math.max(1e-6, R.cum[i] - R.cum[i - 1]); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, Math.atan2(b[1] - a[1], b[0] - a[0])]; }
 function gate489Frame(B, dt) {
   const G = GATE489; if (!G) return;
-  G.open += Math.max(-dt * 0.7, Math.min(dt * 0.7, G.want - G.open));
+  if (!WORLD_PUPPET) G.open += Math.max(-dt * 0.7, Math.min(dt * 0.7, G.want - G.open));
   const a = G.open * 1.45, H = yawChild(G.T, 0, 0, 0, a);   // gira para dentro do lote, dobradiça do lado esquerdo
   box(B, H, 0, G.L, 0.25, 2.15, -0.04, 0.04, G.WD, G.WD2);
   box(B, H, 0.08, G.L - 0.08, 1.2, 2.0, -0.06, -0.04, hex('#6a2a26'), hex('#6a2a26'));   // pano vermelho atrás do vidro
@@ -3685,7 +3694,7 @@ function beagleHome(R, d, dt) {
     if (walk(1.3)) { R.home = 'in'; R.closeT = 1.5; } return true; }
   if (R.home === 'in') {
     if (R.closeT > 0) { R.closeT -= dt; if (R.closeT <= 0) G.want = 0; }
-    d.spd = 0; d.sit = true; d.wag = Math.hypot(player.x - d.x, player.z - d.z) < 6 ? 1 : 0.2; d.sniff = false;
+    d.spd = 0; d.sit = true; d.wag = nearestP(d.x, d.z).d < 6 ? 1 : 0.2; d.sniff = false;
     if (!night) { R.home = 'leave'; G.want = 1; d.path = [ins, out, ...R.toHome.slice(0, -1).reverse()]; d.pi = 0; d.sit = false; R.closeAt = 2; }
     return true;
   }
@@ -3704,11 +3713,13 @@ function beagleFrame(B, dt, t) {
     R.d = { kind: 'beagle', x, z, a, ph: 0, wag: 0.5, spd: 0, look: 0 };
   }
   if (!R.path.length) return;
-  const d = R.d, pd = Math.hypot(player.x - d.x, player.z - d.z);
+  const d = R.d, pd = WORLD_PUPPET ? 99 : nearestP(d.x, d.z).d, myd = Math.hypot(player.x - d.x, player.z - d.z);
   // coçar o bumbum
-  const btn = document.getElementById('btnPet'); R.near = pd < 2.4 && !player.car;
-  if (btn) btn.style.display = R.near && R.scratch <= 0 ? '' : 'none';
-  if (R.scratch > 0) {
+  const btn = document.getElementById('btnPet'); R.near = myd < 2.4 && !player.car;
+  if (btn) btn.style.display = R.near && R.scratch <= 0 && !d.thump ? '' : 'none';
+  if (WORLD_PUPPET) {   // só mostra o que o dono do mundo manda; coraçõezinhos enquanto alguém coça
+    if (d.thump && Math.random() < dt * 5) R.hearts.push({ x: d.x + (Math.random() - 0.5) * 0.25, z: d.z + (Math.random() - 0.5) * 0.25, y: surfAt(d.x, d.z) + 0.75, life: 0 });
+  } else if (R.scratch > 0) {
     R.scratch -= dt; d.thump = true; d.sniff = false; d.wag = 1; d.spd = 0; d.sit = false;
     if (Math.random() < dt * 5) R.hearts.push({ x: d.x + (Math.random() - 0.5) * 0.25, z: d.z + (Math.random() - 0.5) * 0.25, y: surfAt(d.x, d.z) + 0.75, life: 0 });
     if (R.scratch <= 0) { d.thump = false; R.after = 2.5; }
@@ -3799,31 +3810,34 @@ function skyMsgFrame(B, t) {
   for (const sg of [-1, 1]) for (const [u, y, sz, hy] of lumps) { const uu = sg * off + u * sg; box(B, T, uu - sz, uu + sz, y - hy, y + hy, 2.5 - sz * 0.6, 2.5 + sz * 0.6, WC, SC, F_SKYF, true); }
   if (S.seen && el > L + 6.9) SKYMSG = null;
 }
-function beaglePet() { if (BEAGLE.near && BEAGLE.scratch <= 0) { BEAGLE.scratch = 3.5; const d = BEAGLE.d; d.a = Math.atan2(d.z - player.z, d.x - player.x); } }
+function beaglePetAt(x, z) { const R = BEAGLE; if (!R.d || R.scratch > 0) return; R.scratch = 3.5; R.d.a = Math.atan2(R.d.z - z, R.d.x - x); }
+function beaglePet() { if (!BEAGLE.near || BEAGLE.scratch > 0 || (BEAGLE.d && BEAGLE.d.thump)) return;
+  if (WORLD_PUPPET && window.__net && window.__net.worldEvent) window.__net.worldEvent({ k: 'pet', x: +player.x.toFixed(2), z: +player.z.toFixed(2) });   // pede ao dono do mundo
+  else beaglePetAt(player.x, player.z); }
 document.getElementById('btnPet').addEventListener('click', e => { e.stopPropagation(); beaglePet(); });
 document.getElementById('btnPet').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+function drawDog(B, d, t) { if (Math.abs(d.x - player.x) < 160 && Math.abs(d.z - player.z) < 160) buildDog(B, d, t); }
 function dogsFrame(B, dt, t) {
   for (const d of DOGS) {
     const Y = d.yard, D = DOGDEF[d.kind];
-    if (Math.hypot(d.x - player.x, d.z - player.z) > 160 && !d.mode) continue;   // fugindo: continua andando mesmo longe
     const loc = (x, z) => { const dx = x - Y.x, dz = z - Y.z; return [dx * Y.u[0] + dz * Y.u[1], dx * Y.v[0] + dz * Y.v[1]]; };
     const inside = (x, z) => { const [u, v] = loc(x, z); return u > Y.u0 && u < Y.u1 && v > Y.v0 && v < Y.v1 && !(u > Y.nu0 && u < Y.nu1 && v < Y.nv) && freeAt(x, z, 0.25); };
-    const pd = Math.hypot(player.x - d.x, player.z - d.z);
+    const NP = nearestP(d.x, d.z), pd = NP.d, PP = NP.p;
     let want = 0;
-    if (d.mode === 'escape') { if (dogRun(d, dt, 4.2)) { d.mode = 'wait'; d.spd = 0; } d.look = 0; buildDog(B, d, t); continue; }
+    if (d.mode === 'escape') { if (dogRun(d, dt, 4.2)) { d.mode = 'wait'; d.spd = 0; } d.look = 0; drawDog(B, d, t); continue; }
     if (d.mode === 'wait') {   // esperando na frente do portão
       d.spd = 0; d.sit = !(pd < 7); d.wag = pd < 7 ? 1 : 0.4;
       let rel = Math.atan2(GATE116.WP(0, 9)[1] - d.z, GATE116.WP(0, 9)[0] - d.x);
-      if (pd < 7) rel = Math.atan2(player.z - d.z, player.x - d.x);
+      if (pd < 7) rel = Math.atan2(PP.z - d.z, PP.x - d.x);
       let tr = rel - d.a; while (tr > Math.PI) tr -= 2 * Math.PI; while (tr < -Math.PI) tr += 2 * Math.PI; d.a += Math.max(-dt * 3, Math.min(dt * 3, tr));
       if (GATE116.open > 0.9) { const G = GATE116, cu = (G.gA + G.gB) / 2, g = G.WP(cu, G.BV), m = G.WP(cu, G.MV + 0.2), ins = G.WP(cu + (d.kind === 'yorkie' ? -1 : 1), G.BV + 2.4);
         d.mode = 'enter'; d.pi = 0; d.delay = d.kind === 'yorkie' ? 0 : 0.6; d.path = [[m[0], m[1]], [g[0], g[1]], [ins[0], ins[1]]]; d.sit = false; }
-      buildDog(B, d, t); continue;
+      drawDog(B, d, t); continue;
     }
-    if (d.mode === 'enter') { if (dogRun(d, dt, 2.6)) { d.mode = null; d.tx = d.x; d.tz = d.z; d.wait = 1.5; } buildDog(B, d, t); continue; }
+    if (d.mode === 'enter') { if (dogRun(d, dt, 2.6)) { d.mode = null; d.tx = d.x; d.tz = d.z; d.wait = 1.5; } drawDog(B, d, t); continue; }
     if (pd < 7) {            // alguém chegou perto: para, olha e abana o rabo
       d.wait = Math.max(d.wait, 0.5); d.spd = 0;
-      let rel = Math.atan2(player.z - d.z, player.x - d.x) - d.a; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+      let rel = Math.atan2(PP.z - d.z, PP.x - d.x) - d.a; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
       if (Math.abs(rel) > 0.9) d.a += Math.sign(rel) * Math.min(Math.abs(rel) - 0.9, dt * 3);
       want = Math.max(-0.8, Math.min(0.8, rel)); d.wag = Math.min(1, d.wag + dt * 3); d.sit = false;
     } else if (d.wait > 0) {
@@ -3840,9 +3854,65 @@ function dogsFrame(B, dt, t) {
       }
     }
     d.look = (d.look || 0) + (want - (d.look || 0)) * Math.min(1, dt * 5);
-    buildDog(B, d, t);
+    drawDog(B, d, t);
   }
 }
+// ---------------- mundo sincronizado no online ----------------
+// Um jogador online é o "dono do mundo": ele simula cães, Pantufa, portões e carros e manda o estado ~4x por segundo.
+// Os outros mostram esse estado (com interpolação) — assim todos veem as mesmas coisas ao mesmo tempo.
+const WSYNC = { buf: [], delay: 320 };
+const r2 = v => Math.round(v * 100) / 100, r1 = v => Math.round(v * 10) / 10;
+function worldEncDogs() {
+  const dog = d => [r2(d.x), r2(d.z), r2(d.a), r1(d.spd || 0), (d.sit ? 1 : 0) | (d.sniff ? 2 : 0) | (d.thump ? 4 : 0), r1(d.wag || 0), r2(d.look || 0)];
+  const R = BEAGLE, b = R.d ? dog(R.d).concat([r1(R.s || 0), ['out', 'going', 'enter', 'in', 'leave'].indexOf(R.home)]) : null;
+  return JSON.stringify({ d: DOGS.map(dog), b, g: [r2(GATE116 ? GATE116.open : 0), r2(GATE489 ? GATE489.open : 0), GATE116 && GATE116.fired ? 1 : 0] });
+}
+function worldRecvDogs(ts, str) {
+  let v; try { v = JSON.parse(str); } catch (e) { return; }
+  if (!v || !Array.isArray(v.d)) return;
+  WSYNC.buf.push({ ts, v }); WSYNC.buf.sort((a, b) => a.ts - b.ts); while (WSYNC.buf.length > 12) WSYNC.buf.shift();
+}
+function worldPuppetApply(dt) {
+  const B_ = WSYNC.buf; if (!B_.length) return;
+  const rt = nowMs() - WSYNC.delay; let s0 = B_[0], s1 = B_[0];
+  for (let i = 0; i < B_.length; i++) { if (B_[i].ts <= rt) s0 = B_[i]; if (B_[i].ts >= rt) { s1 = B_[i]; break; } s1 = B_[i]; }
+  const k = s1.ts > s0.ts ? Math.max(0, Math.min(1, (rt - s0.ts) / (s1.ts - s0.ts))) : 1;
+  const la = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * k; };
+  const put = (d, a, b) => { if (!a || !b) return;
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 6) a = b;   // teleporte (ex.: entrou em casa): não arrasta
+    d.x = a[0] + (b[0] - a[0]) * k; d.z = a[1] + (b[1] - a[1]) * k; d.a = la(a[2], b[2]); d.spd = a[3] + (b[3] - a[3]) * k;
+    d.sit = !!(b[4] & 1); d.sniff = !!(b[4] & 2); d.thump = !!(b[4] & 4); d.wag = b[5]; d.look = a[6] + (b[6] - a[6]) * k;
+    d.ph = (d.ph || 0) + dt * d.spd * (d.kind && d.kind.startsWith('yorkie') ? 22 : d.spd > 2 ? 22 : 12); };
+  DOGS.forEach((d, i) => put(d, s0.v.d[i], s1.v.d[i]));
+  const R = BEAGLE; if (R.d && s1.v.b) { put(R.d, s0.v.b || s1.v.b, s1.v.b); R.s = s1.v.b[7]; const hm = ['out', 'going', 'enter', 'in', 'leave'][s1.v.b[8]]; R.home = hm; R.scratch = 0; }
+  const g0 = s0.v.g || [0, 0, 0], g1 = s1.v.g || g0;
+  if (GATE116) { GATE116.open = g0[0] + (g1[0] - g0[0]) * k; GATE116.target = GATE116.open; if (g1[2]) GATE116.fired = true; }
+  if (GATE489) { GATE489.open = g0[1] + (g1[1] - g0[1]) * k; GATE489.want = GATE489.open; }
+}
+function worldPuppetFrame(B, dt, t) { for (const d of DOGS) drawDog(B, d, t); }
+function worldEncCars() { return JSON.stringify(traffic.map(c => [c.a.i, c.b.i, r1(c.s), r1(c.v), c.rc | 0])); }
+function worldRecvCars(ts, str) {
+  let v; try { v = JSON.parse(str); } catch (e) { return; }
+  if (!Array.isArray(v)) return;
+  const lag = Math.max(0, Math.min(2, (nowMs() - ts) / 1000));
+  traffic.forEach((c, i) => { const q = v[i]; if (!q) return; const A = RNET[q[0]], Bn = RNET[q[1]]; if (!A || !Bn) return;
+    const sp = q[2] + q[3] * lag;
+    if (c.a === A && c.b === Bn && Math.abs(sp - c.s) < 5) { c.corr = sp - c.s; c.v = q[3]; c.rc = q[4]; return; }   // mesma rua: corrige devagar
+    const e = A.e.find(e => e.n === Bn); if (!e) return;
+    c.a = A; c.b = Bn; c.L = e.L; c.h = e.h; c.t = e.t; c.s = Math.min(sp, e.L - 0.01); c.v = q[3]; c.rc = q[4]; c.corr = 0; c.ad = null;
+    let g = 0; while (c.s >= c.L && g++ < 4) { const over = c.s - c.L; carNext(c); c.s = over; }
+  });
+}
+function worldSetPuppet(on) {
+  if (on === WORLD_PUPPET) return;
+  WORLD_PUPPET = on;
+  if (!on) {   // virei o dono do mundo: continua a partir do que estava vendo
+    for (const d of DOGS) { if (d.mode === 'escape' || d.mode === 'enter') continue; d.tx = d.x; d.tz = d.z; d.wait = 1; d.mode = d.mode || null; d.thump = false; }
+    const R = BEAGLE; if (R.d) { R.stop = 0; R.after = 0; R.scratch = 0; R.d.thump = false; if (R.home === 'enter' || R.home === 'leave' || R.home === 'going') R.home = undefined; }
+    WSYNC.buf.length = 0;
+  }
+}
+window.__world = { encDogs: worldEncDogs, recvDogs: worldRecvDogs, encCars: worldEncCars, recvCars: worldRecvCars, puppet: worldSetPuppet, pet: (x, z) => beaglePetAt(x, z), setClock: off => { CLOCK_OFF = off || 0; } };
 // ---------------- Portela: volta de bicicleta pelo bairro, 2x por dia (07:30 e 16:30 do jogo) ----------------
 const RIDE_TIMES = [7.5, 16.5], RIDE_SPEED = 5.2, RIDE_SAYS = ['Opa! Tô dando minha volta de bicicleta!', 'Bom dia! Já já eu volto pra guarita.', 'Olha a bicicleta passando, hein!', 'Hoje o bairro tá tranquilo, viu?'];
 let ROAD_G = null;
@@ -3993,7 +4063,7 @@ window.__net = (function () {
     if (!window.firebase) { await load(V + 'firebase-app-compat.js'); await load(V + 'firebase-auth-compat.js'); await load(V + 'firebase-database-compat.js'); }
     if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(CFG);
     if (!N.uid) { const cred = await firebase.auth().signInAnonymously(); N.uid = cred.user.uid; }
-    if (!N.db) { N.db = firebase.database(); N.db.ref('.info/serverTimeOffset').on('value', s => { N.offset = s.val() || 0; }); }
+    if (!N.db) { N.db = firebase.database(); N.db.ref('.info/serverTimeOffset').on('value', s => { N.offset = s.val() || 0; if (N.online && window.__world) window.__world.setClock(N.offset); }); }
   };
   async function connect(name, base) {
     await N.ready();
@@ -4044,14 +4114,14 @@ window.__net = (function () {
       const target = v.u === N.uid ? N.meBub : N.others.get(v.u);
       say(v.u === N.uid ? null : target, v.m, v.u);
     });
-    N.online = true; onl.style.display = 'flex'; $('btnLeave').textContent = 'SAIR'; $('btnLeave').classList.remove('join'); $('btnChat').style.display = '';
+    N.online = true; try { N.worldStart(); } catch (e) { console.error(e); } onl.style.display = 'flex'; $('btnLeave').textContent = 'SAIR'; $('btnLeave').classList.remove('join'); $('btnChat').style.display = '';
     if (!N.base) sys('Você está online. Aperte Enter (ou CHAT) para falar.');
   }
   // sair do online: volta ao modo sozinho no mesmo lugar
   N.leave = async () => {
     if (!N.online) return;
     N.tg({ t: 'leave', n: N.name, r: N.base ? N.base.split('/')[1] : '' });
-    N.online = false;
+    N.online = false; N.worldStop();
     try { N.players.off(); N.chatQ.off(); N.connRef.off(); N.me.onDisconnect().cancel(); await N.me.remove(); } catch (e) { console.error(e); }
     for (const o of N.others.values()) { o.el.remove(); if (o.bub) o.bub.remove(); }
     N.others.clear();
@@ -4507,6 +4577,38 @@ window.__net = (function () {
   $('btnJoin').onclick = () => { const c = $('roomIn').value.toUpperCase().replace(/[^A-Z]/g, ''); if (c.length !== 6) { msgEl.textContent = 'O código tem 6 letras.'; return; } enterRoom(c, false); };
   $('roomIn').addEventListener('input', () => { const i = $('roomIn'), v = i.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6); if (i.value !== v) i.value = v; });
   $('roomIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnJoin').click(); });
+  // ---- mundo compartilhado: um "dono" simula e manda o estado; os outros mostram ----
+  N.othersList = () => N.online ? [...N.others.values()] : null;
+  N.worldStart = () => {
+    const W = N.db.ref('rooms/_mundo/meta'), sNow = () => Date.now() + N.offset, STALE = 5000; N.W = W; N.isHost = false; N.wh = null; N.evT = sNow();
+    window.__world.setClock(N.offset);
+    W.child('host').set('-').catch(() => {});   // as regras de rooms/* liberam escrita quando o 'host' da sala não está nela
+    const setHost = me => { if (me === N.isHost) return; N.isHost = me;
+      if (me) W.child('h').onDisconnect().remove(); else W.child('h').onDisconnect().cancel();
+      window.__world.puppet(!me); };
+    W.child('h').on('value', s => { N.wh = s.val(); setHost(!!(N.wh && N.wh.u === N.uid)); if (N.wh && N.wh.u !== N.uid) window.__world.puppet(true); });
+    W.child('d').on('value', s => { const v = s.val(); if (v && !N.isHost && typeof v.v === 'string' && typeof v.s === 'number') window.__world.recvDogs(v.s, v.v); });
+    W.child('c').on('value', s => { const v = s.val(); if (v && !N.isHost && typeof v.v === 'string' && typeof v.s === 'number') window.__world.recvCars(v.s, v.v); });
+    W.child('e').on('value', s => { const v = s.val(); if (!v || typeof v.t !== 'number' || v.t <= N.evT) return; N.evT = v.t;
+      if (N.isHost && v.k === 'pet' && typeof v.x === 'number') window.__world.pet(v.x, v.z); });
+    let k = 0;
+    N.wTimer = setInterval(() => {
+      if (!N.online) return; k++;
+      const stale = !N.wh || sNow() - (N.wh.t || 0) > STALE;
+      if (N.isHost) {
+        W.child('d').set({ s: sNow(), v: window.__world.encDogs() }).catch(() => {});
+        if (k % 4 === 0) { W.child('c').set({ s: sNow(), v: window.__world.encCars() }).catch(() => {}); W.child('h').set({ u: N.uid, t: sNow() }).catch(() => {}); }
+      } else if (stale) {   // ninguém cuidando do mundo (ou o dono sumiu / está com a aba em segundo plano): assumo
+        W.child('h').transaction(cur => (!cur || cur.u === N.uid || sNow() - (cur.t || 0) > STALE) ? { u: N.uid, t: sNow() } : undefined).catch(() => {});
+      }
+    }, 250);
+  };
+  N.worldStop = () => {
+    clearInterval(N.wTimer); const W = N.W; if (!W) return;
+    try { W.child('h').off(); W.child('d').off(); W.child('c').off(); W.child('e').off(); if (N.isHost) { W.child('h').onDisconnect().cancel(); W.child('h').remove(); } } catch (e) { console.error(e); }
+    N.isHost = false; N.W = null; window.__world.puppet(false); window.__world.setClock(0);
+  };
+  N.worldEvent = ev => { if (N.W) N.W.child('e').set(Object.assign({ u: N.uid, t: Date.now() + N.offset }, ev)).catch(() => {}); };
   return N;
 })();
 
@@ -4580,10 +4682,11 @@ function step(dt) {
   // traffic
   for (const c of traffic) {
     placeCar(c);
-    const dx = player.x - c.x, dz = player.z - c.z, d = Math.hypot(dx, dz);
-    const ahead = (dx * Math.cos(c.a_) + dz * Math.sin(c.a_)) > 0;
+    let block = false;   // para se tiver alguém (qualquer jogador) logo à frente
+    for (const p of allPlayers()) { const dx = p.x - c.x, dz = p.z - c.z; if (dx * dx + dz * dz < 81 && (dx * Math.cos(c.a_) + dz * Math.sin(c.a_)) > 0) { block = true; break; } }
+    if (c.corr) { const k = Math.min(1, dt * 3), m = c.corr * k; c.s += m; c.corr -= m; if (Math.abs(c.corr) < 0.01) c.corr = 0; }
     const vmax = c.t === 'secondary' ? c.vmax0 : Math.min(c.vmax0, 10);
-    const tv = (d < 9 && ahead) ? 0 : vmax;
+    const tv = block ? 0 : vmax;
     c.v += (tv - c.v) * Math.min(1, dt * (tv < c.v ? 4 : 1));
     c.s += c.v * dt;
     let guard = 0; while (c.s >= c.L && guard++ < 8) { const over = c.s - c.L; carNext(c); c.s = over; }
@@ -4593,7 +4696,7 @@ function frame_() {
   const now = performance.now();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   step(dt);
-  const t = (now - T0) / 1000;
+  const t = (nowMs() / 1000) % 3600;   // tempo das animações vem do relógio compartilhado
   // dynamic mesh
   dynB.reset();
   if (!cam.fp && !(window.__net && window.__net.drawMe && window.__net.drawMe(dynB))) buildPlayer(dynB, player, MY_LOOK);
@@ -4615,9 +4718,9 @@ function frame_() {
       const poi = POIS.find(p => p.n === 'Portela'); if (poi && (poi.x !== n.x || poi.z !== n.z)) { poi.x = n.x; poi.z = n.z; poi.gy = undefined; }
       if (!n.riding && PORTELA_PARK) buildProp(dynB, 'bike', PORTELA_PARK.x, PORTELA_PARK.z, PORTELA_PARK.a, { y: PORTELA_PARK.y });
     }
-    const dx = player.x - n.x, dz = player.z - n.z, dd = Math.hypot(dx, dz);
+    const dx = player.x - n.x, dz = player.z - n.z, dd = Math.hypot(dx, dz), NPn = nearestP(n.x, n.z);
     let want = 0;
-    if (dd < 14) { want = Math.atan2(dz, dx) - n.base; while (want > Math.PI) want -= 2 * Math.PI; while (want < -Math.PI) want += 2 * Math.PI; want = Math.max(-1.3, Math.min(1.3, want)); }
+    if (NPn.d < 14) { want = Math.atan2(NPn.p.z - n.z, NPn.p.x - n.x) - n.base; while (want > Math.PI) want -= 2 * Math.PI; while (want < -Math.PI) want += 2 * Math.PI; want = Math.max(-1.3, Math.min(1.3, want)); }
     n.look += (want - n.look) * Math.min(1, dt * 4);
     if (n.riding) buildRider(dynB, n, t); else buildNPC(dynB, n, t);
     // speech bubble
@@ -4625,12 +4728,13 @@ function frame_() {
     if (dd > (n.r || 6) + 2) n.near = false;
     n.show = dd < (n.r || 6);
   }
+  if (WORLD_PUPPET) worldPuppetApply(dt);
   gateFrame(dynB, dt);
   vhsFrame(dynB, t);
   gate489Frame(dynB, dt);
   beagleFrame(dynB, dt, t);
   benchFrame();
-  dogsFrame(dynB, dt, t);
+  if (WORLD_PUPPET) worldPuppetFrame(dynB, dt, t); else dogsFrame(dynB, dt, t);
   { const SKY = window.__sky = skyState();
     if (SKY.night > 0.05) for (const p of PROPS) if ((p.k === 'luminaria' || p.k === 'poste') && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
       const T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), g = Math.round(150 + 105 * SKY.night), c = [g, Math.round(g * 0.86), Math.round(g * 0.6)];
@@ -4758,7 +4862,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261119223553";
+  const BUILD = "v20261120014203";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
