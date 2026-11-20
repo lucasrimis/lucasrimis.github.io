@@ -198,7 +198,7 @@
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
+  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnJump" aria-label="Pular">⤴️<span>PULAR</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
 </div>
 <div id="online" class="panel" style="display:none"><span id="onlineTxt"></span><button id="btnLeave">SAIR</button></div>
 <div id="chatLog"></div>
@@ -2714,7 +2714,7 @@ function lampState(S, cx, cz) {   // os 8 postes de luz mais próximos acendem a
   for (let i = 0; i < Math.min(8, L.length); i++) { const p = L[i], T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), q = p.k === 'poste' ? P(T, 2.7, 7.2, 0) : P(T, 1.75, 6.3, 0); out.set([q[0], q[1], q[2], 1.0], i * 4); }
   return out;
 }
-const player = { x: W.spawn[0], z: W.spawn[1], a: 0, va: 0, walk: 0, speed: 0, car: false, cv: 0 };
+const player = { x: W.spawn[0], z: W.spawn[1], a: 0, va: 0, walk: 0, speed: 0, car: false, cv: 0, jy: 0, jv: 0, jt: 0, land: 0 };
 // face along the road at spawn
 {
   let best = 1e9, ang = 0;
@@ -2795,6 +2795,7 @@ addEventListener('keydown', e => {
   if (!e.repeat && window.__hunt && window.__hunt.key(e.code)) { e.preventDefault(); return; }
   keys[e.code] = true;
   if (e.code === 'KeyC') toggleCar();
+  if (e.code === 'Space' && !e.repeat) playerJump();
   if (e.code === 'KeyV') setFP(!cam.fp);
   if (e.code === 'KeyP') { pixel = pixel === 2 ? 3 : pixel === 3 ? 4 : 2; try { localStorage.setItem('mdc_px', String(pixel)); } catch (er) {} resize(); }
   if (e.code === 'KeyM') document.getElementById('mini').classList.toggle('big');
@@ -2866,6 +2867,14 @@ cv.addEventListener('touchend', e => {
   }
 });
 document.getElementById('btnCar').addEventListener('click', toggleCar);
+// pulo: baixo (~60 cm), não atravessa muros; não pula dirigindo nem sentado
+const JUMP_V = 4.1, JUMP_G = 14;
+function playerJump() {
+  if (player.car || player.sit || player.jy > 0.001 || player.jv > 0) return;
+  player.jv = JUMP_V; player.jt = Date.now() + CLOCK_OFF; if (window.__net) window.__net.force = true;
+}
+function jumpArc(tSec) { return tSec > 0 && tSec < 2 * JUMP_V / JUMP_G ? JUMP_V * tSec - 0.5 * JUMP_G * tSec * tSec : 0; }
+{ const bj = document.getElementById('btnJump'); if (bj) bj.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); playerJump(); }); }
 
 try { if (localStorage.getItem('mdc_fp') === '1') setTimeout(() => setFP(true), 0); } catch (e) {}
 { const m = document.getElementById('mini'); m.addEventListener('click', e => { e.stopPropagation(); m.classList.toggle('big'); }); m.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); }
@@ -3087,7 +3096,7 @@ function buildPlayerVox(B, p, look, sk, SKN) {
   const foot = vxPart('ft', b => { b(-1, 1, -3, -3, -2, 3, hex('#3a3a3a')); b(-1, 1, -2, -1, -1, 3, (x, y, z) => z === 3 && y === -1 ? hex('#c8c8c8') : SHOE); });
   // animação
   const t = performance.now() / 1000, w = p.sit ? 0 : Math.min(1, (p.speed || 0) / 3), ph = p.walk || 0, s_ = Math.sin(ph), c_ = Math.cos(ph), br = Math.sin(t * 1.8 + (p.x || 0)) * (1 - w);
-  const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08;
+  const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08 - (p.land > 0 ? Math.sin(p.land / 0.2 * Math.PI) * 1.1 : 0);   // amortece a queda
   const root = { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
   const out = [[pelvis, root]];
   const tor = vX(root, [0, 3, 0], vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.015)));
@@ -3099,12 +3108,14 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
     let hip, knee, ank;
     if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
+    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
     else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
     const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
     out.push([thigh, th], [shin, shn], [foot, ft]);
     const armed = p.gun !== undefined && sd < 0, bib = sk === 'biblia' && sd > 0;
     let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.18 + w * (0.25 + 0.3 * Math.max(0, -ls));
     if (p.sit) { sw = 0.35; el = 0.6; }
+    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
     if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
     if (bib) { sw = 0.45 + br * 0.02; el = 1.25; }
     const ua = vX(tor, [sd * 4.5, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : 0.06 + 0.02 * br))));
@@ -3112,7 +3123,7 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
     out.push([uArm, off(ua)], [armed ? fArmGun : bib ? fArmBib : fArm, off(fa)]);
   }
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02 + (p.jy || 0), p.z, p.a), PSC);
   vxDraw(B, T, out);
 }
 // ================= Lucas / Rimis: musculoso, sem camisa, short e chinelo; cabeça raspada, bigodão, barba rala, brinco, tatuagens =================
@@ -3181,7 +3192,7 @@ function buildLucasVox(B, p, SKN, LS, LS2, LSH, LSH2, INK, INK2) {
 function rigVox(B, p, Pt, shX) {
   const { pelvis, torso, head, glasses, thigh, shin, foot, uArm, fArmL, fArmR, fArmGun } = Pt;
   const t = performance.now() / 1000, w = p.sit ? 0 : Math.min(1, (p.speed || 0) / 3), ph = p.walk || 0, s_ = Math.sin(ph), c_ = Math.cos(ph), br = Math.sin(t * 1.8 + (p.x || 0)) * (1 - w);
-  const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08;
+  const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08 - (p.land > 0 ? Math.sin(p.land / 0.2 * Math.PI) * 1.1 : 0);   // amortece a queda
   const root = { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
   const out = [[pelvis, root]];
   const tor = vX(root, [0, 3, 0], vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.02)));
@@ -3193,19 +3204,21 @@ function rigVox(B, p, Pt, shX) {
     const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
     let hip, knee, ank;
     if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
+    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
     else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
     const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
     out.push([thigh, th], [shin, shn], [foot, ft]); if (Pt.coat) out.push([Pt.coat, th]);
     const armed = p.gun !== undefined && sd < 0;
     let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.22 + w * (0.25 + 0.3 * Math.max(0, -ls));
     if (p.sit) { sw = 0.35; el = 0.6; }
+    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
     if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
     const ua = vX(tor, [sd * shX, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : (shX > 5 ? 0.14 : 0.06) + 0.02 * br))));
     const fa = vX(ua, [0, -4.5, 0], vRx(el));
     const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
     out.push([uArm, off(ua)], [armed ? fArmGun : sd > 0 ? fArmL : fArmR, off(fa)]);
   }
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02 + (p.jy || 0), p.z, p.a), PSC);
   vxDraw(B, T, out);
 }
 
@@ -3263,7 +3276,7 @@ function buildPlayer(B, p, look) {
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
   const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : sk === 'biblia' ? hex('#b98563') : sk === 'lucas' ? hex('#cf9c78') : sk === 'camila' ? hex('#d9a587') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02, p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02 + (p.jy || 0), p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
   const bob = Math.abs(Math.cos(p.walk)) * 0.06 * Math.min(1, p.speed / 3);
   const Tb = { o: [T.o[0], T.o[1] + bob, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
@@ -4175,7 +4188,7 @@ window.__net = (function () {
       if (o.sh !== undefined && v.sh && v.sh !== o.sh) H.onShot(s.key, o, v.sh);
       o.sh = v.sh || '';
       o.pr = v.pr || ''; o.pa = typeof v.pa === 'number' ? v.pa : 0; o.pc = typeof v.pc === 'string' && v.pc ? v.pc.split(',').map(Number) : null; o.ps = v.ps || 1; o.hp = typeof v.hp === 'number' ? v.hp : undefined; o.tt = v.tt || 0;
-      o.tx = v.x; o.tz = v.z; o.ta = v.a || 0; o.car = !!v.car; o.n = String(v.n || '?').slice(0, 16); o.look = LOOKS[(v.c | 0) % LOOKS.length] || LOOKS[0]; o.t = v.t || 0;
+      o.tx = v.x; o.tz = v.z; o.ta = v.a || 0; o.jt = typeof v.jt === 'number' ? v.jt : 0; o.car = !!v.car; o.n = String(v.n || '?').slice(0, 16); o.look = LOOKS[(v.c | 0) % LOOKS.length] || LOOKS[0]; o.t = v.t || 0;
       o.el.textContent = o.n; o.el.style.borderColor = LOOK_CSS[(v.c | 0) % LOOK_CSS.length];
     };
     players.on('child_added', upsert); players.on('child_changed', upsert);
@@ -4292,9 +4305,9 @@ window.__net = (function () {
   N.frame = (B, dt) => {
     const now = performance.now();
     if (N.online && now - lastSend > 125) {
-      const st = Object.assign({ x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0 }, H.fields());
+      const st = Object.assign({ x: +player.x.toFixed(2), z: +player.z.toFixed(2), a: +player.a.toFixed(3), car: player.car ? 1 : 0, jt: player.jt || 0 }, H.fields());
       const hk = JSON.stringify(H.fields());
-      const moved = N.force || !lastSent || Math.abs(st.x - lastSent.x) > 0.02 || Math.abs(st.z - lastSent.z) > 0.02 || Math.abs(st.a - lastSent.a) > 0.02 || st.car !== lastSent.car || hk !== lastSent.hk;
+      const moved = N.force || !lastSent || Math.abs(st.x - lastSent.x) > 0.02 || Math.abs(st.z - lastSent.z) > 0.02 || Math.abs(st.a - lastSent.a) > 0.02 || st.car !== lastSent.car || st.jt !== lastSent.jt || hk !== lastSent.hk;
       if (moved || now - lastSend > 5000) { N.force = false; const path = N.base + 'players/' + N.uid; st.t = firebase.database.ServerValue.TIMESTAMP; N.db.ref(path).update(st).catch(() => N.online && N.db.ref(path).set(N.full())); lastSent = Object.assign({ hk }, st); lastSend = now; }
     }
     const serverNow = Date.now() + N.offset;
@@ -4307,6 +4320,7 @@ window.__net = (function () {
       let da = o.ta - o.a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; o.a += da * k;
       const v = Math.hypot(o.x - px, o.z - pz) / Math.max(dt, 1e-3);
       o.speed += (v - o.speed) * Math.min(1, dt * 6); o.walk += dt * o.speed * 2.3;
+      { const tj = (serverNow - (o.jt || 0)) / 1000, was = o.jy || 0; o.jy = jumpArc(tj); if (was > 0 && o.jy === 0 && tj < 1.2) o.land = 0.2; if (o.land > 0) o.land -= dt; }
       const vis = H.vis(uid, o);
       o.gun = H.code && H.role(uid) === 'seeker' && H.phase() === 'seek' ? o.ap : undefined;
       if (vis === 'prop') buildProp(B, o.pr, o.x, o.z, o.pa, { col: o.pc, s: o.ps });
@@ -4763,6 +4777,12 @@ function step(dt) {
       cam.yaw += d * Math.min(1, dt * 2.5);
     }
   }
+  if (player.jv || player.jy > 0) {   // pulo
+    player.jv -= JUMP_G * dt; player.jy += player.jv * dt;
+    if (player.jy <= 0) { player.jy = 0; player.jv = 0; player.land = 0.2; }
+  }
+  if (player.land > 0) player.land -= dt;
+  { const bj = document.getElementById('btnJump'); if (bj) bj.style.display = player.car || player.sit ? 'none' : ''; }
   // traffic
   for (const c of traffic) {
     placeCar(c);
@@ -4851,7 +4871,7 @@ function frame_() {
   const dynM = { vbo: dynVBO, n: dynB.n };
 
   // camera
-  const gy = surfAt(player.x, player.z);
+  const gy = surfAt(player.x, player.z) + (player.jy || 0) * 0.7;
   camY += (gy - camY) * Math.min(1, dt * 8);
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
   let eye, tgt;
@@ -4963,7 +4983,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120112720";
+  const BUILD = "v20261120122659";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
