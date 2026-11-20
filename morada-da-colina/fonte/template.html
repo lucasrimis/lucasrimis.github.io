@@ -70,6 +70,19 @@
   #chatHistBtn{padding:0 12px}
   #btnVhs{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#2c3550;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018;box-shadow:0 0 14px rgba(120,200,255,.6)}
   #btnVhs .k{opacity:.6}
+  #btnFoto{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#5a3d22;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018;box-shadow:0 0 14px rgba(255,210,120,.6)}
+  #btnFoto .k{opacity:.6}
+  #fotoOv{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.86)}
+  #fotoBox{position:relative;background:#7a4e2b;padding:14px 14px 10px;border:4px solid #d8b24a;box-shadow:0 10px 40px rgba(0,0,0,.6);max-width:min(92vw,560px)}
+  #fotoCard{position:relative;transition:transform .7s cubic-bezier(.4,.1,.3,1);transform-style:preserve-3d}
+  #fotoCard.flip{transform:rotateY(180deg)}
+  #fotoBox{perspective:1400px}
+  #fotoImg,#fotoImgB{display:block;max-width:100%;max-height:68vh;margin:0 auto;border:3px solid #2a1a10;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  #fotoImgB{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:rotateY(180deg);background:#2a1a10}
+  #fotoImgB[src=""]{display:none}
+  #fotoGirar{display:block;margin:10px auto 0;font-size:14px;padding:8px 18px;background:#2c3550}
+  #fotoCap{font-family:'VT323',monospace;font-size:24px;line-height:1.15;color:#fff6dc;text-align:center;margin-top:10px;text-shadow:0 2px 0 #000}
+  #fotoClose{position:absolute;top:-16px;right:-16px;margin:0}
   #btnPet{position:fixed;left:50%;bottom:calc(205px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#7a4a2a;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018}
   #btnPet .k{opacity:.6}
   #btnSit{position:fixed;left:50%;bottom:calc(205px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#86592f;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018}
@@ -84,7 +97,7 @@
   @keyframes skyArrow{50%{transform:translateY(-6px)}}
   @media (pointer:coarse){ #btnSit .k{display:none} }
   @media (pointer:coarse){ #btnPet .k{display:none} }
-  @media (pointer:coarse){ #btnVhs .k{display:none} }
+  @media (pointer:coarse){ #btnVhs .k{display:none} #btnFoto .k{display:none} }
   #vhsOv{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.86)}
   #vhsFrame{position:relative;width:min(92vw,calc(78vh * 16 / 9));aspect-ratio:16/9;background:#000;border:14px solid #2b2b2f;border-radius:18px;box-shadow:0 0 0 4px #111,0 0 40px rgba(0,0,0,.8)}
   #vhsTv,#vhsTv iframe,#vhsNoise{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:6px}
@@ -193,12 +206,12 @@
 </div>
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
-  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (aproxime ao máximo para 1ª pessoa)<br><b>M</b> ou clique no mapa: mapa grande · <b>⚙</b> alterar gráfico<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle · <b>X</b> sentar no banco<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> subir/descer da bicicleta · <b>Espaço</b> pular<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (aproxime ao máximo para 1ª pessoa)<br><b>M</b> ou clique no mapa: mapa grande · <b>⚙</b> alterar gráfico<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle · <b>X</b> sentar no banco<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
   <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)<br>Botão <b>👁</b> primeira/terceira pessoa</div>
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
+  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnJump" aria-label="Pular">⤴️<span>PULAR</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Bicicleta">🚲</button></div>
 </div>
 <div id="online" class="panel" style="display:none"><span id="onlineTxt"></span><button id="btnLeave">SAIR</button></div>
 <div id="chatLog"></div>
@@ -224,6 +237,8 @@
 <button id="btnSit" class="tbtn" style="display:none">🪑 SENTAR <span class="k">(X)</span></button>
 <button id="btnPet" class="tbtn" style="display:none">🐾 COÇAR O BUMBUM <span class="k">(C)</span></button>
 <button id="btnVhs" class="tbtn" style="display:none">📼 ASSISTIR <span class="k">(F)</span></button>
+<button id="btnFoto" class="tbtn" style="display:none">🖼 VER FOTO <span class="k">(F)</span></button>
+<div id="fotoOv"><div id="fotoBox"><div id="fotoCard"><img id="fotoImg" alt="Foto"><img id="fotoImgB" alt="Verso da foto"></div><div id="fotoCap"></div><button id="fotoGirar" class="tbtn" style="display:none">↻ GIRAR</button><button id="fotoClose" class="tbtn">✕</button></div></div>
 <div id="vhsOv"><div id="vhsFrame"><div id="vhsTv"></div><canvas id="vhsNoise" width="160" height="90"></canvas><div id="vhsLbl">● PLAY ▶ &nbsp; SP 0:00:00</div><button id="vhsClose" class="tbtn">✕</button></div></div>
 <div id="chatHist" class="panel"><div class="hd"><span>MENSAGENS</span><button class="tbtn" id="chatHistClose">✕</button></div><div id="chatHistList"></div></div>
 <div id="chatBox"><button class="tbtn" id="chatHistBtn" title="Histórico">☰</button><input id="chatIn" maxlength="120" placeholder="Fale algo… (Enter envia)" autocomplete="off"><button class="tbtn" id="chatSend">ENVIAR</button></div>
