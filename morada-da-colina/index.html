@@ -4815,9 +4815,9 @@ function step(dt) {
     if (cam.fp || (window.__hunt && window.__hunt.shoulder())) player.a = Math.atan2(-Math.cos(cam.yaw), -Math.sin(cam.yaw));   // pegador olha para a mira
   } else {
     const thr = joy.id !== null ? Math.max(-1, Math.min(1, iy)) : Math.sign(iy);   // bicicleta: pedala, freia, anda devagar de ré
-    const acc = thr > 0.05 ? 4.5 * Math.min(1, thr / 0.6) : thr < -0.05 ? (player.cv > 0.5 ? -9 : -2) * Math.min(1, -thr / 0.6) : -Math.sign(player.cv) * 1.2;
+    const acc = thr > 0.05 ? (run && player.cv > 7 ? 3.5 : 4.5) * Math.min(1, thr / 0.6) : thr < -0.05 ? (player.cv > 0.5 ? -9 : -2) * Math.min(1, -thr / 0.6) : -Math.sign(player.cv) * 1.2;
     player.cv += acc * dt;
-    const vmax = run ? 12 : 7.5;
+    const vmax = run ? 70 / 3.6 : 7.5;   // máxima 70 km/h (correndo)
     player.cv = Math.max(-1.5, Math.min(vmax, player.cv));
     if (iy === 0 && Math.abs(player.cv) < 0.2) player.cv = 0;
     const steer = ix * Math.min(1, Math.abs(player.cv) / 2) * 2.4 * Math.sign(player.cv);
@@ -5038,7 +5038,7 @@ window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, D
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120125227";
+  const BUILD = "v20261120125554";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
