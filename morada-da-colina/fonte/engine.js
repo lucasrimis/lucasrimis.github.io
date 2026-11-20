@@ -1,6 +1,12 @@
 'use strict';
 (function () {
 const W = window.WORLD;
+// posto de gasolina na esquina da Av. Antenor O'Reilly com a R. Astor Ornellas (Street View 10/2024) + a sorveteria ao lado
+{ const J = [-323.1, -291.1], U_ = [0.333, 0.943], V_ = [0.943, -0.333];   // u: ao longo da Astor (para o sul), v: para dentro do terreno (leste)
+  const loc = (x, z) => { const dx = x - J[0], dz = z - J[1]; return [dx * U_[0] + dz * U_[1], dx * V_[0] + dz * V_[1]]; };
+  (W.landmarks = W.landmarks || []).push({ type: 'posto', x: J[0], z: J[1], u: U_, v: V_ });
+  W.houses = W.houses.filter(h => { const [u, v] = loc(h[0], h[1]); return !(u > 0 && u < 48 && v > 3 && v < 32); });
+  W.trees = (W.trees || []).filter(t => { const [u, v] = loc(t[0], t[1]); return !(u > 0 && u < 48 && v > 4.5 && v < 32); }); }
 const [BX0, BZ0, BX1, BZ1] = W.bounds;
 const EM = 80; // extra margin of the playable extent
 const EX0 = BX0 - EM, EZ0 = BZ0 - EM, EX1 = BX1 + EM, EZ1 = BZ1 + EM;
@@ -335,7 +341,7 @@ function flatPolyD(B, pts, off, col, fl) {
 function platAt(x, z) {
   let best = -Infinity;
   for (const p of PLATS) { const dx = x - p.ox, dz = z - p.oz; if (dx * dx + dz * dz > p.r2) continue;
-    const ex = x - p.bx, ez = z - p.bz, u = ex * p.ax[0] + ez * p.ax[2], v = ex * p.az[0] + ez * p.az[2]; if (u >= p.u0 && u < p.u1 && v >= p.v0 && v < p.v1) { const y = p.dy !== undefined ? groundAt(x, z) + p.dy : p.y; if (y > best) best = y; } }
+    const ex = x - p.bx, ez = z - p.bz, u = ex * p.ax[0] + ez * p.ax[2], v = ex * p.az[0] + ez * p.az[2]; if (u >= p.u0 && u < p.u1 && v >= p.v0 && v < p.v1 && !(p.cut && u < p.cut(v))) { const y = p.dy !== undefined ? groundAt(x, z) + p.dy : p.y; if (y > best) best = y; } }
   return best;
 }
 function floorAt(x, z) { const s = surfAt(x, z), p = PLATS.length ? platAt(x, z) : -Infinity; return p > s ? p : s; }
@@ -1325,6 +1331,87 @@ for (const h of W.houses) {
       box(B, Tf, 31.6, 32.0, 1.2, 1.55, 5.26, 5.29, hex('#e8e8e8'), hex('#e8e8e8')); box(B, Tf, 31.65, 31.95, 1.3, 1.45, 5.25, 5.26, hex('#c8322a'), hex('#c8322a'));   // placa "garagem"
       { const p0 = P(Tf, 31.5, 0.1, 6.3), p1 = P(Tf, 30.4, 3.0, 8.6); for (let k = 0; k < 6; k++) beam(B, [p0[0] + AZ[0] * k * 0.12, p0[1], p0[2] + AZ[2] * k * 0.12].map((x, i) => i === 1 ? x : x + AX[i] * k * 0.12), [p1[0] + AX[0] * k * 0.12, p1[1], p1[2] + AX[2] * k * 0.12], 0.06, hex('#cfd3d6')); } }   // telha de alumínio encostada
     LATE_NOTES.push({ name: '', style: 'note', x: WP(9, 11)[0], z: WP(9, 11)[1], y: g + 1.4, base: 0, look: 0, t: 0, r: 3, says: ['Padóca'] });
+  }
+
+  for (const lm of (W.landmarks || [])) if (lm.type === 'posto') {   // posto de gasolina (Street View 10/2024): pátio de concreto, cobertura sobre pilares, bombas, lojinha e a sorveteria
+    const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
+    const AX = [ux, 0, uz], AZ = [vx, 0, vz];
+    const at = (u, v, y) => { const p = WP(u, v); return { o: [p[0], y === undefined ? groundAt(p[0], p[1]) : y, p[1]], ax: AX, ay: [0, 1, 0], az: AZ }; };
+    const B = chunkB(...WP(22, 18)), T0 = at(0, 0, 0);
+    const gp = (u, v) => { const p = WP(u, v); return groundAt(p[0], p[1]); }, fy = (u, v) => gp(u, v) + 0.15;   // pátio no nível da calçada
+    const ufront = v => 5.8 + 0.326 * v;   // linha da avenida (o terreno começa depois da calçada dela)
+    const gs = [gp(8, 8), gp(32, 8), gp(12, 30), gp(46, 30)], g = Math.max(...gs) + 0.15, LB = Math.min(...gs) - g - 0.6, T = at(0, 0, g);
+    const CON = hex('#cfc9bd'), CON2 = hex('#c2bcb0'), CURB = hex('#eeeeea'), WH = hex('#efeee9'), WH2 = hex('#dddcd6'), GR = hex('#9c9fa4'), COL = hex('#76493b'), DK = hex('#2a2c30');
+    // pátio de concreto (acompanha o terreno), placas de concreto com juntas
+    for (let u = 4; u < 33; u += 1.5) for (let v = 5.5; v < 31; v += 1.5) {
+      const ua = Math.max(u, ufront(v)), ub = Math.min(33, u + 1.5), vb = Math.min(31, v + 1.5); if (ub - ua < 0.05) continue;
+      const q = [[ua, v], [ub, v], [ub, vb], [Math.max(u, ufront(vb)), vb]].map(([a, b]) => { const p = WP(a, b); return [p[0], fy(a, b), p[1]]; });
+      B.quad(q[0], q[1], q[2], q[3], UP, ((u / 1.5 | 0) + (v / 1.5 | 0)) % 3 ? CON : CON2, F_PLAIN); }
+    PLATS.push({ ox: WP(20, 18)[0], oz: WP(20, 18)[1], r2: 600, ax: AX, az: AZ, bx: lm.x, bz: lm.z, u0: 4, u1: 33, v0: 5.5, v1: 31, dy: 0.15, cut: ufront });
+    const flat = (u, v, w, d, y, c) => { const q = [[u - w, v - d], [u + w, v - d], [u + w, v + d], [u - w, v + d]].map(([a, b]) => { const p = WP(a, b); return [p[0], fy(a, b) + y, p[1]]; }); B.quad(q[0], q[1], q[2], q[3], UP, c, F_PLAIN); };
+    for (const [u, v] of [[12, 9], [21, 8.5], [27, 12], [15, 24.5], [24, 25], [8, 15]]) flat(u, v, 0.35, 0.35, 0.012, hex('#4a4a4c'));   // tampas de inspeção
+    for (let k = 0; k < 14; k++) { const a = k / 14 * 2.2, u = 14 + Math.cos(a) * 7, v = 9 + Math.sin(a) * 4; flat(u, v, 0.35, 0.09, 0.01, hex('#aaa498')); }   // marcas de pneu
+    // canteiro triangular na esquina, com meio-fio pintado de branco e um poste alto
+    { const pts = [[ufront(5.8) + 0.3, 5.8], [16, 5.8], [ufront(9) + 0.3, 9]];
+      for (let i = 0; i < 3; i++) { const [a0, b0] = pts[i], [a1, b1] = pts[(i + 1) % 3]; const p0 = WP(a0, b0), p1 = WP(a1, b1); beam(B, [p0[0], fy(a0, b0) + 0.1, p0[1]], [p1[0], fy(a1, b1) + 0.1, p1[1]], 0.18, CURB); }
+      const q = pts.map(([a, b]) => { const p = WP(a, b); return [p[0], fy(a, b) + 0.14, p[1]]; }); B.quad(q[0], q[1], q[2], q[2], UP, hex('#b7ae9c'), F_PLAIN);
+      const pp = WP(ufront(6.6) + 1.2, 6.6); beam(B, [pp[0], fy(ufront(6.6) + 1.2, 6.6), pp[1]], [pp[0], fy(ufront(6.6) + 1.2, 6.6) + 7.5, pp[1]], 0.12, hex('#8d8a84')); }
+    // cobertura das bombas: laje fina sobre 6 pilares, platibanda branca frisada
+    const cu0 = 7.5, cu1 = 29.5, cv0 = 10.5, cv1 = 21.5, CH = 4.7;
+    for (const pu of [10, 18.5, 27]) for (const pv of [13, 19]) { box(B, T, pu - 0.18, pu + 0.18, LB, CH, pv - 0.18, pv + 0.18, COL, COL); maskRect(T0, pu - 0.25, pu + 0.25, pv - 0.25, pv + 0.25); }
+    box(B, T, cu0, cu1, CH, CH + 0.25, cv0, cv1, hex('#b9bbbf'), GR);   // laje (forro cinza)
+    box(B, T, cu0 - 0.05, cu1 + 0.05, CH + 0.25, CH + 1.0, cv0 - 0.05, cv1 + 0.05, WH, WH);   // platibanda
+    for (let u = cu0 + 0.4; u < cu1; u += 0.6) { wallFeat(B, T, u, u + 0.08, CH + 0.3, CH + 0.95, cv0 - 0.05, -1, hex('#c9cacd')); wallFeat(B, T, u, u + 0.08, CH + 0.3, CH + 0.95, cv1 + 0.05, 1, hex('#c9cacd')); }
+    for (let k = 0; k < 6; k++) { const u = cu0 + 2 + k * 3.6; box(B, T, u - 0.5, u + 0.5, CH - 0.03, CH, 15.6, 16.4, hex('#fbfbf2'), hex('#fbfbf2')); }   // luminárias
+    // ilhas com bombas de combustível
+    for (const iu of [12.3, 18.5, 24.7]) {
+      const yi = fy(iu, 16) - g;
+      box(B, T, iu - 1.6, iu + 1.6, LB, yi + 0.18, 15.3, 16.7, hex('#d9d6cf'), hex('#3a3a3a')); maskRect(T0, iu - 1.6, iu + 1.6, 15.3, 16.7);
+      for (const du of [-0.8, 0.8]) { const u = iu + du;
+        box(B, T, u - 0.38, u + 0.38, yi + 0.18, yi + 1.95, 15.65, 16.35, hex('#d8dadc'), hex('#c4c7ca'));   // corpo da bomba
+        for (const sv of [-1, 1]) { const vf = sv < 0 ? 15.64 : 16.36; wallFeat(B, T, u - 0.28, u + 0.28, yi + 1.2, yi + 1.7, vf, sv, hex('#2b3036')); wallFeat(B, T, u - 0.25, u + 0.25, yi + 0.5, yi + 1.05, vf, sv, hex('#5b6066')); wallFeat(B, T, u - 0.3, u + 0.3, yi + 1.78, yi + 1.9, vf, sv, hex('#3f63b7')); }
+        box(B, T, u - 0.3, u + 0.3, yi + 1.95, yi + 2.15, 15.7, 16.3, hex('#3f63b7'), hex('#3f63b7')); }
+      box(B, T, iu - 1.75, iu - 1.55, yi + 0.18, yi + 0.95, 15.9, 16.1, hex('#e8c227'), hex('#e8c227')); box(B, T, iu + 1.55, iu + 1.75, yi + 0.18, yi + 0.95, 15.9, 16.1, hex('#e8c227'), hex('#e8c227'));   // protetores amarelos
+    }
+    // lojinha / escritório nos fundos: térreo branco, porta amarela, portas de enrolar, platibanda
+    { const bu0 = 6.5, bu1 = 30.5, bv0 = 24, bv1 = 30.5, BH = 3.4;
+      box(B, T, bu0, bu1, LB, BH, bv0, bv1, WH, WH2); box(B, T, bu0 - 0.1, bu1 + 0.1, BH, BH + 0.5, bv0 - 0.1, bv1 + 0.1, WH2, WH2); maskRect(T0, bu0, bu1, bv0, bv1);
+      wallFeat(B, T, 10.5, 11.6, 0, 2.2, bv0, -1, hex('#e3b73f')); wallFeat(B, T, 13, 15.8, 0, 2.6, bv0, -1, hex('#9aa0a6')); wallFeat(B, T, 16.6, 19.4, 0, 2.6, bv0, -1, hex('#9aa0a6'));
+      for (let y = 0.2; y < 2.6; y += 0.18) { wallFeat(B, T, 13, 15.8, y, y + 0.03, bv0 - 0.01, -1, hex('#7f858b')); wallFeat(B, T, 16.6, 19.4, y, y + 0.03, bv0 - 0.01, -1, hex('#7f858b')); }
+      wallFeat(B, T, 21, 25.5, 1.0, 2.3, bv0, -1, hex('#33465c')); wallFeat(B, T, 26.5, 29.5, 0, 2.3, bv0, -1, hex('#33465c'));   // vitrine e porta de vidro
+      wallFeat(B, T, 7.5, 9.5, 1.2, 2.2, bv0, -1, hex('#33465c'));
+      // muro baixo branco dos fundos e do lado
+      box(B, T, 31, 33, LB, 2.2, 5.5, 31, WH, WH2); maskRect(T0, 31, 33, 5.5, 31); }
+    // carros parados (Street View): branco na frente, prata e cinza sob a cobertura, caminhãozinho branco e uma moto
+    const car = (u, v, a, c) => { const p = WP(u, v), K = frame(p[0], fy(u, v), p[1], Math.atan2(AX[2], AX[0]) + a); carMesh(B, K, hex(c)); maskRect(T0, u - 2.2, u + 2.2, v - 1.1, v + 1.1); };
+    car(16, 9.2, 0.15, '#f1f1ee'); car(21.5, 18.2, 0, '#b8bcc2'); car(15.2, 18.2, 0, '#8a8f96'); car(27.5, 22.4, 0.05, '#c63a32');
+    { const p = WP(9.5, 21.8), K = frame(p[0], fy(9.5, 21.8), p[1], Math.atan2(AX[2], AX[0]) + 0.05);   // caminhãozinho branco de carroceria
+      box(B, K, 1.0, 2.6, 0.35, 2.2, -1.0, 1.0, hex('#f1f1ee'), hex('#e2e2df')); wallFeat(B, K, 1.05, 2.55, 1.35, 2.0, -1.01, -1, hex('#33465c')); wallFeat(B, K, 2.61, 2.62, 1.3, 2.0, -0.9, 1, hex('#33465c'));
+      box(B, K, -3.2, 1.0, 0.75, 0.95, -1.05, 1.05, hex('#6d5a46'), hex('#5c4b3a')); for (const sv of [-1, 1]) box(B, K, -3.2, 1.0, 0.95, 1.35, sv * 1.0 - 0.04, sv * 1.0 + 0.04, hex('#8a7a66'), hex('#8a7a66'));
+      for (const [wu, wv] of [[1.9, -1], [1.9, 1], [-2.2, -1], [-2.2, 1]]) box(B, K, wu - 0.4, wu + 0.4, 0, 0.75, wv - 0.15, wv + 0.15, hex('#16171a'), hex('#16171a'));
+      maskRect(T0, 6, 12.4, 20.6, 23); }
+    { const p = WP(7.2, 19.5), K = frame(p[0], fy(7.2, 19.5), p[1], Math.atan2(AX[2], AX[0]) + 1.2);   // moto
+      for (const wu of [-0.65, 0.65]) beam(B, P(K, wu, 0.32, 0), P(K, wu, 0.33, 0.001), 0.62, hex('#16171a'));
+      beam(B, P(K, -0.6, 0.5, 0), P(K, 0.6, 0.75, 0), 0.12, hex('#b02a2a')); box(B, K, -0.5, 0.2, 0.75, 0.85, -0.12, 0.12, hex('#16171a'), hex('#16171a')); beam(B, P(K, 0.55, 0.75, 0), P(K, 0.7, 1.05, 0), 0.05, hex('#9aa0a6')); }
+    // sorveteria ao lado: sobrado ocre/laranja com placa vermelha
+    { const su0 = 34, su1 = 47, sv0 = 9.5, sv1 = 24, H1 = 3.3, H2 = 6.4, OC = hex('#e2a157'), OC2 = hex('#d1914a');
+      const gs2 = [gp(su0, sv0), gp(su1, sv0), gp(su0, sv1), gp(su1, sv1)], g2 = Math.max(...gs2) + 0.15, T2 = at(0, 0, g2), LB2 = Math.min(...gs2) - g2 - 0.6;
+      box(B, T2, su0, su1, LB2, H2, sv0, sv1, OC, OC2); maskRect(T0, su0, su1, sv0, sv1);
+      box(B, T2, su0 - 0.1, su1 + 0.1, H1 - 0.1, H1 + 0.15, sv0 - 1.2, sv0, hex('#c9873f'), hex('#c9873f'));   // marquise entre os andares
+      wallFeat(B, T2, su0 + 0.6, su0 + 5.2, 0, 2.6, sv0, -1, hex('#33465c')); wallFeat(B, T2, su0 + 5.8, su0 + 8.2, 0, 2.6, sv0, -1, hex('#2b3a4c')); wallFeat(B, T2, su0 + 8.8, su1 - 0.6, 0.9, 2.6, sv0, -1, hex('#33465c'));
+      for (const [a0, a1] of [[su0 + 0.8, su0 + 3.4], [su0 + 4.6, su0 + 7.2], [su0 + 8.6, su0 + 11.2]]) { wallFeat(B, T2, a0, a1, H1 + 0.9, H1 + 2.4, sv0, -1, hex('#3d5675')); wallFeat(B, T2, a0 - 0.1, a1 + 0.1, H1 + 0.8, H1 + 0.9, sv0 - 0.03, -1, hex('#f4f1ea')); }
+      for (let a = su0 + 0.2; a < su1 - 0.1; a += 0.22) box(B, T2, a, a + 0.05, H1 + 0.15, H1 + 1.15, sv0 - 1.15, sv0 - 1.1, hex('#5a3a28'), hex('#5a3a28'));   // guarda-corpo da sacada
+      box(B, T2, su0, su1, H1 + 1.1, H1 + 1.18, sv0 - 1.18, sv0 - 1.06, hex('#5a3a28'), hex('#5a3a28'));
+      hipRoof(B, at((su0 + su1) / 2, (sv0 + sv1) / 2, g2), su1 - su0, sv1 - sv0, H2, 1.8, 0.6, hex('#b9573a'));
+      // placa vermelha "SORVETERIA" na lateral voltada para o posto (é a que se vê da esquina)
+      const p0 = WP(su0, 0), Ts = { o: [p0[0], g2, p0[1]], ax: [-AZ[0], 0, -AZ[2]], ay: [0, 1, 0], az: AX }, bu0 = -(sv0 + 9.5), bu1 = -(sv0 + 1.5), by0 = H2 - 1.6, by1 = H2 - 0.4;
+      box(B, Ts, bu0, bu1, by0, by1, -0.16, -0.04, hex('#c8322a'), hex('#a82720'));
+      const Wc = 96, Hc = 22, c2 = document.createElement('canvas'); c2.width = Wc; c2.height = Hc; const gx = c2.getContext('2d'); gx.textAlign = 'center'; gx.textBaseline = 'middle';
+      gx.font = "bold 17px 'VT323', monospace"; gx.fillStyle = '#ffffff'; gx.fillText('SORVETERIA', Wc / 2, 12);
+      const d = gx.getImageData(0, 0, Wc, Hc).data, px_ = (bu1 - bu0 - 0.4) / Wc, py_ = (by1 - by0 - 0.2) / Hc, nn = [-AX[0], 0, -AX[2]], vv = -0.17, uL = bu0 + 0.2, yT = by1 - 0.1;
+      for (let y = 0; y < Hc; y++) { let x0 = -1; for (let x = 0; x <= Wc; x++) { const on = x < Wc && d[(y * Wc + x) * 4 + 3] > 120;
+        if (x0 >= 0 && !on) { const a = uL + x0 * px_, b = uL + x * px_, yy = yT - y * py_; const q = [P(Ts, a, yy, vv), P(Ts, b, yy, vv), P(Ts, b, yy - py_, vv), P(Ts, a, yy - py_, vv)]; B.quad(q[0], q[1], q[2], q[3], nn, [255, 255, 255], F_GLOW); x0 = -1; }
+        if (on && x0 < 0) x0 = x; } } }
   }
   for (const lm of (W.landmarks || [])) if (lm.type === 'padaria') {   // Padaria do Jorge (no lugar da Padaria Colina da R. Agenor Lopes Siqueira)
     const [ux, uz] = lm.u, [vx, vz] = lm.v, WP = (u, v) => [lm.x + ux * u + vx * v, lm.z + uz * u + vz * v];
