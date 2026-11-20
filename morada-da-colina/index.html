@@ -3802,7 +3802,7 @@ const PHOTOS = [
   { pos: [-15.74, 121.89], src: FOTO_PRACA, caption: '' },   // praça redonda do alto do bairro, ao lado da fita do banco
   { pos: SOB9_FOTOS && SOB9_FOTOS[0], src: FOTO_SOBRADO, caption: '' },   // terreno do sobrado da Layca, junto ao muro perto das fitas
   { pos: SOB9_FOTOS && SOB9_FOTOS[1], src: FOTO_CARRO, caption: '' },   // calçada da frente do mesmo sobrado
-  { pos: SOB9_FOTOS && SOB9_FOTOS[2], src: FOTO_PAOQ, back: FOTO_PAOQ, caption: '' },   // porta-retrato de dois lados: dá para girar   // dentro do terreno, no jardim da frente perto das fitas
+  { pos: SOB9_FOTOS && SOB9_FOTOS[2], src: FOTO_PAOQ, back: FOTO_PAOQ, caption: 'verso-paodequeijo.jpg.jpg' },   // porta-retrato de dois lados: dá para girar   // dentro do terreno, no jardim da frente perto das fitas
 ].filter(o => o.pos).map(o => Object.assign(o, { near: false, px: null }));
 const PH = { open: false, cur: null };
 const thumb = (src, cb) => { const im = new Image(); im.onload = () => { const land = im.width > im.height, w = land ? 16 : 12, h = land ? 12 : 16, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h);
