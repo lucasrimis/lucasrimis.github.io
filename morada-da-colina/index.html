@@ -74,7 +74,13 @@
   #btnFoto .k{opacity:.6}
   #fotoOv{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.86)}
   #fotoBox{position:relative;background:#7a4e2b;padding:14px 14px 10px;border:4px solid #d8b24a;box-shadow:0 10px 40px rgba(0,0,0,.6);max-width:min(92vw,560px)}
-  #fotoImg{display:block;max-width:100%;max-height:68vh;margin:0 auto;border:3px solid #2a1a10}
+  #fotoCard{position:relative;transition:transform .7s cubic-bezier(.4,.1,.3,1);transform-style:preserve-3d}
+  #fotoCard.flip{transform:rotateY(180deg)}
+  #fotoBox{perspective:1400px}
+  #fotoImg,#fotoImgB{display:block;max-width:100%;max-height:68vh;margin:0 auto;border:3px solid #2a1a10;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  #fotoImgB{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:rotateY(180deg);background:#2a1a10}
+  #fotoImgB[src=""]{display:none}
+  #fotoGirar{display:block;margin:10px auto 0;font-size:14px;padding:8px 18px;background:#2c3550}
   #fotoCap{font-family:'VT323',monospace;font-size:24px;line-height:1.15;color:#fff6dc;text-align:center;margin-top:10px;text-shadow:0 2px 0 #000}
   #fotoClose{position:absolute;top:-16px;right:-16px;margin:0}
   #btnPet{position:fixed;left:50%;bottom:calc(205px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;background:#7a4a2a;color:#fff;font-size:13px;padding:10px 16px;border:3px solid #0d1018}
@@ -232,7 +238,7 @@
 <button id="btnPet" class="tbtn" style="display:none">🐾 COÇAR O BUMBUM <span class="k">(C)</span></button>
 <button id="btnVhs" class="tbtn" style="display:none">📼 ASSISTIR <span class="k">(F)</span></button>
 <button id="btnFoto" class="tbtn" style="display:none">🖼 VER FOTO <span class="k">(F)</span></button>
-<div id="fotoOv"><div id="fotoBox"><img id="fotoImg" alt="Foto"><div id="fotoCap"></div><button id="fotoClose" class="tbtn">✕</button></div></div>
+<div id="fotoOv"><div id="fotoBox"><div id="fotoCard"><img id="fotoImg" alt="Foto"><img id="fotoImgB" alt="Verso da foto"></div><div id="fotoCap"></div><button id="fotoGirar" class="tbtn" style="display:none">↻ GIRAR</button><button id="fotoClose" class="tbtn">✕</button></div></div>
 <div id="vhsOv"><div id="vhsFrame"><div id="vhsTv"></div><canvas id="vhsNoise" width="160" height="90"></canvas><div id="vhsLbl">● PLAY ▶ &nbsp; SP 0:00:00</div><button id="vhsClose" class="tbtn">✕</button></div></div>
 <div id="chatHist" class="panel"><div class="hd"><span>MENSAGENS</span><button class="tbtn" id="chatHistClose">✕</button></div><div id="chatHistList"></div></div>
 <div id="chatBox"><button class="tbtn" id="chatHistBtn" title="Histórico">☰</button><input id="chatIn" maxlength="120" placeholder="Fale algo… (Enter envia)" autocomplete="off"><button class="tbtn" id="chatSend">ENVIAR</button></div>
@@ -3796,9 +3802,12 @@ const PHOTOS = [
   { pos: [-15.74, 121.89], src: FOTO_PRACA, caption: '' },   // praça redonda do alto do bairro, ao lado da fita do banco
   { pos: SOB9_FOTOS && SOB9_FOTOS[0], src: FOTO_SOBRADO, caption: '' },   // terreno do sobrado da Layca, junto ao muro perto das fitas
   { pos: SOB9_FOTOS && SOB9_FOTOS[1], src: FOTO_CARRO, caption: '' },   // calçada da frente do mesmo sobrado
-  { pos: SOB9_FOTOS && SOB9_FOTOS[2], src: FOTO_PAOQ, caption: '' },   // dentro do terreno, no jardim da frente perto das fitas
+  { pos: SOB9_FOTOS && SOB9_FOTOS[2], src: FOTO_PAOQ, back: FOTO_PAOQ, caption: '' },   // porta-retrato de dois lados: dá para girar   // dentro do terreno, no jardim da frente perto das fitas
 ].filter(o => o.pos).map(o => Object.assign(o, { near: false, px: null }));
 const PH = { open: false, cur: null };
+const thumb = (src, cb) => { const im = new Image(); im.onload = () => { const land = im.width > im.height, w = land ? 16 : 12, h = land ? 12 : 16, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h);
+  const d = g.getImageData(0, 0, w, h).data, px = { w, h, c: [] }; for (let i = 0; i < w * h; i++) px.c.push([d[i * 4], d[i * 4 + 1], d[i * 4 + 2]].map(v => Math.min(255, v * 1.6 + 20))); cb(px); }; im.src = src; };
+for (const o of PHOTOS) if (o.back) thumb(o.back, px => { o.pxB = px; });   // verso
 for (const o of PHOTOS) { const im = new Image(); im.onload = () => {   // miniatura em pixels para mostrar no porta-retrato
   const land = im.width > im.height, w = land ? 16 : 12, h = land ? 12 : 16, c = document.createElement('canvas'); o.land = land; c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h);
   const d = g.getImageData(0, 0, w, h).data; o.px = { w, h, c: [] }; for (let i = 0; i < w * h; i++) o.px.c.push([d[i * 4], d[i * 4 + 1], d[i * 4 + 2]].map(v => Math.min(255, v * 1.6 + 20))); }; im.src = o.src; }
@@ -3812,8 +3821,9 @@ function photoFrame(B, t) {
     box(B, T, -W_ - 0.06, W_ + 0.06, -H_ - 0.06, H_ + 0.06, -0.03, 0.03, WD, WD2);   // moldura de madeira
     box(B, T, -W_ - 0.02, W_ + 0.02, -H_ - 0.02, H_ + 0.02, -0.035, 0.035, GLD, GLD);   // filete dourado
     for (const sd of [-1, 1]) {   // a foto dos dois lados
-      if (!o.px) { box(B, T, -W_, W_, -H_, H_, sd * 0.04 - 0.003, sd * 0.04 + 0.003, hex('#2a2a30'), hex('#2a2a30')); continue; }
-      const { w, h, c } = o.px, cw = 2 * W_ / w, ch = 2 * H_ / h;
+      const PX = sd < 0 && o.back ? o.pxB : o.px;
+      if (!PX) { box(B, T, -W_, W_, -H_, H_, sd * 0.04 - 0.003, sd * 0.04 + 0.003, hex('#2a2a30'), hex('#2a2a30')); continue; }
+      const { w, h, c } = PX, cw = 2 * W_ / w, ch = 2 * H_ / h;
       for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const u0 = sd > 0 ? -W_ + i * cw : W_ - (i + 1) * cw, y0 = H_ - (j + 1) * ch, v = sd * 0.04;
         const q = [P(T, u0, y0, v), P(T, u0 + cw, y0, v), P(T, u0 + cw, y0 + ch, v), P(T, u0, y0 + ch, v)]; B.quad(q[0], q[1], q[2], q[3], [T.az[0] * sd, 0, T.az[2] * sd], c[j * w + i], F_GLOW); }
     }
@@ -3828,11 +3838,13 @@ function photoOpen(o) {
   o = o || PH.cur; if (!o || PH.open) return;
   if (document.pointerLockElement) document.exitPointerLock();
   PH.open = true; for (const k in keys) keys[k] = false;
-  document.getElementById('fotoImg').src = o.src; document.getElementById('fotoCap').textContent = o.caption; document.getElementById('fotoCap').style.display = o.caption ? '' : 'none';
+  document.getElementById('fotoImg').src = o.src; document.getElementById('fotoImgB').src = o.back || ''; document.getElementById('fotoCard').classList.remove('flip');
+  document.getElementById('fotoGirar').style.display = o.back ? '' : 'none'; document.getElementById('fotoCap').textContent = o.caption; document.getElementById('fotoCap').style.display = o.caption ? '' : 'none';
   document.getElementById('fotoOv').style.display = 'flex';
 }
 function photoClose() { PH.open = false; document.getElementById('fotoOv').style.display = 'none'; }
 document.getElementById('fotoClose').addEventListener('click', photoClose);
+document.getElementById('fotoGirar').addEventListener('click', e => { e.stopPropagation(); document.getElementById('fotoCard').classList.toggle('flip'); });   // gira o porta-retrato
 document.getElementById('fotoOv').addEventListener('click', e => { if (e.target.id === 'fotoOv') photoClose(); });
 document.getElementById('btnFoto').addEventListener('click', e => { e.stopPropagation(); photoOpen(); });
 document.getElementById('btnFoto').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
@@ -5147,7 +5159,7 @@ window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, D
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120134748";
+  const BUILD = "v20261120135340";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
