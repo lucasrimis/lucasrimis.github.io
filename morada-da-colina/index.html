@@ -327,7 +327,7 @@ let PEAK_A = -Math.PI / 2;   // direção (a partir do centro do mapa) do pico m
 let PORTELA_PARK = null;     // onde a bicicleta do Portela fica parada
 let GATE116 = null;          // portão de correr da casa 116
 let GATE9 = null;            // portão grande do sobrado da esquina: duas folhas que abrem para fora
-let SOB9_TAPE = null;        // fita dentro do terreno do sobrado, junto ao muro da esquerda
+let SOB9_TAPE = null, SOB9_TAPE_A = null;        // fita dentro do terreno do sobrado, junto ao muro da esquerda
 let GATE489 = null;          // porta de madeira da casa 389 (abre para dentro para a Pantufa)
 const angOf = T => Math.atan2(T.ax[2], T.ax[0]);
 function P(T, u, y, v) { return [T.o[0] + u * T.ax[0] + y * T.ay[0] + v * T.az[0], T.o[1] + u * T.ax[1] + y * T.ay[1] + v * T.az[1], T.o[2] + u * T.ax[2] + y * T.ay[2] + v * T.az[2]]; }
@@ -1103,6 +1103,7 @@ for (const h of W.houses) {
     { const TR = at(14.65, MV, g0 + 2.7); hipRoof(B, TR, 7.7, 1.1, 0.0, 0.55, 0.25, TILE); }
     maskRect(at(0, 0, 0), 11.0, 11.7, MV - 0.3, MV + 0.3); maskRect(at(0, 0, 0), 15.5, 18.3, MV - 0.3, MV + 0.3);   // pilares e portinha (o vão do portão é livre quando aberto)
     { const v = 14, u = sideU(v) + 1.3, p = WP(u, v); SOB9_TAPE = [p[0], p[1], Math.atan2(uz, ux)]; }
+    { const T2 = v => { const u = sideU(v) + 1.3, p = WP(u, v); return [p[0], p[1], Math.atan2(uz, ux)]; }; SOB9_TAPE_A = T2(11.3); }
     // caixa de correio + medidor no painel da direita
     box(B, G, 19.6, 20.1, 1.0, 1.55, MV - 0.22, MV - 0.12, hex('#7a4a2c'), hex('#6a3f25'));
     box(B, G, 22.3, 22.9, 0.6, 1.1, MV - 0.18, MV - 0.12, hex('#b9b6ad'), hex('#a7a49b'));
@@ -3537,7 +3538,8 @@ const VHS = { open: false, near: false, vis: false, cur: null, tapes: [
   { video: 'GZI6GsWwDmE', pos: [-392.6, -315.8, 0.18] },   // calçada da Av. Darcy Ribeiro (principal), entrada oeste do bairro
   { video: 'IQjjz3oMf1w', start: 47, pos: (() => { const L = (W.landmarks || []).find(l => l.type === 'baldio'); if (!L) return null; const u = -16, v = 14; return [L.x + L.u[0] * u + L.v[0] * v, L.z + L.u[1] * u + L.v[1] * v, Math.atan2(L.u[1], L.u[0])]; })() },   // terreno baldio, lado direito
   { video: 'FfL2Yv2F4mo', start: 60, pos: BENCH && BENCH.tape },   // ao lado do banco da praça da rotatória
-  { video: 'iRpbKtXmeks', pos: SOB9_TAPE },   // sobrado da esquina: dentro do terreno, junto ao muro da esquerda
+  { video: 'iRpbKtXmeks', pos: SOB9_TAPE },
+  { video: 'adz-ePj0Oy8', pos: SOB9_TAPE_A },   // um pouco à esquerda da anterior, junto ao mesmo muro   // sobrado da esquina: dentro do terreno, junto ao muro da esquerda
   { video: '437DR4XdGjU', more: ['YVNCtyXO51Q', '4gY35lBxOII'], u: 9, v: 28.15 },   // lista: toca um depois do outro    // no muro do fundo, do lado de dentro, junto da hera
 ].map(o => Object.assign(o, { pos: o.pos || null, sx: -1e4, sy: -1e4, vis: false, near: false })) };
 function vhsPos(o = VHS.tapes[0]) {
@@ -4904,7 +4906,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120104715";
+  const BUILD = "v20261120105336";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
