@@ -312,7 +312,7 @@ function frame(x, y, z, ang) { const c = Math.cos(ang), s = Math.sin(ang); retur
 const PROPS = [];
 const LATE_NOTES = [];   // mensagens criadas antes da lista de NPCs existir
 const DOGS = [];
-const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa', labrador: 'Balu', pastor: 'Zatara', golden: 'Laica' };         // cachorros soltos em quintais (andam sozinhos)
+const DOG_NAMES = { pitbull: 'Marley', bull: 'Branca', yorkieRoupa: 'Bob', yorkie: 'Junior', beagle: 'Pantufa', labrador: 'Balu', pastor: 'Zatara', golden: 'Layca' };         // cachorros soltos em quintais (andam sozinhos)
 // relógio do jogo: 1 hora do jogo = 1 minuto real (o dia inteiro dura 24 minutos), igual para todos os jogadores
 const DAY_SEC = 24 * 60;
 let CLOCK_OFF = 0;   // diferença para o relógio do servidor quando online: todos veem o mesmo horário e as mesmas animações
@@ -1090,7 +1090,7 @@ for (const h of W.houses) {
     panel(18.3, MV, 24.5, MV, H);            // frente, à direita da portaria
     panel(24.5, MV, 24.5, 24.5, H);          // lateral direita (fecha o lote)
     panel(24.5, 24.5, sideU(24.5), 24.5, H); // fundo
-    { const yard = { x: WP(0, 0)[0], z: WP(0, 0)[1], u: lm.u, v: lm.v, u0: 8.2, u1: 23.8, v0: 21.7, v1: 24.0, nu0: 0, nu1: 0, nv: -1 };   // Laica no quintal dos fundos
+    { const yard = { x: WP(0, 0)[0], z: WP(0, 0)[1], u: lm.u, v: lm.v, u0: 8.2, u1: 23.8, v0: 21.7, v1: 24.0, nu0: 0, nu1: 0, nv: -1 };   // Layca no quintal dos fundos
       const p = WP(15, 22.8); DOGS.push({ kind: 'golden', x: p[0], z: p[1], a: Math.random() * 6.28, yard, tx: p[0], tz: p[1], wait: 1, ph: 0, wag: 0, spd: 0 }); }
     // ---- portaria: pilares de pedra, portão de garagem marrom, portinha e telhadinho de barro ----
     const g0 = gy(14.5, MV), G = at(0, 0, g0);
@@ -4906,7 +4906,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120105336";
+  const BUILD = "v20261120111302";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
