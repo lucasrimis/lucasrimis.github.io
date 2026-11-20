@@ -326,6 +326,7 @@ function gameClock() { const sec = nowMs() / 1000 + (window.__timeShift || 0); c
 let PEAK_A = -Math.PI / 2;   // direção (a partir do centro do mapa) do pico mais alto da serra: o sol nasce e se põe atrás dele
 let PORTELA_PARK = null;     // onde a bicicleta do Portela fica parada
 let GATE116 = null;          // portão de correr da casa 116
+let PLATS = [];              // patamares onde dá para subir pulando (degraus do terreno baldio)
 let GATE9 = null;            // portão grande do sobrado da esquina: duas folhas que abrem para fora
 let SOB9_TAPE = null, SOB9_TAPE_A = null;        // fita dentro do terreno do sobrado, junto ao muro da esquerda
 let GATE489 = null;          // porta de madeira da casa 389 (abre para dentro para a Pantufa)
@@ -584,6 +585,14 @@ function latH(i, j, x, z) { return (i >= 0 && j >= 0 && i < LW && j < LH) ? LAT[
 function flatPolyD(B, pts, off, col, fl) {
   for (const [a, b, c] of triangulate(pts)) B.tri([pts[a][0], groundAt(pts[a][0], pts[a][1]) + off, pts[a][1]], [pts[b][0], groundAt(pts[b][0], pts[b][1]) + off, pts[b][1]], [pts[c][0], groundAt(pts[c][0], pts[c][1]) + off, pts[c][1]], UP, col, fl);
 }
+// chão onde os pés ficam: terreno/rua ou o topo de um patamar
+function platAt(x, z) {
+  let best = -Infinity;
+  for (const p of PLATS) { const dx = x - p.ox, dz = z - p.oz; if (dx * dx + dz * dz > p.r2) continue;
+    const ex = x - p.bx, ez = z - p.bz, u = ex * p.ax[0] + ez * p.ax[2], v = ex * p.az[0] + ez * p.az[2]; if (u >= p.u0 && u < p.u1 && v >= p.v0 && v < p.v1 && p.y > best) best = p.y; }
+  return best;
+}
+function floorAt(x, z) { const s = surfAt(x, z), p = PLATS.length ? platAt(x, z) : -Infinity; return p > s ? p : s; }
 function surfAt(x, z) {
   const r = roadSurf(x, z);
   if (r && r.e <= 0) return r.h + (r.foot ? 0.03 : r.ec <= 0 ? 0.18 : 0.06);
@@ -1404,10 +1413,11 @@ for (const h of W.houses) {
     for (let u = U0; u < U1; u += 4) { const B = chunkB(...WP(u + 2, (VS + V1) / 2)), g = Math.min(gp(u, VS), gp(u + 4, VS));
       for (let k = 0; k < steps; k++) { const T = at(0, 0, g), v0 = VS + k * sd, y1 = (k + 1) * sh + (r() - 0.5) * 0.25;
         box(B, T, u, u + 4.02, -1.0, y1, v0, V1, k % 2 ? RED : RED3, RED2);
+        { const c = WP(u + 2, (v0 + V1) / 2), o = WP(0, 0); PLATS.push({ ox: c[0], oz: c[1], r2: 16 + (V1 - v0) * (V1 - v0) / 4 + 9, ax: AX, az: AZ, u0: u, u1: u + 4.02, v0, v1: k === steps - 1 ? V1 : v0 + sd, y: g + y1 + 0.02, bx: o[0], bz: o[1] }); }   // dá para subir pulando
         const q = [[u, v0 + 0.05], [u + 4.02, v0 + 0.05], [u + 4.02, v0 + sd * 0.45], [u, v0 + sd * 0.45]].map(([a, b]) => P(T, a, y1 + 0.02, b)); B.quad(q[0], q[1], q[2], q[3], UP, TOPG, F_TEX);   // capinzal no patamar
         for (let j = 0; j < 3; j++) wallFeat(B, T, u + r() * 3.5, u + 0.3 + r() * 3.7, y1 - 0.3 - r() * 1.0, y1 - 0.15 - r() * 0.5, v0, -1, RED2);   // marcas da escavadeira
       }
-      maskRect(at(0, 0, 0), u, u + 4, VS + 0.1, V1); }
+    }
     // rampinhas de tábua (lado esquerdo de quem olha da rua) e a BMX parada do lado
     const WOOD = hex('#a8834f'), WOOD2 = hex('#8e6c3d'), WOOD3 = hex('#c39a5f'), BLK = hex('#9b968c'), BLK2 = hex('#857f74');
     const ramp = (cu, cv, ang, L, h, w) => {   // sobe ao longo de "ang" (em relação ao eixo v do terreno)
@@ -3108,14 +3118,14 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
     let hip, knee, ank;
     if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
-    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
+    else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
     else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
     const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
     out.push([thigh, th], [shin, shn], [foot, ft]);
     const armed = p.gun !== undefined && sd < 0, bib = sk === 'biblia' && sd > 0;
     let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.18 + w * (0.25 + 0.3 * Math.max(0, -ls));
     if (p.sit) { sw = 0.35; el = 0.6; }
-    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
+    else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
     if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
     if (bib) { sw = 0.45 + br * 0.02; el = 1.25; }
     const ua = vX(tor, [sd * 4.5, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : 0.06 + 0.02 * br))));
@@ -3123,7 +3133,7 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
     out.push([uArm, off(ua)], [armed ? fArmGun : bib ? fArmBib : fArm, off(fa)]);
   }
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02 + (p.jy || 0), p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : floorAt(p.x, p.z) + 0.02 + (p.jy || 0) + (p.climbY || 0), p.z, p.a), PSC);
   vxDraw(B, T, out);
 }
 // ================= Lucas / Rimis: musculoso, sem camisa, short e chinelo; cabeça raspada, bigodão, barba rala, brinco, tatuagens =================
@@ -3204,21 +3214,21 @@ function rigVox(B, p, Pt, shX) {
     const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
     let hip, knee, ank;
     if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
-    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
+    else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
     else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
     const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
     out.push([thigh, th], [shin, shn], [foot, ft]); if (Pt.coat) out.push([Pt.coat, th]);
     const armed = p.gun !== undefined && sd < 0;
     let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.22 + w * (0.25 + 0.3 * Math.max(0, -ls));
     if (p.sit) { sw = 0.35; el = 0.6; }
-    else if (p.jy > 0.02) { const k = Math.min(1, p.jy / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
+    else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
     if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
     const ua = vX(tor, [sd * shX, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : (shX > 5 ? 0.14 : 0.06) + 0.02 * br))));
     const fa = vX(ua, [0, -4.5, 0], vRx(el));
     const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
     out.push([uArm, off(ua)], [armed ? fArmGun : sd > 0 ? fArmL : fArmR, off(fa)]);
   }
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : surfAt(p.x, p.z) + 0.02 + (p.jy || 0), p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : floorAt(p.x, p.z) + 0.02 + (p.jy || 0) + (p.climbY || 0), p.z, p.a), PSC);
   vxDraw(B, T, out);
 }
 
@@ -3276,7 +3286,7 @@ function buildPlayer(B, p, look) {
   if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
   const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : sk === 'biblia' ? hex('#b98563') : sk === 'lucas' ? hex('#cf9c78') : sk === 'camila' ? hex('#d9a587') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : surfAt(p.x, p.z) + 0.02 + (p.jy || 0), p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : floorAt(p.x, p.z) + 0.02 + (p.jy || 0) + (p.climbY || 0), p.z, p.a), PSC);
   const sw = p.sit ? 0 : Math.sin(p.walk) * 0.7 * Math.min(1, p.speed / 3);
   const bob = Math.abs(Math.cos(p.walk)) * 0.06 * Math.min(1, p.speed / 3);
   const Tb = { o: [T.o[0], T.o[1] + bob, T.o[2]], ax: T.ax, ay: T.ay, az: T.az };
@@ -4746,13 +4756,30 @@ function step(dt) {
       let da = ta - player.a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
       player.a += da * Math.min(1, dt * 12);
       const dist = player.speed * dt, nsub = Math.max(1, Math.ceil(dist / 0.2));
-      for (let k = 0; k < nsub; k++) { // sub-steps so fast running can't pass through thin walls
+      const feet = floorAt(player.x, player.z) + player.jy;
+      const ok = (x, z) => {   // livre e sem degrau alto à frente (degrau alto: só subindo no pulo)
+        if (!freeAt(x, z, 0.35)) return false;
+        if (!PLATS.length) return true;
+        const f = Math.max(floorAt(x, z), floorAt(x + mx_ * 0.3, z + mz_ * 0.3));
+        if (f <= feet + 0.45) return true;
+        if ((player.jv > 0 || player.jy > 0.05) && f <= feet + 1.35 && !player.car) {   // agarra a beirada e sobe
+          const tx = x + mx_ * 0.5, tz = z + mz_ * 0.5, ft = floorAt(tx, tz);
+          if (freeAt(tx, tz, 0.35) && ft <= feet + 1.35) { player.climbY = feet - ft; player.x = tx; player.z = tz; player.jy = 0; player.jv = 0; player.climbed = true; }
+        }
+        return false;
+      };
+      for (let k = 0; k < nsub && !player.climbed; k++) { // sub-steps so fast running can't pass through thin walls
         const nx = player.x + mx_ * dist / nsub, nz = player.z + mz_ * dist / nsub;
-        if (freeAt(nx, nz, 0.35)) { player.x = nx; player.z = nz; }
-        else if (freeAt(nx, player.z, 0.35)) player.x = nx;
-        else if (freeAt(player.x, nz, 0.35)) player.z = nz;
+        if (ok(nx, nz)) { player.x = nx; player.z = nz; }
+        else if (player.climbed) break;
+        else if (ok(nx, player.z)) player.x = nx;
+        else if (ok(player.x, nz)) player.z = nz;
         else break;
       }
+      player.climbed = false;
+      { const fN = floorAt(player.x, player.z);   // mantém a altura dos pés ao passar de um chão para outro; saiu da beirada: cai
+        if (player.jy > 0 || player.jv) { player.jy = Math.max(0, feet - fN); if (player.jy === 0 && player.jv < 0) { player.jv = 0; player.land = 0.2; } }
+        else if (fN < feet - 0.3) player.jy = feet - fN; }
       player.walk += dt * player.speed * 2.3;
     }
     if (cam.fp || (window.__hunt && window.__hunt.shoulder())) player.a = Math.atan2(-Math.cos(cam.yaw), -Math.sin(cam.yaw));   // pegador olha para a mira
@@ -4777,10 +4804,11 @@ function step(dt) {
       cam.yaw += d * Math.min(1, dt * 2.5);
     }
   }
-  if (player.jv || player.jy > 0) {   // pulo
+  if (player.jv || player.jy > 0) {   // pulo / queda
     player.jv -= JUMP_G * dt; player.jy += player.jv * dt;
     if (player.jy <= 0) { player.jy = 0; player.jv = 0; player.land = 0.2; }
   }
+  if (player.climbY) { player.climbY *= Math.max(0, 1 - dt * 9); if (Math.abs(player.climbY) < 0.01) player.climbY = 0; }   // subindo na beirada: o corpo acompanha suave
   if (player.land > 0) player.land -= dt;
   { const bj = document.getElementById('btnJump'); if (bj) bj.style.display = player.car || player.sit ? 'none' : ''; }
   // traffic
@@ -4871,7 +4899,7 @@ function frame_() {
   const dynM = { vbo: dynVBO, n: dynB.n };
 
   // camera
-  const gy = surfAt(player.x, player.z) + (player.jy || 0) * 0.7;
+  const gy = floorAt(player.x, player.z) + (player.jy || 0) * 0.7 + (player.climbY || 0);
   camY += (gy - camY) * Math.min(1, dt * 8);
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
   let eye, tgt;
@@ -4975,7 +5003,7 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, gate9: () => GATE9, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, traffic, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, gate9: () => GATE9, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, traffic, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
 
 },30);
@@ -4983,7 +5011,7 @@ window.__game = { player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, b
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120122659";
+  const BUILD = "v20261120123707";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
