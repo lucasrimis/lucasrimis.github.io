@@ -32,7 +32,7 @@ export async function onRequest({ request: req, env }) {
     const n = String(b.n || '?').replace(/\s+/g, ' ').slice(0, 24), m = String(b.m || '').slice(0, 200), r = String(b.r || '').replace(/[^A-Z]/g, '').slice(0, 6);
     let text;
     if (b.t === 'join') text = `🟢 ${n} entrou no jogo (${b.mode === 'online' ? 'online' : b.mode === 'sala' ? 'esconde-esconde, sala ' + r : 'sozinho'})`;
-    else if (b.t === 'leave') text = `🔴 ${n} saiu do online${r ? ' (sala ' + r + ')' : ''}${b.why === 'fechou' ? ' — fechou o jogo' : ''}`;
+    else if (b.t === 'leave') text = `🔴 ${n} saiu do online${r ? ' (sala ' + r + ')' : ''}${b.why === 'fechou' ? ' — fechou o jogo' : b.why === 'sumiu' ? ' — fechou o app ou a conexão caiu' : ''}`;
     else if (b.t === 'chat' && m) text = `💬 ${r ? '[sala ' + r + '] ' : ''}${n}: ${m}`;
     else return J({ ok: false }, 400);
     await api('sendMessage', { chat_id: owner, text, disable_web_page_preview: true });
