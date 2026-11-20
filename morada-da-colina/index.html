@@ -193,12 +193,12 @@
 </div>
 <div id="help" class="panel">
   <div class="h">CONTROLES</div>
-  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> entrar/sair do carro<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (aproxime ao máximo para 1ª pessoa)<br><b>M</b> ou clique no mapa: mapa grande · <b>⚙</b> alterar gráfico<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle · <b>X</b> sentar no banco<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
+  <div class="kb"><b>WASD / setas</b> andar · <b>Shift</b> correr<br><b>C</b> subir/descer da bicicleta · <b>Espaço</b> pular<br><b>Arrastar mouse</b> / <b>Q E</b> girar câmera<br><b>Roda do mouse</b> zoom (aproxime ao máximo para 1ª pessoa)<br><b>M</b> ou clique no mapa: mapa grande · <b>⚙</b> alterar gráfico<br><b>V</b> primeira/terceira pessoa (clique para travar o mouse)<br><b>L</b> sombras · <b>H</b> esconder ajuda<br><b>Enter</b> falar no chat (online)<br><b>F</b> assistir a fita VHS (perto dela) · <b>C</b> coçar o beagle · <b>X</b> sentar no banco<br><b>Espaço</b> virar/atirar · <b>T</b> travar · <b>G</b> provocar (esconde-esconde)</div>
   <div class="tc">Lado esquerdo: <b>joystick</b> (empurre até o fim para correr)<br>Lado direito: <b>girar câmera</b> (2 dedos = zoom)<br>Botão <b>CHAT</b> para falar (online)<br>Botão <b>👁</b> primeira/terceira pessoa</div>
 </div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
-  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnJump" aria-label="Pular">⤴️<span>PULAR</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Carro">🚗</button></div>
+  <div id="tbtns"><button class="tbtn rb big2 act" id="btnAct" style="display:none">🎭<span>VIRAR</span></button><button class="tbtn rb" id="btnLock" style="display:none">🔓<span>TRAVAR</span></button><button class="tbtn rb" id="btnTaunt" style="display:none">📣<span>PROVOCAR</span></button><button class="tbtn rb" id="btnChat" style="display:none">💬<span>CHAT</span></button><button class="tbtn rb" id="btnJump" aria-label="Pular">⤴️<span>PULAR</span></button><button class="tbtn rb big2" id="btnCar" aria-label="Bicicleta">🚲</button></div>
 </div>
 <div id="online" class="panel" style="display:none"><span id="onlineTxt"></span><button id="btnLeave">SAIR</button></div>
 <div id="chatLog"></div>
@@ -2833,10 +2833,11 @@ cv.addEventListener('pointermove', e => { if (!drag) return; cam.yaw -= (e.clien
 cv.addEventListener('pointerup', () => { drag = null; });
 cv.addEventListener('wheel', e => { e.preventDefault(); if (cam.fp) { if (e.deltaY > 0) { setFP(false); cam.dist = 7.5; } return; } if (e.deltaY < 0 && cam.dist <= 7.05) { cam.zin = (cam.zin || 0) - e.deltaY; if (cam.zin > 120) { cam.zin = 0; setFP(true); } return; } cam.zin = 0; cam.dist = Math.max(7, Math.min(260, cam.dist * Math.exp(e.deltaY * 0.0012))); }, { passive: false });   // zoom: aproximar ao máximo entra em 1ª pessoa
 function toggleCar() {
-  if (window.__hunt && window.__hunt.active() && !player.car) return;   // sem carro no esconde-esconde
+  if (window.__hunt && window.__hunt.active() && !player.car) return;   // sem bicicleta no esconde-esconde
+  if (!player.car && (player.jy > 0 || player.sit)) return;
   if (player.car) { // step out to the side
-    const sx = player.x - Math.sin(player.a) * 2.2, sz = player.z + Math.cos(player.a) * 2.2;
-    if (freeAt(sx, sz, 0.35)) { player.x = sx; player.z = sz; }
+    const sx = player.x - Math.sin(player.a) * 0.8, sz = player.z + Math.cos(player.a) * 0.8;
+    if (freeAt(sx, sz, 0.35) && Math.abs(floorAt(sx, sz) - floorAt(player.x, player.z)) < 0.45) { player.x = sx; player.z = sz; }
     player.car = false; player.cv = 0;
   } else { player.car = true; player.cv = 0; }
   document.getElementById('btnCar').classList.toggle('on', player.car);
@@ -3107,9 +3108,10 @@ function buildPlayerVox(B, p, look, sk, SKN) {
   // animação
   const t = performance.now() / 1000, w = p.sit ? 0 : Math.min(1, (p.speed || 0) / 3), ph = p.walk || 0, s_ = Math.sin(ph), c_ = Math.cos(ph), br = Math.sin(t * 1.8 + (p.x || 0)) * (1 - w);
   const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08 - (p.land > 0 ? Math.sin(p.land / 0.2 * Math.PI) * 1.1 : 0);   // amortece a queda
-  const root = { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
+  const BK = p.car ? bikeRig(p) : null;
+  const root = BK ? { R: vRy(0), t: [0, BK.y, BK.z] } : { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
   const out = [[pelvis, root]];
-  const tor = vX(root, [0, 3, 0], vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.015)));
+  const tor = vX(root, [0, 3, 0], BK ? vRx(-BK.lean) : vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.015)));
   out.push([torso, tor]);
   const hd = vX(tor, [0, 8, 0], vMM(vRy(w * s_ * 0.12), vRx(0.04 * w * Math.abs(c_) - br * 0.02)));
   if (sk === 'carlos') hd.R = hd.R.map(v => v * 2);
@@ -3117,7 +3119,8 @@ function buildPlayerVox(B, p, look, sk, SKN) {
   for (const sd of [-1, 1]) {   // sd = +1: lado esquerdo do personagem (x+)
     const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
     let hip, knee, ank;
-    if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
+    if (BK) [hip, knee, ank] = BK.legs[sd < 0 ? 0 : 1];
+    else if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
     else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
     else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
     const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
@@ -3126,6 +3129,7 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.18 + w * (0.25 + 0.3 * Math.max(0, -ls));
     if (p.sit) { sw = 0.35; el = 0.6; }
     else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
+    if (BK) { sw = BK.sw; el = BK.el; }
     if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
     if (bib) { sw = 0.45 + br * 0.02; el = 1.25; }
     const ua = vX(tor, [sd * 4.5, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : 0.06 + 0.02 * br))));
@@ -3133,7 +3137,7 @@ function buildPlayerVox(B, p, look, sk, SKN) {
     const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
     out.push([uArm, off(ua)], [armed ? fArmGun : bib ? fArmBib : fArm, off(fa)]);
   }
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : floorAt(p.x, p.z) + 0.02 + (p.jy || 0) + (p.climbY || 0), p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : floorAt(p.x, p.z) + 0.02 + (p.car ? 0 : (p.jy || 0) + (p.climbY || 0)), p.z, p.a), PSC);
   vxDraw(B, T, out);
 }
 // ================= Lucas / Rimis: musculoso, sem camisa, short e chinelo; cabeça raspada, bigodão, barba rala, brinco, tatuagens =================
@@ -3203,9 +3207,10 @@ function rigVox(B, p, Pt, shX) {
   const { pelvis, torso, head, glasses, thigh, shin, foot, uArm, fArmL, fArmR, fArmGun } = Pt;
   const t = performance.now() / 1000, w = p.sit ? 0 : Math.min(1, (p.speed || 0) / 3), ph = p.walk || 0, s_ = Math.sin(ph), c_ = Math.cos(ph), br = Math.sin(t * 1.8 + (p.x || 0)) * (1 - w);
   const bob = w * (-0.55 + 0.55 * Math.abs(c_)) + br * 0.08 - (p.land > 0 ? Math.sin(p.land / 0.2 * Math.PI) * 1.1 : 0);   // amortece a queda
-  const root = { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
+  const BK = p.car ? bikeRig(p) : null;
+  const root = BK ? { R: vRy(0), t: [0, BK.y, BK.z] } : { R: vMM(vRy(w * s_ * 0.12), vRz(w * c_ * 0.035)), t: [0, 12 + bob, 0] };
   const out = [[pelvis, root]];
-  const tor = vX(root, [0, 3, 0], vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.02)));
+  const tor = vX(root, [0, 3, 0], BK ? vRx(-BK.lean) : vMM(vRy(-w * s_ * 0.22), vRx(-0.06 * w + br * 0.02)));
   out.push([torso, tor]);
   const hdM = vX(tor, [0, 9, 0], vMM(vRy(w * s_ * 0.12), vRx(0.04 * w * Math.abs(c_) - br * 0.02)));
   out.push([head, hdM]); if (glasses) out.push([glasses, { R: hdM.R.map(v => v * 0.5), t: hdM.t }]);
@@ -3213,7 +3218,8 @@ function rigVox(B, p, Pt, shX) {
   for (const sd of [-1, 1]) {
     const q = sd < 0 ? ph : ph + Math.PI, ls = Math.sin(q);
     let hip, knee, ank;
-    if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
+    if (BK) [hip, knee, ank] = BK.legs[sd < 0 ? 0 : 1];
+    else if (p.sit) { hip = Math.PI / 2; knee = Math.PI / 2; ank = 0; }
     else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); hip = (0.55 + (sd < 0 ? 0.25 : -0.05)) * k; knee = 1.15 * k; ank = 0.35 * k; }   // no ar: encolhe as pernas
     else { hip = w * ls * 0.48; knee = w * (0.08 + 0.75 * Math.max(0, -Math.sin(q - 0.5)) ** 1.4) + (1 - w) * 0.03; ank = knee - hip + w * 0.18 * Math.max(0, Math.cos(q)); }
     const th = vX(root, [sd * 2, 0, 0], vRx(hip)), shn = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(shn, [0, -3, 0], vRx(p.sit ? 0 : ank));
@@ -3222,13 +3228,14 @@ function rigVox(B, p, Pt, shX) {
     let sw = -w * ls * 0.5 + br * 0.03 * sd, el = 0.22 + w * (0.25 + 0.3 * Math.max(0, -ls));
     if (p.sit) { sw = 0.35; el = 0.6; }
     else if (p.jy > 0.02 || p.climbY < -0.05) { const k = Math.min(1, Math.max(p.jy, -(p.climbY || 0)) / 0.25); sw = sw * (1 - k) - 0.55 * k; el = el * (1 - k) + 0.9 * k; }   // braços sobem no ar
+    if (BK) { sw = BK.sw; el = BK.el; }
     if (armed) { sw = Math.PI / 2 + p.gun; el = 0; }
     const ua = vX(tor, [sd * shX, 6, 0], vMM(vRx(sw), vRz(sd * (armed ? 0 : (shX > 5 ? 0.14 : 0.06) + 0.02 * br))));
     const fa = vX(ua, [0, -4.5, 0], vRx(el));
     const off = M => ({ R: M.R, t: vMV(M.R, [0.5, 0, 0]).map((x, i) => x + M.t[i]) });
     out.push([uArm, off(ua)], [armed ? fArmGun : sd > 0 ? fArmL : fArmR, off(fa)]);
   }
-  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : floorAt(p.x, p.z) + 0.02 + (p.jy || 0) + (p.climbY || 0), p.z, p.a), PSC);
+  const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.755 * PSC : floorAt(p.x, p.z) + 0.02 + (p.car ? 0 : (p.jy || 0) + (p.climbY || 0)), p.z, p.a), PSC);
   vxDraw(B, T, out);
 }
 
@@ -3280,10 +3287,33 @@ function buildCamilaVox(B, p) {
   const foot = vxPart('ftCam', b => { b(-1, 1, -3, -3, -2, 3, hex('#d7d9dc')); b(-1, 1, -2, -1, -1, 3, WH); b(-1, 1, -2, -2, 3, 3, hex('#d7d9dc')); });   // tênis branco
   rigVox(B, p, { pelvis, torso, head, glasses, thigh, shin, foot, uArm, fArmL: fArm, fArmR: fArm, fArmGun, coat }, 4.5);
 }
+
+// ================= bicicleta do jogador (BMX prateada) + pose de quem pedala =================
+const BIKE_PED = [-0.05, 0.27], BIKE_PR = 0.1, BIKE_SEAT = [-0.22, 0.72], BIKE_BAR = [0.26, 0.98, 0.3];
+function bikeMesh(B, p) {
+  const K = frame(p.x, floorAt(p.x, p.z) + 0.02, p.z, p.a), rr = 0.25, tire = hex('#17181b'), fr = hex('#b9bec6'), chrome = hex('#e3e6ea'), wr = p.wr || 0, ped = p.ped || 0;
+  const wheel = cu => { for (let q = 0; q < 12; q++) { const b0 = q / 12 * Math.PI * 2, b1 = (q + 1) / 12 * Math.PI * 2; beam(B, P(K, cu + Math.cos(b0) * rr, rr + Math.sin(b0) * rr, 0), P(K, cu + Math.cos(b1) * rr, rr + Math.sin(b1) * rr, 0), 0.07, tire); }
+    for (let q = 0; q < 4; q++) { const b = q / 4 * Math.PI - wr; beam(B, P(K, cu - Math.cos(b) * rr * 0.9, rr - Math.sin(b) * rr * 0.9, 0), P(K, cu + Math.cos(b) * rr * 0.9, rr + Math.sin(b) * rr * 0.9, 0), 0.014, chrome); } };
+  wheel(-0.42); wheel(0.42);
+  const rear = P(K, -0.42, rr, 0), crank = P(K, BIKE_PED[0], BIKE_PED[1], 0), seat = P(K, BIKE_SEAT[0], BIKE_SEAT[1] - 0.06, 0), head = P(K, 0.3, 0.72, 0), front = P(K, 0.42, rr, 0);
+  beam(B, rear, crank, 0.04, fr); beam(B, rear, seat, 0.04, fr); beam(B, crank, seat, 0.05, fr); beam(B, crank, head, 0.055, fr); beam(B, seat, head, 0.05, fr); beam(B, head, front, 0.04, chrome);
+  box(B, K, BIKE_SEAT[0] - 0.12, BIKE_SEAT[0] + 0.12, BIKE_SEAT[1] - 0.06, BIKE_SEAT[1] - 0.01, -0.06, 0.06, tire, tire);   // selim
+  beam(B, head, P(K, BIKE_BAR[0], BIKE_BAR[1], 0), 0.035, chrome); beam(B, P(K, BIKE_BAR[0], BIKE_BAR[1], -BIKE_BAR[2]), P(K, BIKE_BAR[0], BIKE_BAR[1], BIKE_BAR[2]), 0.035, chrome);
+  for (const sv of [-BIKE_BAR[2], BIKE_BAR[2]]) beam(B, P(K, BIKE_BAR[0], BIKE_BAR[1], sv), P(K, BIKE_BAR[0] - 0.06, BIKE_BAR[1], sv), 0.05, tire);
+  for (const sd of [-1, 1]) { const a = ped + (sd > 0 ? 0 : Math.PI), px = BIKE_PED[0] + Math.cos(a) * BIKE_PR, py = BIKE_PED[1] - Math.sin(a) * BIKE_PR;   // pedivela e pedal girando
+    beam(B, P(K, BIKE_PED[0], BIKE_PED[1], sd * 0.07), P(K, px, py, sd * 0.07), 0.025, chrome); box(B, K, px - 0.06, px + 0.06, py - 0.015, py + 0.015, sd * 0.07 + (sd > 0 ? 0 : -0.1), sd * 0.07 + (sd > 0 ? 0.1 : 0), hex('#2a2a2a'), hex('#2a2a2a')); }
+}
+function bikeRig(p) {   // em cubinhos (escala PSC): quadril no selim, pés nos pedais, mãos no guidão
+  const u = 1 / (VX * PSC), hipY = BIKE_SEAT[1] * u + 0.6, hipZ = BIKE_SEAT[0] * u, lean = 0.32, ped = p.ped || 0;
+  const legs = [-1, 1].map(sd => { const a = ped + (sd > 0 ? 0 : Math.PI), py = (BIKE_PED[1] - Math.sin(a) * BIKE_PR) * u + 2.4, pz = (BIKE_PED[0] + Math.cos(a) * BIKE_PR) * u;
+    const [th, al, kb] = ik2(6, 3, pz - hipZ, py - hipY); return [th + al, kb, kb - (th + al)]; });
+  const sy = hipY + 3 + 6 * Math.cos(lean), sz = hipZ + 6 * Math.sin(lean), [ath, aal, akb] = ik2(4.5, 5, BIKE_BAR[0] * u - sz, BIKE_BAR[1] * u - sy);
+  return { y: hipY, z: hipZ, lean, legs, sw: ath - aal + lean, el: akb };
+}
 function buildPlayer(B, p, look) {
   p = p || player; look = look || { shirt: SHIRT, car: PCAR };
   let SHIRT_ = look.shirt; const CAR_ = look.car;
-  if (p.car) { carMesh(B, groundFrame(p.x, p.z, p.a, 0.0), CAR_); return; }
+  if (p.car) bikeMesh(B, p);   // de bicicleta: desenha a bike e o personagem pedalando
   const sk = skinOf(p === player ? player.n : p.n), SKN = sk === 'miguel' ? hex('#c99878') : sk === 'kiko' ? hex('#d6a17c') : sk === 'carlos' ? hex('#d9a684') : sk === 'manoel' ? hex('#d8ab92') : sk === 'biblia' ? hex('#b98563') : sk === 'lucas' ? hex('#cf9c78') : sk === 'camila' ? hex('#d9a587') : SKIN;
   if (p === player || Math.hypot(p.x - player.x, p.z - player.z) < 45) { buildPlayerVox(B, p, look, sk, SKN); return; }   // perto: modelo detalhado; longe: o simples
   const T = scaleT(frame(p.x, p.sit ? p.sit.y - 0.75 * PSC : floorAt(p.x, p.z) + 0.02 + (p.jy || 0) + (p.climbY || 0), p.z, p.a), PSC);
@@ -4128,7 +4158,7 @@ function updateHUD() {
   if (txt !== lastStreet) { hudStreet.textContent = txt; lastStreet = txt; }
   const v = player.car ? Math.abs(player.cv) : player.speed;
   const gc = gameClock(), hh = Math.floor(gc.h), mm = Math.floor((gc.h - hh) * 60), isDay = gc.h >= 6 && gc.h < 18;
-  hudMode.textContent = (player.car ? 'CARRO ' : (player.running ? 'CORRENDO ' : 'A PÉ ')) + Math.round(v * 3.6) + ' km/h · alt. ' + Math.round((DEM ? DEM.base : 0) + groundAt(player.x, player.z)) + ' m · ' + (isDay ? '☀ ' : '☾ ') + String(hh).padStart(2, '0') + ':' + String(mm - mm % 10).padStart(2, '0');
+  hudMode.textContent = (player.car ? 'BICICLETA ' : (player.running ? 'CORRENDO ' : 'A PÉ ')) + Math.round(v * 3.6) + ' km/h · alt. ' + Math.round((DEM ? DEM.base : 0) + groundAt(player.x, player.z)) + ' m · ' + (isDay ? '☀ ' : '☾ ') + String(hh).padStart(2, '0') + ':' + String(mm - mm % 10).padStart(2, '0');
 }
 
 // ---------------- modo online (Firebase Realtime Database) ----------------
@@ -4784,18 +4814,19 @@ function step(dt) {
     }
     if (cam.fp || (window.__hunt && window.__hunt.shoulder())) player.a = Math.atan2(-Math.cos(cam.yaw), -Math.sin(cam.yaw));   // pegador olha para a mira
   } else {
-    const thr = joy.id !== null ? Math.max(-1, Math.min(1, iy)) : Math.sign(iy);
-    const acc = thr > 0.05 ? 9 * Math.min(1, thr / 0.6) : thr < -0.05 ? (player.cv > 0.5 ? -16 : -6) * Math.min(1, -thr / 0.6) : -Math.sign(player.cv) * 3;
+    const thr = joy.id !== null ? Math.max(-1, Math.min(1, iy)) : Math.sign(iy);   // bicicleta: pedala, freia, anda devagar de ré
+    const acc = thr > 0.05 ? 4.5 * Math.min(1, thr / 0.6) : thr < -0.05 ? (player.cv > 0.5 ? -9 : -2) * Math.min(1, -thr / 0.6) : -Math.sign(player.cv) * 1.2;
     player.cv += acc * dt;
-    const vmax = run ? 30 : 18;
-    player.cv = Math.max(-6, Math.min(vmax, player.cv));
+    const vmax = run ? 12 : 7.5;
+    player.cv = Math.max(-1.5, Math.min(vmax, player.cv));
     if (iy === 0 && Math.abs(player.cv) < 0.2) player.cv = 0;
-    const steer = ix * Math.min(1, Math.abs(player.cv) / 4) * 1.9 * Math.sign(player.cv);
+    const steer = ix * Math.min(1, Math.abs(player.cv) / 2) * 2.4 * Math.sign(player.cv);
     player.a += steer * dt;
     const fx = Math.cos(player.a), fz = Math.sin(player.a);
     const nx = player.x + fx * player.cv * dt, nz = player.z + fz * player.cv * dt;
-    const ok = freeAt(nx, nz, 0.9) && freeAt(nx + fx * 1.8, nz + fz * 1.8, 0.6) && freeAt(nx - fx * 1.8, nz - fz * 1.8, 0.6);
-    if (ok) { player.x = nx; player.z = nz; } else player.cv *= -0.25;
+    const f0 = floorAt(player.x, player.z), ok = freeAt(nx, nz, 0.35) && freeAt(nx + fx * 0.7, nz + fz * 0.7, 0.3) && freeAt(nx - fx * 0.6, nz - fz * 0.6, 0.3) && floorAt(nx + fx * 0.7, nz + fz * 0.7) <= f0 + 0.45;
+    if (ok) { player.x = nx; player.z = nz; } else player.cv *= -0.2;
+    player.wr = (player.wr || 0) + player.cv * dt / 0.25; player.ped = (player.ped || 0) + player.cv * dt / 0.25 / 2.2;   // rodas e pedais giram com a velocidade
     // camera auto-follow behind the car
     cam.follow = Math.max(0, cam.follow - dt);
     if (cam.follow <= 0 && Math.abs(player.cv) > 1) {
@@ -4849,12 +4880,8 @@ function frame_() {
   // dynamic mesh
   dynB.reset();
   if (!cam.fp && !(window.__net && window.__net.drawMe && window.__net.drawMe(dynB))) buildPlayer(dynB, player, MY_LOOK);
-  if (cam.fp && player.car) { // capô e painel do carro em primeira pessoa
-    const T = groundFrame(player.x, player.z, player.a, 0.0), cc = MY_LOOK.car || PCAR;
-    box(dynB, T, 1.25, 2.1, 0.35, 0.98, -0.9, 0.9, cc, cc);
-    box(dynB, T, 0.95, 1.25, 0.94, 1.0, -0.88, 0.88, hex('#1b1d22'), hex('#26282c'));
-    for (const v of [-0.9, 0.9]) box(dynB, T, 0.2, 0.95, 1.05, 1.65, v - 0.04, v + 0.04, cc, cc);   // colunas
-  }
+  if (cam.fp && player.car) { const K = frame(player.x, floorAt(player.x, player.z) + 0.02, player.z, player.a), c = hex('#e3e6ea');   // guidão em primeira pessoa
+    beam(dynB, P(K, BIKE_BAR[0], BIKE_BAR[1], -BIKE_BAR[2]), P(K, BIKE_BAR[0], BIKE_BAR[1], BIKE_BAR[2]), 0.035, c); beam(dynB, P(K, 0.3, 0.72, 0), P(K, BIKE_BAR[0], BIKE_BAR[1], 0), 0.035, c); }
   if (window.__net) window.__net.frame(dynB, dt);
   for (const f of FLY_SPOTS) for (let k = 0; k < 7; k++) {
     const ph = t * (2.2 + k * 0.37) + k * 1.9, r = 0.25 + 0.18 * Math.sin(t * 1.3 + k);
@@ -4904,7 +4931,7 @@ function frame_() {
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
   let eye, tgt;
   if (cam.fp) { // primeira pessoa: olhos na altura da cabeça (ou do objeto, no esconde-esconde)
-    const eh = (window.__net && window.__net.eyeH && window.__net.eyeH()) || (player.car ? 1.48 : 1.68 * PSC);
+    const eh = (window.__net && window.__net.eyeH && window.__net.eyeH()) || (player.car ? 1.6 * PSC : 1.68 * PSC);
     const fx = Math.cos(player.a), fz = Math.sin(player.a);
     eye = player.car ? [player.x + fx * 0.15 - fz * 0.38, camY + eh, player.z + fz * 0.15 + fx * 0.38] : [player.x + fx * 0.12, camY + eh, player.z + fz * 0.12];
     tgt = [eye[0] - Math.sin(cam.yaw) * cp, eye[1] - sp, eye[2] - Math.cos(cam.yaw) * cp];
@@ -5011,7 +5038,7 @@ window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, D
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120124430";
+  const BUILD = "v20261120125227";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
