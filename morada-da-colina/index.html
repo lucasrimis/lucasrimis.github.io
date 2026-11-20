@@ -3408,7 +3408,14 @@ function npcPose(B, T, Pt, head, pose) {   // pose: y, lean, legs [[hip,knee,ank
   const out = [[Pt.pelvis, root]];
   const tor = vX(root, [0, 3, 0], vRx(-(pose.lean || 0)));
   out.push([Pt.torso, tor]);
-  out.push([head, vX(tor, [0, 8, 0], vMM(vRy(pose.hy || 0), vRx(pose.hp || 0)))]);
+  const hdM = vX(tor, [0, 8, 0], vMM(vRy(pose.hy || 0), vRx(pose.hp || 0)));
+  out.push([head, hdM]);
+  if (pose.halo) {   // auréola dourada flutuando sobre a cabeça (como a dos cães)
+    const q = vMV(hdM.R, [0, 14, 0]).map((v, i) => v + hdM.t[i]), c = [0, 1, 2].map(i => T.o[i] + (T.ax[i] * q[2] + T.ay[i] * q[1] - T.az[i] * q[0]) * VX);
+    const tt = nowMs() / 1000; c[1] += Math.sin(tt * 2.4) * 0.03;
+    for (let i = 0; i < 16; i++) { const a0 = i / 16 * Math.PI * 2, a1 = (i + 1) / 16 * Math.PI * 2, R = 0.19;
+      beam(B, [c[0] + Math.cos(a0) * R, c[1], c[2] + Math.sin(a0) * R], [c[0] + Math.cos(a1) * R, c[1], c[2] + Math.sin(a1) * R], 0.022, [255, 214, 90], F_GLOW); }
+  }
   [-1, 1].forEach((sd, i) => {
     const [hip, knee, ank] = pose.legs[i];
     const th = vX(root, [sd * 2, 0, 0], vRx(hip)), sh = vX(th, [0, -6, 0], vRx(-knee)), ft = vX(sh, [0, -3, 0], vRx(ank));
@@ -4131,7 +4138,7 @@ function buildRider(B, n, t) {   // Portela pedalando, de boné
   const sy = hipY + 3 + 6 * Math.cos(lean), sz = hipZ + 6 * Math.sin(lean), hy = 1.12 * u, hz = 0.38 * u;   // ombro → guidão
   const [ath, aal, akb] = ik2(4.5, 5, hz - sz, hy - sy);
   const arm = [ath - aal + lean, akb, 0.02, 0];
-  npcPose(B, T, npcParts('portela', PORTELA_O), portelaHead(), { y: hipY - 3 * 0, z: hipZ, lean, hp: -lean * 0.8, legs, arms: [arm, arm] });
+  npcPose(B, T, npcParts('portela', PORTELA_O), portelaHead(), { y: hipY - 3 * 0, z: hipZ, lean, hp: -lean * 0.8, legs, arms: [arm, arm], halo: true });
 }
 function buildNPC(B, n, t) {
   if (n.style === 'caudinho') return buildCaudinho(B, n, t);
@@ -4139,7 +4146,7 @@ function buildNPC(B, n, t) {
   const T = scaleT(frame(n.x, n.y, n.z, n.base), PSC), br = Math.sin(t * 1.6), g = Math.sin(t * 0.7) * 0.15;
   // Portela parado na guarita: uma mão na cintura, a outra gesticulando devagar; a cabeça vira para quem chega
   npcPose(B, T, npcParts('portela', PORTELA_O), portelaHead(), { y: 12 + br * 0.08, hy: -(n.look || 0), legs: [[0, 0.03, 0.03], [0, 0.03, 0.03]],
-    arms: [[0.15 + g, 0.5 + g, 0.06], [-0.15, 1.9, 0.7, 1.2]] });
+    arms: [[0.15 + g, 0.5 + g, 0.06], [-0.15, 1.9, 0.7, 1.2]], halo: true });
 }
 // ---------------- resize ----------------
 function resize() {
@@ -5038,7 +5045,7 @@ window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, D
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261120125554";
+  const BUILD = "v20261120125959";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
