@@ -4487,9 +4487,7 @@ window.__net = (function () {
   };
   H.onTaunt = (uid, o) => {
     const d = Math.hypot(o.x - player.x, o.z - player.z);
-    sndTaunt(Math.max(0, 1 - d / 80) * 0.3);
-    if (!o.bub) { o.bub = document.createElement('div'); o.bub.className = 'bubble'; lblLayer.appendChild(o.bub); }
-    o.bub.textContent = '♪ ♫ ♪'; o.bubUntil = performance.now() + 2500; o.bubTaunt = true;
+    sndTaunt(Math.max(0, 1 - d / 80) * 0.3);   // só o som: nada aparece em cima de quem provocou, o pegador tem que achar pelo ouvido
   };
   H.shoot = () => {
     const now = performance.now(); if (now - H.lastShot < 700 || !H.eye) return; H.lastShot = now;
