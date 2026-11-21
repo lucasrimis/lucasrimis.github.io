@@ -3,14 +3,21 @@
 //   TG_TOKEN  (secreta) token do bot criado no @BotFather
 //   TG_CHAT   o seu ID do Telegram (veja em /mdc-tg/setup depois de mandar "oi" para o bot)
 // Rotas:
-//   POST /mdc-tg/notify   {t:'join'|'chat', n, m, mode, r}  -> manda o aviso para o criador
+//   POST /mdc-tg/notify   {t:'join'|'chat'|'leave'|'away'|'back', n, m, mode, r, sid}  -> manda o aviso para o criador
+//     away: o jogo sumiu da tela (celular foi para a tela inicial, trocou de app, bloqueou, fechou pelo multitarefa).
+//           Espera AWAY_MS; se não chegar 'back' nem 'leave' da mesma sessão (sid), avisa que a pessoa saiu.
+//     back: voltou para o jogo; se a saída já tinha sido avisada, avisa que voltou.
+//     O estado de cada sessão fica no Cache API do Cloudflare (funciona em *.pages.dev, sem configurar nada).
 //   GET  /mdc-tg/criador  -> últimas mensagens que o criador mandou para o bot (o jogo mostra no céu e no chat)
 //   GET  /mdc-tg/setup    -> enquanto TG_CHAT não existe, lista quem mandou mensagem para o bot
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...CORS } });
 let memo = { t: 0, v: null };   // cache curtinho por instância, para não chamar o Telegram a cada jogador
 
-export async function onRequest({ request: req, env }) {
+const AWAY_MS = 25000;   // waitUntil das Pages Functions vai até ~30 s depois da resposta
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+export async function onRequest({ request: req, env, waitUntil }) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
   const url = new URL(req.url), path = url.pathname.replace(/^\/mdc-tg\/?/, '').replace(/\/$/, '');
   const T = env.TG_TOKEN; if (!T) return J({ ok: false, error: 'TG_TOKEN não configurado' }, 503);
@@ -30,6 +37,32 @@ export async function onRequest({ request: req, env }) {
     if (!owner) return J({ ok: false }, 503);
     let b; try { b = JSON.parse(await req.text()); } catch (e) { return J({ ok: false }, 400); }
     const n = String(b.n || '?').replace(/\s+/g, ' ').slice(0, 24), m = String(b.m || '').slice(0, 200), r = String(b.r || '').replace(/[^A-Z]/g, '').slice(0, 6);
+    const sid = String(b.sid || '').replace(/[^a-z0-9]/g, '').slice(0, 12);
+    const C = caches.default, K = k => new Request(url.origin + '/__mdc-estado/' + k + '/' + sid);
+    const get = async k => { try { const r = await C.match(K(k)); return r ? await r.text() : null; } catch (e) { return null; } };
+    const put = (k, v) => C.put(K(k), new Response(String(v), { headers: { 'Cache-Control': 'max-age=86400' } })).catch(() => {});
+    const del = k => C.delete(K(k)).catch(() => {});
+    const send = text => api('sendMessage', { chat_id: owner, text, disable_web_page_preview: true });
+    const where = r ? ' (sala ' + r + ')' : '';
+    if (b.t === 'away') {
+      if (!sid) return J({ ok: false }, 400);
+      const t0 = Date.now(); await put('away', t0);
+      waitUntil((async () => {
+        await sleep(AWAY_MS);
+        if (await get('done')) return;                          // a saída já foi avisada (fechou a aba, apertou SAIR...)
+        if (+(await get('back') || 0) >= t0) return;            // voltou a tempo
+        await put('done', 1);
+        await send(`🔴 ${n} saiu do online${where} — saiu do app ou trocou de tela`);
+      })());
+      return J({ ok: true });
+    }
+    if (b.t === 'back') {
+      if (!sid) return J({ ok: true });
+      await put('back', Date.now());
+      if (await get('done')) { await del('done'); await send(`🟢 ${n} voltou ao jogo${where}`); }
+      return J({ ok: true });
+    }
+    if (b.t === 'leave' && sid) { if (await get('done')) return J({ ok: true }); await put('done', 1); }   // não repete a saída da mesma sessão
     let text;
     if (b.t === 'join') text = `🟢 ${n} entrou no jogo (${b.mode === 'online' ? 'online' : b.mode === 'sala' ? 'esconde-esconde, sala ' + r : 'sozinho'})`;
     else if (b.t === 'leave') text = `🔴 ${n} saiu do online${r ? ' (sala ' + r + ')' : ''}${b.why === 'fechou' ? ' — fechou o jogo' : b.why === 'sumiu' ? ' — fechou o app ou a conexão caiu' : ''}`;
