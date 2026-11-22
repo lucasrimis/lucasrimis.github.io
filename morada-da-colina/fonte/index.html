@@ -2910,7 +2910,7 @@ addEventListener('keydown', e => {
   if (typeof PH !== 'undefined' && PH.open) return;
   if (e.code === 'KeyF' && typeof VHS !== 'undefined' && VHS.near) { vhsOpen(VHS.cur); return; }
   if (e.code === 'KeyF' && typeof PH !== 'undefined' && PH.near) { photoOpen(); return; }
-  if (e.code === 'KeyC' && typeof BEAGLE !== 'undefined' && BEAGLE.near) { beaglePet(); return; }
+  if (e.code === 'KeyC' && typeof PET !== 'undefined' && PET.target) { petNow(); return; }
   if (e.code === 'KeyX' && BENCH && BENCH.near) { benchSit(); return; }
   if (e.code === 'Enter' && window.__net && window.__net.online) { e.preventDefault(); window.__net.openChat(); return; }
   if (!e.repeat && window.__hunt && window.__hunt.key(e.code)) { e.preventDefault(); return; }
@@ -3654,7 +3654,8 @@ function buildDog(B, d, t) {
       beam(B, p0, p1, 0.016, GOLD, F_GLOW); }
   }
   const eyes = (m, u, y, vs) => { for (const sv of [-1, 1]) { m(u - 0.03, u, y, y + 0.035, sv * vs - 0.018, sv * vs + 0.018, EYE); m(u - 0.03, u, y + 0.035, y + 0.045, sv * vs - 0.005 - (sv < 0 ? 0.012 : 0), sv * vs + 0.005 - (sv < 0 ? 0.012 : 0), SHINE); } };
-  const head = dogVox(k + 'head', m => {
+  const smile = k === 'yorkieRoupa' && d.smile;
+  const head = dogVox(k + 'head' + (smile ? 'S' : ''), m => {
     if (k === 'beagle') {
       const CAR = hex('#c98a4a');
       m(-0.01, 0.17, 0.02, 0.22, -0.1, 0.1, CAR);                      // cabeça caramelo
@@ -3702,7 +3703,12 @@ function buildDog(B, d, t) {
       m(0.22, 0.255, 0.07, 0.11, -0.025, 0.025, NOSE);
       eyes(m, 0.17, 0.12, 0.045);
       for (const sv of [-1, 1]) m(0.0, 0.05, 0.22, 0.31, sv * 0.06 - 0.025, sv * 0.06 + 0.025, HC);
-      if (k === 'yorkieRoupa') m(0.2, 0.31, -0.03, 0.06, -0.06, 0.06, hex('#3fae5f'));   // brinquedo verde na boca
+      if (k === 'yorkieRoupa' && smile) {   // sorriso: larga o brinquedo, boca em U com a linguinha de fora (alinhado aos cubinhos de 3,5 cm)
+        const MTH = hex('#3a1e1e'), TNG = hex('#f07a8a');
+        m(0.21, 0.245, 0.0, 0.035, -0.035, 0.07, MTH);                   // boca
+        m(0.21, 0.245, 0.035, 0.07, 0.035, 0.07, MTH); m(0.21, 0.245, 0.035, 0.07, -0.035, 0.0, MTH);   // cantos levantados
+        m(0.21, 0.28, -0.035, 0.0, 0.0, 0.035, TNG);                     // linguinha
+      } else if (k === 'yorkieRoupa') m(0.2, 0.31, -0.03, 0.06, -0.06, 0.06, hex('#3fae5f'));   // brinquedo verde na boca
     }
   });
   out.push([head, at(hu, hy, 0, vRy(-(d.look || 0)))]);
@@ -4074,8 +4080,7 @@ function beagleFrame(B, dt, t) {
   if (!R.path.length) return;
   const d = R.d, pd = WORLD_PUPPET ? 99 : nearestP(d.x, d.z).d, myd = Math.hypot(player.x - d.x, player.z - d.z);
   // coçar o bumbum
-  const btn = document.getElementById('btnPet'); R.near = myd < 2.4 && !player.car;
-  if (btn) btn.style.display = R.near && R.scratch <= 0 && !d.thump ? '' : 'none';
+  R.near = myd < 2.4 && !player.car && R.scratch <= 0 && !d.thump; R.myd = myd;   // o botão de carinho é decidido em petFrame (Pantufa + cachorros dos quintais)
   if (WORLD_PUPPET) {   // só mostra o que o dono do mundo manda; coraçõezinhos enquanto alguém coça
     if (d.thump && Math.random() < dt * 5) R.hearts.push({ x: d.x + (Math.random() - 0.5) * 0.25, z: d.z + (Math.random() - 0.5) * 0.25, y: surfAt(d.x, d.z) + 0.75, life: 0 });
   } else if (R.scratch > 0) {
@@ -4173,7 +4178,42 @@ function beaglePetAt(x, z) { const R = BEAGLE; if (!R.d || R.scratch > 0) return
 function beaglePet() { if (!BEAGLE.near || BEAGLE.scratch > 0 || (BEAGLE.d && BEAGLE.d.thump)) return;
   if (WORLD_PUPPET && window.__net && window.__net.worldEvent) window.__net.worldEvent({ k: 'pet', x: +player.x.toFixed(2), z: +player.z.toFixed(2) });   // pede ao dono do mundo
   else beaglePetAt(player.x, player.z); }
-document.getElementById('btnPet').addEventListener('click', e => { e.stopPropagation(); beaglePet(); });
+// ---------------- carinho nos cachorros dos quintais (a Pantufa tem o dela, com a patinha) ----------------
+const PET = { target: null, hearts: [], label: '' };
+function dogPetAt(i, x, z) { const d = DOGS[i]; if (!d || d.mode === 'escape' || d.mode === 'enter' || d.petT > 0) return; d.petT = 3.5; d.pet = true; d.petA = Math.atan2(z - d.z, x - d.x); }
+function petFrame(B, dt) {
+  // quem está mais perto: a Pantufa ou um cachorro de quintal
+  let best = null, bd = 2.4;
+  if (!player.car && !player.sit) {
+    if (BEAGLE.near && BEAGLE.myd < bd) { bd = BEAGLE.myd; best = { beagle: true }; }
+    DOGS.forEach((d, i) => { if (d.pet || d.mode === 'escape' || d.mode === 'enter') return; const dd = Math.hypot(player.x - d.x, player.z - d.z); if (dd < bd) { bd = dd; best = { i }; } });
+  }
+  PET.target = best;
+  const btn = document.getElementById('btnPet');
+  if (btn) {
+    btn.style.display = best ? '' : 'none';
+    const lab = best ? (best.beagle ? '🐾 COÇAR O BUMBUM' : '🐾 FAZER CARINHO NO ' + (DOG_NAMES[DOGS[best.i].kind] || 'CACHORRO').toUpperCase()) : '';
+    if (lab && lab !== PET.label) { PET.label = lab; btn.innerHTML = lab + ' <span class="k">(C)</span>'; }
+  }
+  // coraçõezinhos subindo de quem está ganhando carinho (vale para o dono do mundo e para quem só assiste)
+  for (const d of DOGS) if (d.pet && Math.random() < dt * 5) { const D = DOGDEF[d.kind]; PET.hearts.push({ x: d.x + (Math.random() - 0.5) * 0.25, z: d.z + (Math.random() - 0.5) * 0.25, y: surfAt(d.x, d.z) + (D.lh + D.bh) * 1.6 + 0.25, life: 0 }); }
+  drawHearts(B, PET, dt);
+}
+function drawHearts(B, R, dt) {
+  R.hearts = R.hearts.filter(h => (h.life += dt) < 1.6);
+  for (const h of R.hearts) {
+    const y = h.y + h.life * 0.5, s_ = 0.05 * (1 - h.life / 1.6 * 0.4), c = [235, 60, 90], Th = frame(h.x + Math.sin(h.life * 6) * 0.05, y, h.z, cam.yaw);
+    box(B, Th, -s_ * 1.4, -s_ * 0.1, 0, s_ * 1.6, -0.005, 0.005, c, c, F_GLOW); box(B, Th, s_ * 0.1, s_ * 1.4, 0, s_ * 1.6, -0.005, 0.005, c, c, F_GLOW);
+    box(B, Th, -s_ * 0.9, s_ * 0.9, -s_ * 1.0, 0.02, -0.005, 0.005, c, c, F_GLOW); box(B, Th, -s_ * 0.4, s_ * 0.4, -s_ * 1.5, -s_ * 0.9, -0.005, 0.005, c, c, F_GLOW);
+  }
+}
+function petNow() {
+  const T = PET.target; if (!T) return;
+  if (T.beagle) { beaglePet(); return; }
+  if (WORLD_PUPPET && window.__net && window.__net.worldEvent) window.__net.worldEvent({ k: 'pet', i: T.i, x: +player.x.toFixed(2), z: +player.z.toFixed(2) });   // pede ao dono do mundo
+  else dogPetAt(T.i, player.x, player.z);
+}
+document.getElementById('btnPet').addEventListener('click', e => { e.stopPropagation(); petNow(); });
 document.getElementById('btnPet').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
 function drawDog(B, d, t) { if (Math.abs(d.x - player.x) < 160 && Math.abs(d.z - player.z) < 160) buildDog(B, d, t); }
 function dogsFrame(B, dt, t) {
@@ -4194,6 +4234,13 @@ function dogsFrame(B, dt, t) {
       drawDog(B, d, t); continue;
     }
     if (d.mode === 'enter') { if (dogRun(d, dt, 2.6)) { d.mode = null; d.tx = d.x; d.tz = d.z; d.wait = 1.5; } drawDog(B, d, t); continue; }
+    // o Bob (yorkshire de roupinha) sorri quando alguém chega perto dele dentro do quintal da 116
+    if (d.kind === 'yorkieRoupa') { const [pu, pv] = loc(PP.x, PP.z); d.smile = pd < 4 && pu > Y.u0 - 0.5 && pu < Y.u1 + 0.5 && pv > Y.v0 - 0.5 && pv < Y.v1 + 0.5 && !(pu > Y.nu0 && pu < Y.nu1 && pv < Y.nv); }
+    if (d.petT > 0) {        // ganhando carinho: fica parado, olhando para quem faz carinho, abanando o rabo sem parar
+      d.petT -= dt; d.pet = d.petT > 0; d.spd = 0; d.sit = false; d.wag = 1; d.wait = Math.max(d.wait, 2);
+      if (d.petA !== undefined) { let tr = d.petA - d.a; while (tr > Math.PI) tr -= 2 * Math.PI; while (tr < -Math.PI) tr += 2 * Math.PI; d.a += Math.max(-dt * 4, Math.min(dt * 4, tr)); }
+      d.look = (d.look || 0) * (1 - Math.min(1, dt * 5)); drawDog(B, d, t); continue;
+    }
     if (pd < 7) {            // alguém chegou perto: para, olha e abana o rabo
       d.wait = Math.max(d.wait, 0.5); d.spd = 0;
       let rel = Math.atan2(PP.z - d.z, PP.x - d.x) - d.a; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
@@ -4222,7 +4269,7 @@ function dogsFrame(B, dt, t) {
 const WSYNC = { buf: [], delay: 320 };
 const r2 = v => Math.round(v * 100) / 100, r1 = v => Math.round(v * 10) / 10;
 function worldEncDogs() {
-  const dog = d => [r2(d.x), r2(d.z), r2(d.a), r1(d.spd || 0), (d.sit ? 1 : 0) | (d.sniff ? 2 : 0) | (d.thump ? 4 : 0), r1(d.wag || 0), r2(d.look || 0)];
+  const dog = d => [r2(d.x), r2(d.z), r2(d.a), r1(d.spd || 0), (d.sit ? 1 : 0) | (d.sniff ? 2 : 0) | (d.thump ? 4 : 0) | (d.pet ? 8 : 0) | (d.smile ? 16 : 0), r1(d.wag || 0), r2(d.look || 0)];
   const R = BEAGLE, b = R.d ? dog(R.d).concat([r1(R.s || 0), ['out', 'going', 'enter', 'in', 'leave'].indexOf(R.home)]) : null;
   return JSON.stringify({ d: DOGS.map(dog), b, g: [r2(GATE116 ? GATE116.open : 0), r2(GATE489 ? GATE489.open : 0), GATE116 && GATE116.fired ? 1 : 0, r2(GATE9 ? GATE9.open : 0)] });
 }
@@ -4240,7 +4287,7 @@ function worldPuppetApply(dt) {
   const put = (d, a, b) => { if (!a || !b) return;
     if (Math.hypot(b[0] - a[0], b[1] - a[1]) > 6) a = b;   // teleporte (ex.: entrou em casa): não arrasta
     d.x = a[0] + (b[0] - a[0]) * k; d.z = a[1] + (b[1] - a[1]) * k; d.a = la(a[2], b[2]); d.spd = a[3] + (b[3] - a[3]) * k;
-    d.sit = !!(b[4] & 1); d.sniff = !!(b[4] & 2); d.thump = !!(b[4] & 4); d.wag = b[5]; d.look = a[6] + (b[6] - a[6]) * k;
+    d.sit = !!(b[4] & 1); d.sniff = !!(b[4] & 2); d.thump = !!(b[4] & 4); d.pet = !!(b[4] & 8); d.smile = !!(b[4] & 16); d.wag = b[5]; d.look = a[6] + (b[6] - a[6]) * k;
     d.ph = (d.ph || 0) + dt * d.spd * (d.kind && d.kind.startsWith('yorkie') ? 22 : d.spd > 2 ? 22 : 12); };
   DOGS.forEach((d, i) => put(d, s0.v.d[i], s1.v.d[i]));
   const R = BEAGLE; if (R.d && s1.v.b) { put(R.d, s0.v.b || s1.v.b, s1.v.b); R.s = s1.v.b[7]; const hm = ['out', 'going', 'enter', 'in', 'leave'][s1.v.b[8]]; R.home = hm; R.scratch = 0; }
@@ -4267,12 +4314,12 @@ function worldSetPuppet(on) {
   if (on === WORLD_PUPPET) return;
   WORLD_PUPPET = on;
   if (!on) {   // virei o dono do mundo: continua a partir do que estava vendo
-    for (const d of DOGS) { if (d.mode === 'escape' || d.mode === 'enter') continue; d.tx = d.x; d.tz = d.z; d.wait = 1; d.mode = d.mode || null; d.thump = false; }
+    for (const d of DOGS) { if (d.mode === 'escape' || d.mode === 'enter') continue; d.tx = d.x; d.tz = d.z; d.wait = 1; d.mode = d.mode || null; d.thump = false; d.petT = 0; d.pet = false; }
     const R = BEAGLE; if (R.d) { R.stop = 0; R.after = 0; R.scratch = 0; R.d.thump = false; if (R.home === 'enter' || R.home === 'leave' || R.home === 'going') R.home = undefined; }
     WSYNC.buf.length = 0;
   }
 }
-window.__world = { encDogs: worldEncDogs, recvDogs: worldRecvDogs, encCars: worldEncCars, recvCars: worldRecvCars, puppet: worldSetPuppet, pet: (x, z) => beaglePetAt(x, z), setClock: off => { CLOCK_OFF = off || 0; } };
+window.__world = { encDogs: worldEncDogs, recvDogs: worldRecvDogs, encCars: worldEncCars, recvCars: worldRecvCars, puppet: worldSetPuppet, pet: (x, z, i) => typeof i === 'number' ? dogPetAt(i, x, z) : beaglePetAt(x, z), setClock: off => { CLOCK_OFF = off || 0; } };
 // ---------------- Portela: volta de bicicleta pelo bairro, 2x por dia (07:30 e 16:30 do jogo) ----------------
 const RIDE_TIMES = [7.5, 16.5], RIDE_SPEED = 5.2, RIDE_SAYS = ['Opa! Tô dando minha volta de bicicleta!', 'Bom dia! Já já eu volto pra guarita.', 'Olha a bicicleta passando, hein!', 'Hoje o bairro tá tranquilo, viu?'];
 let ROAD_G = null;
@@ -4962,7 +5009,7 @@ window.__net = (function () {
     W.child('d').on('value', s => { const v = s.val(); if (v && !N.isHost && typeof v.v === 'string' && typeof v.s === 'number') window.__world.recvDogs(v.s, v.v); });
     W.child('c').on('value', s => { const v = s.val(); if (v && !N.isHost && typeof v.v === 'string' && typeof v.s === 'number') window.__world.recvCars(v.s, v.v); });
     W.child('e').on('value', s => { const v = s.val(); if (!v || typeof v.t !== 'number' || v.t <= N.evT) return; N.evT = v.t;
-      if (N.isHost && v.k === 'pet' && typeof v.x === 'number') window.__world.pet(v.x, v.z); });
+      if (N.isHost && v.k === 'pet' && typeof v.x === 'number') window.__world.pet(v.x, v.z, typeof v.i === 'number' ? v.i : undefined); });
     let k = 0;
     N.wTimer = setInterval(() => {
       if (!N.online) return; k++;
@@ -5145,6 +5192,7 @@ function frame_() {
   beagleFrame(dynB, dt, t);
   benchFrame();
   if (WORLD_PUPPET) worldPuppetFrame(dynB, dt, t); else dogsFrame(dynB, dt, t);
+  petFrame(dynB, dt);
   { const SKY = window.__sky = skyState();
     if (SKY.night > 0.05) for (const p of PROPS) if ((p.k === 'luminaria' || p.k === 'poste') && Math.abs(p.x - player.x) < 300 && Math.abs(p.z - player.z) < 300) {   // lâmpadas acesas
       const T = frame(p.x, surfAt(p.x, p.z), p.z, p.a), g = Math.round(150 + 105 * SKY.night), c = [g, Math.round(g * 0.86), Math.round(g * 0.6)];
@@ -5272,7 +5320,7 @@ window.__game = { floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, D
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261121232211";
+  const BUILD = "v20261122182431";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
