@@ -319,6 +319,7 @@
 <div id="fx"></div>
 <div class="modal" id="modal" hidden><div class="box" id="modalBox"></div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 (function(){
 const $ = s => document.querySelector(s);
@@ -347,7 +348,7 @@ const I18N = {
     tooMany:n=>`Só cabem 4 na mesa: ${n} vai(ão) assistir.`,
     waitingHost:'Aguardando o anfitrião começar a partida…', connecting:'Conectando…',
     roomNotFound:'Nenhuma sala encontrada com esse código.', badCode:'O código tem 6 letras (A–Z).',
-    onlineUnavailable:'O modo online não está disponível aqui. Abra o jogo pelo link do Claude, com sua conta conectada.',
+    onlineUnavailable:'Não deu para conectar ao modo online agora. Verifique a internet e tente de novo.',
     hostLeft:'O anfitrião saiu da sala.', leave:'Sair da sala', roomLabel:'Sala',
     waitOthers:'Decore bem! Esperando os outros jogadores…', waitHostNext:'Aguardando o anfitrião…',
     spectating:'Você está assistindo a esta partida.',
@@ -421,7 +422,7 @@ const I18N = {
     tooMany:n=>`Only 4 fit at the table: ${n} will watch.`,
     waitingHost:'Waiting for the host to start the game…', connecting:'Connecting…',
     roomNotFound:'No room found with that code.', badCode:'The code is 6 letters (A–Z).',
-    onlineUnavailable:'Online play isn’t available here. Open the game from its Claude link while signed in.',
+    onlineUnavailable:'Couldn’t connect to online play right now. Check your connection and try again.',
     hostLeft:'The host left the room.', leave:'Leave room', roomLabel:'Room',
     waitOthers:'Memorise them! Waiting for the other players…', waitHostNext:'Waiting for the host…',
     spectating:'You are watching this game.',
@@ -495,7 +496,7 @@ const I18N = {
     tooMany:n=>`Nur 4 passen an den Tisch: ${n} schauen zu.`,
     waitingHost:'Warte darauf, dass der Gastgeber das Spiel startet…', connecting:'Verbinde…',
     roomNotFound:'Kein Raum mit diesem Code gefunden.', badCode:'Der Code besteht aus 6 Buchstaben (A–Z).',
-    onlineUnavailable:'Online-Spiel ist hier nicht verfügbar. Öffne das Spiel über den Claude-Link, während du angemeldet bist.',
+    onlineUnavailable:'Online-Spiel gerade nicht erreichbar. Prüfe deine Verbindung und versuch es nochmal.',
     hostLeft:'Der Gastgeber hat den Raum verlassen.', leave:'Raum verlassen', roomLabel:'Raum',
     waitOthers:'Gut merken! Warte auf die anderen Spieler…', waitHostNext:'Warte auf den Gastgeber…',
     spectating:'Du schaust diesem Spiel zu.',
@@ -1059,10 +1060,125 @@ async function seatToBot(seat){
   else if(G.phase==='power') await botPower(seat);
 }
 
-/* ---------- networking (same room protocol as LuMa) ---------- */
+/* ---------- networking ----------
+   Inside Claude the page uses Claude's live rooms; anywhere else (GitHub Pages, Cloudflare Pages)
+   it connects browsers directly with PeerJS / WebRTC, the same way LuMa does. Both expose
+   host(code) / connect(code) -> {presence, peers, onPeers, leave}. */
+const PEER_PREFIX='cabochechuda-';
+function makePeerNet(){
+  if(typeof window.Peer!=='function') return null;
+  const OPTS={debug:0, config:{iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {urls:'stun:stun.cloudflare.com:3478'}
+  ]}};
+  const HB=3000, TIMEOUT=15000;
+  function hub(){
+    const st={me:null, mine:{}, others:new Map(), subs:new Set(), pend:{joined:[],left:[],updated:[]}, t:null, snap:[], dirty:true};
+    st.list=()=>{
+      if(!st.dirty) return st.snap;
+      const a=[{peer:st.me,isMe:true,sameTab:true,kind:'viewer',presence:st.mine}];
+      st.others.forEach((v,k)=>a.push({peer:k,isMe:false,sameTab:false,kind:'viewer',presence:v}));
+      st.snap=a; st.dirty=false; return a;
+    };
+    st.notify=(kind,id)=>{
+      st.dirty=true; st.pend[kind].push(id);
+      if(st.t) return;
+      st.t=setTimeout(()=>{
+        st.t=null; const all=st.list(); const pick=ids=>all.filter(p=>ids.includes(p.peer));
+        const ch={peers:all, joined:pick(st.pend.joined), left:st.pend.left.map(id=>({peer:id,isMe:false,sameTab:false,presence:{}})), updated:pick(st.pend.updated)};
+        st.pend={joined:[],left:[],updated:[]};
+        st.subs.forEach(f=>{ try{ f(ch); }catch(e){ console.error(e); } });
+      },16);
+    };
+    st.merge=p=>{ const m={...st.mine,...p}; Object.keys(p).forEach(k=>{ if(p[k]===null) delete m[k]; }); st.mine=m; st.dirty=true; };
+    st.onPeers=fn=>{ st.subs.add(fn); setTimeout(()=>{ const a=st.list(); fn({peers:a,joined:a,left:[],updated:[]}); },0); return ()=>st.subs.delete(fn); };
+    return st;
+  }
+  const isObj=x=>x && typeof x==='object' && !Array.isArray(x);
+
+  return {
+    // create a room: resolves once this browser is reachable under the room's name
+    host(code){
+      return new Promise((resolve,reject)=>{
+        const st=hub(), conns=new Map(); let sendT=null, dead=false, ready=false, hb=null;
+        const peer=new window.Peer(PEER_PREFIX+code.toLowerCase(), OPTS);
+        const flush=()=>{ sendT=null; const msg={type:'p',presence:st.mine}; conns.forEach(c=>{ if(c.open) try{ c.send(msg); }catch(e){} }); };
+        const drop=id=>{ const c=conns.get(id); if(!c) return; conns.delete(id); try{ c.close(); }catch(e){} if(st.others.delete(id)) st.notify('left',id); };
+        peer.on('open',id=>{
+          ready=true; st.me=id; st.dirty=true;
+          hb=setInterval(()=>{ const now=Date.now(); conns.forEach((c,cid)=>{ if(now-c._last>TIMEOUT) drop(cid); else if(c.open) try{ c.send({type:'hb'}); }catch(e){} }); },HB);
+          resolve({
+            presence(p){ st.merge(p); if(!sendT) sendT=setTimeout(flush,30); return Promise.resolve(); },
+            peers:()=>st.list(),
+            onPeers:fn=>st.onPeers(fn),
+            leave(){ dead=true; clearInterval(hb); conns.forEach(c=>{ try{ c.close(); }catch(e){} }); try{ peer.destroy(); }catch(e){} return Promise.resolve(); }
+          });
+        });
+        peer.on('connection',c=>{
+          if(conns.size>=10){ c.on('open',()=>{ try{ c.close(); }catch(e){} }); return; }
+          c._last=Date.now();
+          c.on('open',()=>{ conns.set(c.peer,c); c._last=Date.now(); try{ c.send({type:'p',presence:st.mine}); }catch(e){} });
+          c.on('data',d=>{
+            c._last=Date.now();
+            if(isObj(d) && d.type==='p' && isObj(d.presence)){
+              const ex=st.others.has(c.peer); st.others.set(c.peer,d.presence); st.notify(ex?'updated':'joined',c.peer);
+            }
+          });
+          c.on('close',()=>drop(c.peer)); c.on('error',()=>drop(c.peer));
+        });
+        peer.on('error',e=>{ if(!ready){ try{ peer.destroy(); }catch(_){} reject(e); } });
+        peer.on('disconnected',()=>{ if(!dead) try{ peer.reconnect(); }catch(e){} });
+      });
+    },
+    // join a room: resolves once the direct link to the host is open
+    connect(code){
+      return new Promise((resolve,reject)=>{
+        const st=hub(), hostId=PEER_PREFIX+code.toLowerCase();
+        let conn=null, done=false, sendT=null, dead=false, hb=null;
+        const peer=new window.Peer(OPTS);
+        const fail=e=>{ if(done) return; done=true; clearTimeout(timer); try{ peer.destroy(); }catch(_){} reject(e); };
+        const timer=setTimeout(()=>fail({type:'timeout'}),TIMEOUT);
+        const hostGone=()=>{ if(dead) return; clearInterval(hb); if(st.others.delete(hostId)) st.notify('left',hostId); };
+        const api={
+          presence(p){ st.merge(p); if(!sendT) sendT=setTimeout(()=>{ sendT=null; if(conn&&conn.open) try{ conn.send({type:'p',presence:st.mine}); }catch(e){} },30); return Promise.resolve(); },
+          peers:()=>st.list(),
+          onPeers:fn=>st.onPeers(fn),
+          leave(){ dead=true; clearInterval(hb); try{ conn&&conn.close(); }catch(e){} try{ peer.destroy(); }catch(e){} return Promise.resolve(); }
+        };
+        peer.on('error',e=>{ if(!done) fail(e); });
+        peer.on('open',id=>{
+          st.me=id; st.dirty=true;
+          conn=peer.connect(hostId,{reliable:true, serialization:'json'});
+          conn.on('open',()=>{
+            if(done) return; done=true; clearTimeout(timer);
+            conn._last=Date.now();
+            try{ conn.send({type:'p',presence:st.mine}); }catch(e){}
+            hb=setInterval(()=>{ if(Date.now()-conn._last>TIMEOUT){ try{ conn.close(); }catch(e){} hostGone(); } else if(conn.open) try{ conn.send({type:'hb'}); }catch(e){} },HB);
+            resolve(api);
+          });
+          conn.on('data',d=>{
+            conn._last=Date.now();
+            if(isObj(d) && d.type==='p' && isObj(d.presence)){
+              const ex=st.others.has(hostId); st.others.set(hostId,d.presence); st.notify(ex?'updated':'joined',hostId);
+            }
+          });
+          conn.on('close',hostGone); conn.on('error',hostGone);
+        });
+        peer.on('disconnected',()=>{ if(!dead && done) try{ peer.reconnect(); }catch(e){} });
+      });
+    }
+  };
+}
+function claudeRooms(room){
+  if(!room) return null;
+  const j=code=>room.join('cabo-'+code.toLowerCase());
+  return {host:j, connect:j};
+}
 function initRoom(){
   try{
-    net.roomP = (window.claude && typeof window.claude.use==='function') ? Promise.resolve(window.claude.use('room')).catch(()=>null) : Promise.resolve(null);
+    const inClaude = window.claude && typeof window.claude.use==='function';
+    net.roomP = inClaude ? Promise.resolve(window.claude.use('room')).then(claudeRooms).catch(()=>null) : Promise.resolve(makePeerNet());
   }catch(e){ net.roomP=Promise.resolve(null); }
   net.roomP.then(r=>{ if(!r){ $('#hostBtn').disabled=true; $('#joinBtn').disabled=true; homeNote('onlineUnavailable'); } });
 }
@@ -1081,9 +1197,13 @@ function leaveRoom(){
 async function createRoom(){
   readName(); homeNote('connecting', true);
   const room=await net.roomP; if(!room){ homeNote('onlineUnavailable'); return; }
-  const code=Array.from({length:6},()=>String.fromCharCode(65+Math.floor(Math.random()*26))).join('');
-  let named;
-  try{ named=await room.join('cabo-'+code.toLowerCase()); }catch(e){ homeNote('onlineUnavailable'); return; }
+  let named=null, code='';
+  for(let tries=0; tries<4 && !named; tries++){
+    code=Array.from({length:6},()=>String.fromCharCode(65+Math.floor(Math.random()*26))).join('');
+    try{ named=await room.host(code); }
+    catch(e){ if(!(e && e.type==='unavailable-id')){ homeNote('onlineUnavailable'); return; } }
+  }
+  if(!named){ homeNote('onlineUnavailable'); return; }
   leaveRoom();
   net.named=named; net.code=code; net.order=[]; net.seen={}; MODE='host'; G=null; mySeat=0;
   named.onPeers(onHostPeers, ()=>{});
@@ -1130,7 +1250,8 @@ async function joinRoom(){
   homeNote('connecting', true);
   const room=await net.roomP; if(!room){ homeNote('onlineUnavailable'); return; }
   let named;
-  try{ named=await room.join('cabo-'+code.toLowerCase()); }catch(e){ homeNote('onlineUnavailable'); return; }
+  try{ named=await room.connect(code); }
+  catch(e){ homeNote((e && (e.type==='peer-unavailable'||e.type==='timeout'))?'roomNotFound':'onlineUnavailable'); return; }
   leaveRoom();
   net.named=named; net.code=code; MODE='client'; G=null; mySeat=-1; net.reqSeq=0; net.lastApplied=0; net.lastQueued=0;
   named.presence({role:'player', n:myName}).catch(()=>{});

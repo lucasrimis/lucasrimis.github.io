@@ -26,6 +26,6 @@ Código e histórico: https://github.com/lucasrimis/cabo
 ## Modos
 
 - **Contra bots** (1 a 3 adversários, três velocidades) — funciona aqui no GitHub Pages.
-- **Online com código de sala** — só funciona quando o jogo é aberto pelo link do Claude, porque usa as salas em tempo real do Claude.
+- **Online com código de sala** (até 4 na mesa) — quem cria a sala passa o código de 6 letras e os outros entram com ele. Os navegadores ligam-se diretamente (PeerJS/WebRTC); dentro do Claude usa as salas do Claude.
 
 Idiomas: português, inglês e alemão. Tudo num único `index.html`, sem dependências além das fontes do Google.
