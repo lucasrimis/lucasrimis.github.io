@@ -2,7 +2,17 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#101a33">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cabo">
+<meta name="description" content="Cabo (chechuda) — jogo de cartas de memória para até 4 pessoas, contra bots ou online.">
+<meta name="cabo-build" content="20261123001156">
 <title>Cabo (chechuda) — jogo de cartas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Tilt+Neon&display=swap" rel="stylesheet">
@@ -191,6 +201,16 @@
   /* 6-7 easter egg */
   .sixSeven{position:absolute;z-index:24;pointer-events:none;user-select:none}
   .sixSeven.inward{transform:scaleX(-1)}
+  /* "new version" notice */
+  #updBar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:35;display:flex;gap:10px;align-items:center;
+    background:#1e1a3d;border:1px solid var(--accent);border-radius:14px;padding:8px 10px 8px 14px;box-shadow:0 8px 24px rgba(0,0,0,.45);
+    font-size:14px;max-width:calc(100vw - 20px)}
+  #updBar small{color:var(--muted)}
+  /* installed app: keep clear of the notch and the home bar */
+  header{padding-top:calc(12px + env(safe-area-inset-top,0px));padding-left:calc(16px + env(safe-area-inset-left,0px));padding-right:calc(16px + env(safe-area-inset-right,0px))}
+  body{padding-bottom:env(safe-area-inset-bottom,0px)}
+  #updBar{bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  .installHint{color:var(--muted);font-size:14px;margin-top:12px;line-height:1.4}
   @media (prefers-reduced-motion: reduce){ .card.glow{animation:none;box-shadow:0 0 0 3px #9fd3ff} .card.pick:hover{transform:none} }
 </style>
 </head>
@@ -221,7 +241,9 @@
     </div>
     <div class="divider" data-i18n="orSolo"></div>
     <button class="btn big" id="soloBtn" data-i18n="solo"></button>
+    <button class="btn big" id="installBtn" data-i18n="install" hidden style="margin-top:10px;background:#2f6fb0;border-color:transparent"></button>
   </div>
+  <div class="installHint" id="iosHint" hidden data-i18n="iosInstall"></div>
   <div class="note" id="homeNote"></div>
 </section>
 
@@ -317,6 +339,7 @@
   <button class="btn primary" id="finaleBtn"></button>
 </div>
 <div id="fx"></div>
+<div id="updBar" hidden><span><span data-i18n="updateReady"></span> <small data-i18n="updateLater"></small></span><button class="btn primary" id="updBtn" data-i18n="updateNow"></button></div>
 <div class="modal" id="modal" hidden><div class="box" id="modalBox"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -333,6 +356,7 @@ const powOf = v => (v===7||v===8)?'peek':(v===9||v===10)?'spy':(v===11||v===12)?
 const I18N = {
   pt: {
     htmlLang:'pt-BR', title:'Cabo (chechuda) — jogo de cartas',
+    install:'📲 Instalar o jogo', iosInstall:'📲 Para instalar no iPhone: toque em Compartilhar e depois em Adicionar à Tela de Início.', updateReady:'Há uma nova versão do Cabo.', updateLater:'Ela entra sozinha quando você voltar ao início.', updateNow:'Atualizar agora',
     rules:'Regras', home:'Início', welcome:'Bem-vindo à mesa',
     intro:'Memorize suas cartas, espie, troque e grite CABO quando achar que tem a menor soma. O jogo acaba quando alguém passa de 100.',
     yourName:'Seu nome', namePh:'Como quer ser chamado?',
@@ -407,6 +431,7 @@ const I18N = {
   },
   en: {
     htmlLang:'en', title:'Cabo (chechuda) — card game',
+    install:'📲 Install the game', iosInstall:'📲 To install on iPhone: tap Share, then Add to Home Screen.', updateReady:'A new version of Cabo is available.', updateLater:'It loads by itself when you go back home.', updateNow:'Update now',
     rules:'Rules', home:'Home', welcome:'Welcome to the table',
     intro:'Memorise your cards, peek, spy, swap and call CABO when you think you have the lowest total. The game ends when someone goes over 100.',
     yourName:'Your name', namePh:'What should we call you?',
@@ -481,6 +506,7 @@ const I18N = {
   },
   de: {
     htmlLang:'de', title:'Cabo (chechuda) — Kartenspiel',
+    install:'📲 Spiel installieren', iosInstall:'📲 Auf dem iPhone installieren: Tippe auf Teilen und dann auf Zum Home-Bildschirm.', updateReady:'Eine neue Version von Cabo ist verfügbar.', updateLater:'Sie lädt automatisch, wenn du zum Start zurückkehrst.', updateNow:'Jetzt aktualisieren',
     rules:'Regeln', home:'Start', welcome:'Willkommen am Tisch',
     intro:'Merk dir deine Karten, spicke, spioniere, tausche und ruf CABO, wenn du glaubst, die niedrigste Summe zu haben. Das Spiel endet, sobald jemand über 100 kommt.',
     yourName:'Dein Name', namePh:'Wie sollen wir dich nennen?',
@@ -1393,7 +1419,7 @@ $('#newBtn').onclick=goHome;
   lg.addEventListener('click',flip);
   lg.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); flip(); } }); })();
 $('#rulesBtn').onclick=showRules;
-function goHome(){ document.querySelectorAll('.sixSeven').forEach(e=>e.remove()); stopFinale(); closeModal(); leaveRoom(); G=null; ['#fx','#opps','#mine','#deck','#discard','#held','#scores','#log','#msg','#acts'].forEach(q=>{ $(q).innerHTML=''; }); mySeat=0; show('home'); }
+function goHome(){ if(updatePending){ leaveRoom(); reloadFresh(); return; } document.querySelectorAll('.sixSeven').forEach(e=>e.remove()); stopFinale(); closeModal(); leaveRoom(); G=null; ['#fx','#opps','#mine','#deck','#discard','#held','#scores','#log','#msg','#acts'].forEach(q=>{ $(q).innerHTML=''; }); mySeat=0; show('home'); }
 
 function renderLobby(){
   const T=L();
@@ -1772,6 +1798,53 @@ function runCanvas(win){
   if(finRaf) cancelAnimationFrame(finRaf);
   finRaf=requestAnimationFrame(frame);
 }
+
+/* ---------- installable app (PWA), like the other games ---------- */
+const HOSTED=/github\.io$|pages\.dev$/i.test(location.hostname) || location.hostname==='localhost' || location.hostname==='127.0.0.1';
+let swReg=null;
+if(HOSTED && 'serviceWorker' in navigator){ try{ navigator.serviceWorker.register('sw.js').then(r=>{ swReg=r; }).catch(()=>{}); }catch(e){} }
+(function(){
+  const standalone=(window.matchMedia && matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) || navigator.standalone;
+  if(standalone || !HOSTED) return;
+  let deferred=null;
+  const btn=$('#installBtn');
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; btn.hidden=false; });
+  btn.addEventListener('click',async()=>{ if(!deferred) return; deferred.prompt(); try{ await deferred.userChoice; }catch(e){} deferred=null; btn.hidden=true; });
+  window.addEventListener('appinstalled',()=>{ btn.hidden=true; });
+  if(/iphone|ipad|ipod/i.test(navigator.userAgent)) $('#iosHint').hidden=false;
+})();
+
+/* ---------- automatic updates ----------
+   GitHub Pages lets browsers keep an old copy for a while. The page asks the server
+   for its own newest copy (bypassing every cache) and, when the build stamp differs,
+   reloads itself while nobody is mid-game, or offers a button when someone is. */
+const BUILD=(document.querySelector('meta[name="cabo-build"]')||{}).content||'';
+let updatePending=false, lastUpdCheck=0;
+const inGame=()=>!!G || MODE!=='solo';
+function reloadFresh(){
+  try{ if(swReg) swReg.update().catch(()=>{}); }catch(e){}
+  const u=location.pathname+'?v='+Date.now()+location.hash;
+  location.replace(u);
+}
+async function checkUpdate(){
+  if(!BUILD || location.protocol==='file:' || Date.now()-lastUpdCheck<20000) return;
+  lastUpdCheck=Date.now();
+  try{
+    const r=await fetch(location.pathname+'?check='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return;
+    const m=(await r.text()).match(/<meta name="cabo-build" content="([^"]+)"/);
+    if(!m || m[1]===BUILD) return;
+    updatePending=true;
+    if(!inGame()) reloadFresh(); else $('#updBar').hidden=false;
+  }catch(e){}
+}
+$('#updBtn').onclick=reloadFresh;
+// drop the cache-busting "?v=" from the address bar so shared links stay clean
+if(/[?&]v=\d+/.test(location.search)){ try{ history.replaceState(null,'',location.pathname+location.hash); }catch(e){} }
+setTimeout(checkUpdate, 1500);
+setInterval(checkUpdate, 5*60*1000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkUpdate(); });
+
 
 applyStatic();
 initRoom();

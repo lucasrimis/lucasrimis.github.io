@@ -8,6 +8,11 @@ Jogo de cartas de memória baseado no **Cabo**: espie, espione, troque às cegas
 
 Código e histórico: https://github.com/lucasrimis/cabo
 
+## Instalar no celular
+- **Android (Chrome) ou computador:** abra o link e toque em **📲 Instalar o jogo** na tela inicial (ou no menu ⋮ → *Instalar app*).
+- **iPhone (Safari):** toque em **Compartilhar** → **Adicionar à Tela de Início**.
+- O jogo instalado abre em tela cheia, funciona sem internet contra os bots depois da primeira visita e se atualiza sozinho.
+
 ## Como jogar
 
 - Baralho de 52 cartas, de 0 a 13. Cada jogador recebe 4 cartas viradas para baixo, lado a lado.
