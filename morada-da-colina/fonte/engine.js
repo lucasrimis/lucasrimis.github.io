@@ -1,8 +1,9 @@
 'use strict';
 (function () {
 const W = window.WORLD;
+const SERR = W.map === 'serrinha';   // segundo mapa: Serrinha do Alambari (mesmo motor, outro mundo)
 // posto de gasolina na esquina da Av. Antenor O'Reilly com a R. Astor Ornellas (Street View 10/2024) + a sorveteria ao lado
-{ const J = [-323.1, -291.1], U_ = [0.9997, -0.024], V_ = [0.024, 0.9997];   // u: ao longo da avenida (para leste), v: para dentro do terreno (sul); a Astor corta na diagonal (u = 0,326·v)
+if (!SERR) { const J = [-323.1, -291.1], U_ = [0.9997, -0.024], V_ = [0.024, 0.9997];   // u: ao longo da avenida (para leste), v: para dentro do terreno (sul); a Astor corta na diagonal (u = 0,326·v)
   const loc = (x, z) => { const dx = x - J[0], dz = z - J[1]; return [dx * U_[0] + dz * U_[1], dx * V_[0] + dz * V_[1]]; };
   (W.landmarks = W.landmarks || []).push({ type: 'posto', x: J[0], z: J[1], u: U_, v: V_ });
   const inLot = (u, v) => u > 0.326 * v + 3 && u < 42 && v > 3 && v < 48;
@@ -182,9 +183,10 @@ function demRaw(x, z) {
   return cr(row(-1), row(0), row(1), row(2), fr);
 }
 let DEM_MEAN = 0; if (DEM) { let s = 0; for (const v of DEM.data) s += v / 10; DEM_MEAN = s / DEM.data.length; }
+const FAR0 = SERR ? 3500 : 500, FAR1 = SERR ? 6000 : 900;   // na Serrinha as montanhas de verdade aparecem no horizonte
 function demFar(x, z) { // outside the playable extent: fade towards the mean
   const cx = clampN(x, EX0, EX1), cz = clampN(z, EZ0, EZ1), d = Math.hypot(x - cx, z - cz);
-  return demRaw(x, z) * (1 - sstep(500, 900, d)) + DEM_MEAN * sstep(500, 900, d);
+  return demRaw(x, z) * (1 - sstep(FAR0, FAR1, d)) + DEM_MEAN * sstep(FAR0, FAR1, d);
 }
 function segDistT(x, z, ax, az, bx, bz) {
   const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz;
@@ -225,12 +227,43 @@ const PITCH_H = PITCH ? PITCH.pts.reduce((s, p) => s + demRaw(p[0], p[1]), 0) / 
 const CREEK = W.creek || null, CREEK2 = W.creek2 || null;
 const creekD = (x, z, C) => { let d = 1e9; for (let k = 0; k < C.length - 1; k++) d = Math.min(d, segDistT(x, z, C[k][0], C[k][1], C[k + 1][0], C[k + 1][1])[0]); return d; };
 
-const TS = 5; // terrain lattice spacing (m)
+// rios da Serrinha (OpenStreetMap): grade para achar o mais perto rápido
+const STREAMS = W.streams || [], SGR = 40, streamGrid = new Map();
+for (const s of STREAMS) for (let i = 0; i < s.pts.length - 1; i++) {
+  const a = s.pts[i], b = s.pts[i + 1], m = s.w + 8;
+  for (let gx = Math.floor((Math.min(a[0], b[0]) - m) / SGR); gx <= Math.floor((Math.max(a[0], b[0]) + m) / SGR); gx++)
+    for (let gz = Math.floor((Math.min(a[1], b[1]) - m) / SGR); gz <= Math.floor((Math.max(a[1], b[1]) + m) / SGR); gz++) { const k = gx + ',' + gz; if (!streamGrid.has(k)) streamGrid.set(k, []); streamGrid.get(k).push([a, b, s.w]); }
+}
+function streamAt(x, z) { let best = null; for (const [a, b, w] of streamGrid.get(Math.floor(x / SGR) + ',' + Math.floor(z / SGR)) || []) { const d = segDistT(x, z, a[0], a[1], b[0], b[1])[0] - w; if (!best || d < best.e) best = { e: d, w }; } return best; }
+// máscara de detalhe (Serrinha): relevo fino só perto das vias e do Poço do Céu; o resto é malha grossa
+const FG = 30, FGW = Math.ceil((EX1 - EX0) / FG) + 1, FGH = Math.ceil((EZ1 - EZ0) / FG) + 1, FINE = new Uint8Array(FGW * FGH).fill(SERR ? 0 : 1);
+if (SERR) {
+  const R_ = W.fineR || 230, mark = (x, z) => { const i = Math.floor((x - EX0) / FG), j = Math.floor((z - EZ0) / FG); if (i >= 0 && j >= 0 && i < FGW && j < FGH) FINE[j * FGW + i] = 1; };
+  for (const r of W.roads) for (let k = 0; k < r.pts.length - 1; k++) {
+    const a = r.pts[k], b = r.pts[k + 1];
+    for (let x = Math.min(a[0], b[0]) - R_; x <= Math.max(a[0], b[0]) + R_; x += FG) for (let z = Math.min(a[1], b[1]) - R_; z <= Math.max(a[1], b[1]) + R_; z += FG)
+      if (segDistT(x, z, a[0], a[1], b[0], b[1])[0] < R_ + FG) mark(x, z);
+  }
+  for (const lm of W.landmarks) if (lm.type === 'pocoCeu') for (let x = lm.x - 280; x <= lm.x + 280; x += FG) for (let z = lm.z - 280; z <= lm.z + 280; z += FG) mark(x, z);
+}
+// Poço do Céu: o terreno vira uma bacia em volta do poço (lado de cima = onde sobe o relevo, lá fica a queda)
+const POCO = (() => { const lm = SERR && W.landmarks.find(l => l.type === 'pocoCeu'); if (!lm) return null;
+  // encaixa no rio mais perto; a queda fica do lado de onde a água vem (rio acima = mais alto)
+  let best = null; for (const sm of STREAMS) for (let i = 0; i < sm.pts.length - 1; i++) { const a = sm.pts[i], b = sm.pts[i + 1], [d, px, pz] = segDistT(lm.x, lm.z, a[0], a[1], b[0], b[1]); if (!best || d < best.d) best = { d, px, pz, a, b }; }
+  let x = lm.x, z = lm.z, up;
+  if (best && best.d < 45) { x = best.px; z = best.pz; const tx = best.b[0] - best.a[0], tz = best.b[1] - best.a[1], l = Math.hypot(tx, tz) || 1; up = [tx / l, tz / l]; if (demRaw(x + up[0] * 15, z + up[1] * 15) < demRaw(x - up[0] * 15, z - up[1] * 15)) up = [-up[0], -up[1]]; }
+  else { const e = 8, gx = demRaw(x + e, z) - demRaw(x - e, z), gz = demRaw(x, z + e) - demRaw(x, z - e), l = Math.hypot(gx, gz) || 1; up = [gx / l, gz / l]; }
+  lm.x = x; lm.z = z; return { x, z, R: 8, y: demRaw(x, z) - 1.2, up }; })();
+const fineAt = (x, z) => { const i = Math.floor((x - EX0) / FG), j = Math.floor((z - EZ0) / FG); return i >= 0 && j >= 0 && i < FGW && j < FGH && FINE[j * FGW + i] === 1; };
+const TS = W.ts || 5; // terrain lattice spacing (m)
 const LW = Math.ceil((EX1 - EX0) / TS) + 1, LH = Math.ceil((EZ1 - EZ0) / TS) + 1;
 const LAT = new Float32Array(LW * LH), LOT = 26;   // profundidade dos lotes nivelados com a calçada (m)
 for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
   const x = EX0 + i * TS, z = EZ0 + j * TS;
   let h = demRaw(x, z);
+  if (SERR && !fineAt(x, z) && !fineAt(x + TS, z) && !fineAt(x, z + TS) && !fineAt(x - TS, z) && !fineAt(x, z - TS)) { LAT[j * LW + i] = h; continue; }
+  if (STREAMS.length) { const sa = streamAt(x, z); if (sa && sa.e < 6) h -= (sa.w > 2 ? 1.6 : 1.0) * sstep(6, -sa.w * 0.4, sa.e); }   // leito dos rios
+  if (POCO) { const d = Math.hypot(x - POCO.x, z - POCO.z); if (d < POCO.R) h = Math.min(h, POCO.y - 0.4 - 1.8 * sstep(POCO.R, POCO.R - 4, d)); else if (d < POCO.R + 6) h = Math.min(h, POCO.y + 0.25 + (d - POCO.R) * 0.7); }
   // flatten road beds
   const rs = roadSurf(x, z);
   if (rs && !rs.foot && rs.e < LOT + 10) {   // lotes ao longo das ruas ficam na altura da calçada (casas e muros alinhados com ela)
@@ -285,11 +318,11 @@ function latH(i, j, x, z) { return (i >= 0 && j >= 0 && i < LW && j < LH) ? LAT[
 {
   const xs = [], zs = [];
   const grow = (lo, hi, step0, sign, arr) => { let s = step0, v = sign > 0 ? hi : lo; const out = []; for (let k = 0; k < 14; k++) { s *= 1.7; v += sign * s; out.push(v); } return out; };
-  const R = 1700, cxm = (BX0 + BX1) / 2, czm = (BZ0 + BZ1) / 2;
-  const leftX = []; { let s = TS, v = EX0; while (v > cxm - R) { s = Math.min(s * 1.6, 160); v -= s; leftX.unshift(v); } }
-  const rightX = []; { let s = TS, v = EX0 + (LW - 1) * TS; while (v < cxm + R) { s = Math.min(s * 1.6, 160); v += s; rightX.push(v); } }
-  const topZ = []; { let s = TS, v = EZ0; while (v > czm - R) { s = Math.min(s * 1.6, 160); v -= s; topZ.unshift(v); } }
-  const botZ = []; { let s = TS, v = EZ0 + (LH - 1) * TS; while (v < czm + R) { s = Math.min(s * 1.6, 160); v += s; botZ.push(v); } }
+  const cxm = (BX0 + BX1) / 2, czm = (BZ0 + BZ1) / 2, R = Math.max(1700, (BX1 - BX0) / 2 + (SERR ? 4500 : 900), (BZ1 - BZ0) / 2 + (SERR ? 4500 : 900));
+  const leftX = []; { let s = TS, v = EX0; while (v > cxm - R) { s = Math.min(s * 1.6, SERR ? 320 : 160); v -= s; leftX.unshift(v); } }
+  const rightX = []; { let s = TS, v = EX0 + (LW - 1) * TS; while (v < cxm + R) { s = Math.min(s * 1.6, SERR ? 320 : 160); v += s; rightX.push(v); } }
+  const topZ = []; { let s = TS, v = EZ0; while (v > czm - R) { s = Math.min(s * 1.6, SERR ? 320 : 160); v -= s; topZ.unshift(v); } }
+  const botZ = []; { let s = TS, v = EZ0 + (LH - 1) * TS; while (v < czm + R) { s = Math.min(s * 1.6, SERR ? 320 : 160); v += s; botZ.push(v); } }
   const ix = [], iz = [];
   for (const v of leftX) { xs.push(v); ix.push(-1); }
   for (let i = 0; i < LW; i++) { xs.push(EX0 + i * TS); ix.push(i); }
@@ -303,7 +336,19 @@ function latH(i, j, x, z) { return (i >= 0 && j >= 0 && i < LW && j < LH) ? LAT[
   const wood = W.areas.filter(a => a.t === 'wood'), parks = W.areas.filter(a => a.t === 'park' || a.t === 'island'), strips = W.areas.filter(a => a.t === 'strip'), unis = W.areas.filter(a => a.t === 'uni');
   const h2 = (x, z) => { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); };
   const G1 = hex('#6fa64a'), G2 = hex('#63a044'), G3 = hex('#79ad50'), DRY = hex('#9aa556'), SAND = C.sand, MUD = hex('#6e5a3a');
+  const CV = W.cover, CVC = { t: hex('#2f5a2a'), s: hex('#4f7434'), g: hex('#7ea455'), b: hex('#8c9a63'), r: hex('#8a8577'), w: hex('#3c6f8f') };
+  function coverCol(x, z, slope) {
+    const i = Math.floor((x - CV.x0) / CV.step), j = Math.floor((z - CV.z0) / CV.step);
+    const k = i >= 0 && j >= 0 && i < CV.cols && j < CV.rows ? CV.data[j * CV.cols + i] : 't';
+    let c = jit(CVC[k] || CVC.t, () => h2(Math.floor(x / 17), Math.floor(z / 17)), 0.07);
+    if (slope > 0.7) c = [c[0] + (138 - c[0]) * 0.45, c[1] + (133 - c[1]) * 0.45, c[2] + (119 - c[2]) * 0.45];   // paredão de pedra
+    return c;
+  }
   function cellCol(x, z, slope, inner) {
+    if (SERR) {
+      if (STREAMS.length) { const sa = streamAt(x, z); if (sa && sa.e < 1.5) return [hex('#6b6253'), F_TEX]; }
+      return [coverCol(x, z, slope), F_TEX];
+    }
     if (inner) {
       if (LAKE && (inPoly(x, z, LAKE.pts) || polyEdgeDist(x, z, LAKE.pts) < 3)) return [SAND, F_TEX];
       if (CREEK) { let d = 1e9; for (let k = 0; k < CREEK.length - 1; k++) d = Math.min(d, segDistT(x, z, CREEK[k][0], CREEK[k][1], CREEK[k + 1][0], CREEK[k + 1][1])[0]); if (d < 3.2) return [MUD, F_TEX]; }
@@ -325,11 +370,23 @@ function latH(i, j, x, z) { return (i >= 0 && j >= 0 && i < LW && j < LH) ? LAT[
     const pa = [x0, HV[b * NX + a], z0], pb = [x1, HV[b * NX + a + 1], z0], pc = [x1, HV[(b + 1) * NX + a + 1], z1], pd = [x0, HV[(b + 1) * NX + a], z1];
     const inner = ix[a] >= 0 && ix[a + 1] >= 0 && iz[b] >= 0 && iz[b + 1] >= 0;
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    if (SERR && inner && !fineAt(cx, cz)) continue;   // longe das vias: coberto pela malha grossa abaixo
     const slope = Math.max(Math.abs(pb[1] - pa[1]) / (x1 - x0), Math.abs(pd[1] - pa[1]) / (z1 - z0));
     const [col, fl] = cellCol(cx, cz, slope, inner);
     const B = inner ? chunkB(cx, cz) : ground;
     B.tri(pa, pb, pc, faceN(pa, pb, pc, true), col, fl);
     B.tri(pa, pc, pd, faceN(pa, pc, pd, true), col, fl);
+  }
+  if (SERR) {   // malha grossa (blocos de 36 m) onde não há detalhe, um pouco abaixo para não brigar com a fina
+    const K = 6, gh = (i, j) => LAT[Math.min(LH - 1, j) * LW + Math.min(LW - 1, i)] - 0.9;
+    for (let j = 0; j < LH - 1; j += K) for (let i = 0; i < LW - 1; i += K) {
+      let need = false; for (let jj = j; jj < Math.min(LH - 1, j + K) && !need; jj += 2) for (let ii = i; ii < Math.min(LW - 1, i + K) && !need; ii += 2) if (!fineAt(EX0 + (ii + 0.5) * TS, EZ0 + (jj + 0.5) * TS)) need = true;
+      if (!need) continue;
+      const i1 = Math.min(LW - 1, i + K), j1 = Math.min(LH - 1, j + K), x0 = EX0 + i * TS, x1 = EX0 + i1 * TS, z0 = EZ0 + j * TS, z1 = EZ0 + j1 * TS;
+      const pa = [x0, gh(i, j), z0], pb = [x1, gh(i1, j), z0], pc = [x1, gh(i1, j1), z1], pd = [x0, gh(i, j1), z1], cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      const slope = Math.max(Math.abs(pb[1] - pa[1]) / (x1 - x0), Math.abs(pd[1] - pa[1]) / (z1 - z0)), col = coverCol(cx, cz, slope), B = chunkB(cx, cz);
+      B.tri(pa, pb, pc, faceN(pa, pb, pc, true), col, F_TEX); B.tri(pa, pc, pd, faceN(pa, pc, pd, true), col, F_TEX);
+    }
   }
   // backstop plane far below (hides any seam)
   ground.quad([cxm - 2500, -6, czm - 2500], [cxm + 2500, -6, czm - 2500], [cxm + 2500, -6, czm + 2500], [cxm - 2500, -6, czm + 2500], UP, C.grass, F_TEX);
@@ -401,7 +458,8 @@ for (const a of W.areas) {
     }
   }
 }
-POIS.push({ n: 'Morada da Colina', x: W.label[0], z: W.label[1], y: 26, big: true });
+POIS.push({ n: W.name || 'Morada da Colina', x: W.label[0], z: W.label[1], y: 26, big: true });
+for (const p of (W.pois || [])) POIS.push({ n: p[0], x: p[1], z: p[2], y: p[3] === 'waterfall' ? 6 : 9 });
 
 // ---------------- roads (draped on the terrain) ----------------
 const SEGS = [];
@@ -496,6 +554,25 @@ for (const r of W.roads) {
   if ((r.t === 'residential' || r.t === 'secondary' || r.t === 'living_street') && len > 60 && !r.ring) ROUTES.push({ pts, len, h: r.h, t: r.t });
 }
 
+// ---------------- rios da Serrinha ----------------
+for (const sm of STREAMS) {
+  const cp = sm.pts;
+  for (let i = 0; i < cp.length - 1; i += 6) {
+    const piece = cp.slice(i, i + 7); if (piece.length < 2) continue;
+    const [cx, cz] = centroid(piece); if (!fineAt(cx, cz)) continue;
+    const B = chunkB(cx, cz), r = rngFor(cx, cz, 13);
+    strip(B, piece, sm.w * 0.75, 0.35, hex('#3d84a8'), F_WATER, 2, groundAt);
+    for (let k = 0; k < piece.length - 1; k++) {
+      const a = piece[k], b = piece[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+      for (let j = 0; j < Math.min(8, l / 3); j++) {
+        if (r() < 0.35) continue;
+        const t = r(), side = r() < 0.5 ? -1 : 1, o = sm.w * (0.6 + r() * 0.9), x = a[0] + dx * t - dz / l * side * o, z = a[1] + dz * t + dx / l * side * o;
+        const sz = 0.3 + r() * (sm.w > 2 ? 0.9 : 0.5), g = jit(hex('#8d8a80'), r, 0.12);
+        box(B, frame(x, groundAt(x, z) - 0.15, z, r() * 3), -sz, sz, 0, sz * 0.8, -sz * 0.8, sz * 0.8, g, g);
+      }
+    }
+  }
+}
 // ---------------- creek (riacho) ----------------
 if (CREEK) {
   const cp = trim(CREEK, 22, 22);
@@ -560,7 +637,7 @@ for (const c of (W.culverts || [])) {
 }
 
 // ---------------- collision mask ----------------
-const MR = 2;
+const MR = SERR ? 0.8 : 2;   // Serrinha: 8 km de mundo, máscara mais grossa para caber na memória
 const MW = Math.ceil((EX1 - EX0) * MR), MH = Math.ceil((EZ1 - EZ0) * MR);
 const mcv = document.createElement('canvas'); mcv.width = MW; mcv.height = MH;
 const mx = mcv.getContext('2d');
@@ -1680,6 +1757,13 @@ function tree(B, x, z, kind, s, castMask) {
     if (castMask) maskCircle(x, z, 0.3);
     return;
   }
+  if (kind === 5) {   // pinheiro: tronco alto e copa em cone de camadas
+    const h = 3.2 * s, pc = jit(hex('#2d5a34'), r, 0.08), pc2 = jit(pc, r, 0.08);
+    box(B, T, -0.22 * s, 0.22 * s, 0, h + 4.2 * s, -0.22 * s, 0.22 * s, trunk, trunk);
+    for (let k = 0; k < 4; k++) { const w = (2.1 - k * 0.45) * s, y = h + k * 1.35 * s; box(B, T, -w, w, y, y + 1.3 * s, -w, w, k % 2 ? pc2 : pc, k % 2 ? pc2 : pc); }
+    box(B, T, -0.35 * s, 0.35 * s, h + 5.4 * s, h + 6.3 * s, -0.35 * s, 0.35 * s, pc, pc);
+    if (castMask) maskCircle(x, z, 0.3 * s); return;
+  }
   if (kind === 1) {
     const h = 2.4 * s;
     box(B, T, -0.2 * s, 0.2 * s, 0, h, -0.2 * s, 0.2 * s, trunk, trunk);
@@ -2333,11 +2417,112 @@ function buildProp(B, k, x, z, a, o) {
   }
 }
 
+// ================= Serrinha do Alambari: pórtico, praça, Poço do Céu  +  pontos de ônibus =================
+Object.assign(GLYPH, { H: ['101', '101', '111', '101', '101'], D: ['110', '101', '101', '101', '110'], B: ['110', '101', '110', '101', '110'], T: ['111', '010', '010', '010', '010'] });
+const shd = (c, k) => c.map(v => Math.max(0, Math.min(255, Math.round(v * k))));
+const BUS_STOPS = [];   // { x, z, a (rumo do ônibus parado), sx, sz (abrigo), to: 'serrinha' | 'morada' }
+function busShelter(B, x, z, a) {   // abrigo de ponto de ônibus: cobertura, banco, placa com ônibus
+  const g = groundAt(x, z) + 0.15, T = frame(x, g, z, a), MET = hex('#5d6b78'), ROOF = hex('#2f6fb0'), WOOD = hex('#8a5a32'), GL = hex('#a9c9d8');
+  for (const u of [-1.7, 1.7]) box(B, T, u - 0.06, u + 0.06, -0.3, 2.6, -0.06, 0.06, MET, MET);        // pilares de trás
+  box(B, T, -2.0, 2.0, 2.6, 2.72, -0.9, 0.5, ROOF, shd(ROOF, 0.8));                                    // cobertura azul
+  box(B, T, -1.7, 1.7, 0.9, 2.4, -0.04, 0.0, GL, GL, F_PLAIN);                                           // vidro de trás
+  box(B, T, -1.4, 1.4, 0.42, 0.5, -0.5, -0.08, WOOD, shd(WOOD, 0.8)); for (const u of [-1.2, 1.2]) box(B, T, u - 0.05, u + 0.05, -0.2, 0.42, -0.35, -0.25, MET, MET);   // banco
+  // placa do ponto, do lado da rua
+  box(B, T, 2.3, 2.38, -0.3, 2.9, -0.95, -0.87, MET, MET); box(B, T, 2.2, 2.48, 2.3, 2.9, -1.02, -0.8, hex('#f2f2f2'), hex('#d9d9d9'));
+  box(B, T, 2.25, 2.43, 2.42, 2.62, -1.04, -1.02, hex('#2f6fb0'), hex('#2f6fb0'), F_PLAIN);
+  maskRect(T, -2.0, 2.0, -0.6, 0.1);
+}
+// ---- ponto de ônibus do bairro: Av. Professor Darcy Ribeiro, na calçada do lado da igreja ----
+if (!SERR) for (const lm of (W.landmarks || [])) {
+  if (lm.type !== 'parque') continue;
+  const ch = P(frame(lm.x, 0, lm.z, lm.ang), 66, 0, 24.5);   // igreja
+  let best = null;
+  for (const r of W.roads) { if (r.t !== 'secondary' || !/Darcy/.test(r.n)) continue;
+    for (let i = 0; i < r.pts.length - 1; i++) { const [d, px, pz] = segDistT(ch[0], ch[2], r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1]); if (!best || d < best.d) best = { d, px, pz, r, i }; } }
+  if (!best) break;
+  const a = best.r.pts[best.i], b = best.r.pts[best.i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  let nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L; if (nx * (ch[0] - best.px) + nz * (ch[2] - best.pz) < 0) { nx = -nx; nz = -nz; }   // n: para o lado da igreja
+  const fx = nz, fz = -nx;   // mão de direção: a calçada (n) fica à direita do ônibus
+  const off = best.r.h + best.r.sw * 0.55, sx = best.px + nx * off, sz = best.pz + nz * off;
+  busShelter(chunkB(sx, sz), sx, sz, Math.atan2(-fz, -fx));
+  BUS_STOPS.push({ x: best.px + nx * (best.r.h - 2.3), z: best.pz + nz * (best.r.h - 2.3), a: Math.atan2(fz, fx), sx, sz, to: 'serrinha' });
+  POIS.push({ n: '🚌 Ônibus p/ Serrinha', x: sx, z: sz, y: 4 });
+  break;
+}
+if (SERR) for (const lm of W.landmarks) {
+  // ---- Pórtico Dairton Balbino dos Santos: dois pilares de pedra, viga de madeira com telhadinho e o letreiro ----
+  if (lm.type === 'portico') {
+    const T0 = frame(lm.x, 0, lm.z, lm.a), STONE = hex('#8d8374'), STONE2 = hex('#766d60'), WOOD = hex('#6b4a2f'), TILE = hex('#a9512f');
+    const B = chunkB(lm.x, lm.z), W2 = 5.4;
+    for (const sv of [-1, 1]) { const p = P(T0, 0, 0, sv * W2), g = groundAt(p[0], p[2]), T = frame(p[0], g, p[2], lm.a);
+      box(B, T, -0.65, 0.65, -0.6, 5.4, -0.65, 0.65, STONE, STONE2); box(B, T, -0.8, 0.8, -0.6, 0.5, -0.8, 0.8, STONE2, STONE2); maskRect(T, -0.7, 0.7, -0.7, 0.7); }
+    const g = Math.max(groundAt(...(() => { const p = P(T0, 0, 0, -W2); return [p[0], p[2]]; })()), groundAt(...(() => { const p = P(T0, 0, 0, W2); return [p[0], p[2]]; })()));
+    const T = frame(lm.x, g, lm.z, lm.a);
+    box(B, T, -0.45, 0.45, 5.4, 6.0, -W2 - 1.1, W2 + 1.1, WOOD, shd(WOOD, 0.8));                       // viga
+    const TR = frame(lm.x, g, lm.z, lm.a + Math.PI / 2); gableRoof(B, TR, 2 * W2 + 2.6, 1.9, 6.0, 0.7, 0.15, TILE, WOOD);   // telhadinho
+    for (const sg of [1, -1]) {   // letreiro dos dois lados
+      const TS_ = frame(lm.x, g, lm.z, lm.a + (sg > 0 ? Math.PI / 2 : -Math.PI / 2));
+      box(B, TS_, -4.3, 4.3, 4.35, 5.35, 0.42, 0.5, hex('#efe4c8'), hex('#d8cba8'));
+      pixelText(B, TS_, 'SERRINHA', -4.0, 5.2, 0.52, 0.12, hex('#4a2c18'));
+      pixelText(B, TS_, 'DO ALAMBARI', -2.25 - 0.9, 4.72, 0.52, 0.1, hex('#4a2c18'));
+    }
+    POIS.push({ n: 'Pórtico da Serrinha', x: lm.x, z: lm.z, y: 8 });
+  }
+  // ---- praça central da vila: piso de pedra, canteiro com ipê, bancos, postes e o ponto de ônibus ----
+  if (lm.type === 'pracaSerrinha') {
+    const T0 = frame(lm.x, 0, lm.z, lm.a), B = chunkB(lm.x, lm.z), PAV = hex('#c4baa6'), PAV2 = hex('#b2a891');
+    const WP = (u, v) => { const p = P(T0, u, 0, v); return [p[0], p[2]]; };
+    flatPolyD(B, [WP(-15, -9), WP(15, -9), WP(15, 9), WP(-15, 9)], 0.08, PAV, F_TEX);
+    flatPolyD(B, [WP(-15.4, -9.4), WP(15.4, -9.4), WP(15.4, 9.4), WP(-15.4, 9.4)], 0.05, PAV2, F_TEX);
+    { const c = WP(0, 0), g = groundAt(c[0], c[1]), T = frame(c[0], g, c[1], lm.a);   // canteiro redondo com ipê amarelo
+      for (let k = 0; k < 12; k++) { const a0 = k / 12 * Math.PI * 2; box(B, T, Math.cos(a0) * 2.6 - 0.45, Math.cos(a0) * 2.6 + 0.45, 0, 0.5, Math.sin(a0) * 2.6 - 0.45, Math.sin(a0) * 2.6 + 0.45, hex('#9b8f7a'), hex('#857a66')); }
+      box(B, T, -2.3, 2.3, 0, 0.42, -2.3, 2.3, hex('#5b3e28'), hex('#5b3e28')); tree(B, c[0], c[1], 4, 1.3, true); maskCircle(c[0], c[1], 2.9); }
+    for (const [u, v, r] of [[-9, -5, 0], [9, -5, 0], [-9, 5, Math.PI], [9, 5, Math.PI]]) {   // bancos de madeira
+      const p = WP(u, v), g = groundAt(p[0], p[1]), T = frame(p[0], g + 0.08, p[1], lm.a + r), WD = hex('#8a5a32');
+      box(B, T, -1.1, 1.1, 0.42, 0.5, -0.25, 0.25, WD, shd(WD, 0.8)); box(B, T, -1.1, 1.1, 0.5, 0.95, 0.2, 0.27, WD, shd(WD, 0.8));
+      for (const u2 of [-0.9, 0.9]) box(B, T, u2 - 0.06, u2 + 0.06, 0, 0.42, -0.2, 0.2, hex('#3a3a3a'), hex('#3a3a3a')); maskRect(T, -1.1, 1.1, -0.3, 0.3); }
+    for (const [u, v] of [[-14, -8.5], [14, 8.5]]) { const p = WP(u, v), g = groundAt(p[0], p[1]), T = frame(p[0], g, p[1], 0), MET = hex('#2d2f33');   // postes
+      box(B, T, -0.08, 0.08, 0, 4.2, -0.08, 0.08, MET, MET); box(B, T, -0.28, 0.28, 4.2, 4.6, -0.28, 0.28, hex('#f4e8b8'), hex('#f4e8b8'), F_GLOW); maskCircle(p[0], p[1], 0.2); }
+    // ponto de ônibus na beira da estrada, do lado da praça
+    const rl = Math.hypot(lm.x - lm.rx, lm.z - lm.rz) || 1, nx = (lm.x - lm.rx) / rl, nz = (lm.z - lm.rz) / rl;
+    const fx = nz, fz = -nx, sx = lm.rx + nx * 5.6 + fx * 12, sz = lm.rz + nz * 5.6 + fz * 12;
+    busShelter(chunkB(sx, sz), sx, sz, Math.atan2(-fz, -fx));
+    BUS_STOPS.push({ x: lm.rx + nx * 1.6 + fx * 12, z: lm.rz + nz * 1.6 + fz * 12, a: Math.atan2(fz, fx), sx, sz, to: 'morada' });
+    POIS.push({ n: 'Praça da Serrinha', x: lm.x, z: lm.z, y: 7 }); POIS.push({ n: '🚌 Ônibus p/ Morada', x: sx, z: sz, y: 4 });
+  }
+  // ---- Poço do Céu: poço de água verde-azulada ao pé de uma queda d'água, cercado de pedra ----
+  if (lm.type === 'pocoCeu') {
+    const B = chunkB(lm.x, lm.z), r = rngFor(lm.x, lm.z, 21), wy = POCO.y;
+    const up = POCO.up, ang = Math.atan2(up[1], up[0]);
+    // água
+    const ring = []; for (let k = 0; k < 20; k++) { const a0 = k / 20 * Math.PI * 2, rr = POCO.R * (0.92 + 0.1 * Math.sin(k * 2.3)); ring.push([lm.x + Math.cos(a0) * rr, lm.z + Math.sin(a0) * rr]); }
+    for (const [a, b, c] of triangulate(ring)) B.tri([ring[a][0], wy, ring[a][1]], [ring[b][0], wy, ring[b][1]], [ring[c][0], wy, ring[c][1]], UP, hex('#2fa8a6'), F_WATER);
+    // paredão de pedra do lado de cima, com a queda no meio
+    const RK = hex('#7d7a70'), RK2 = hex('#67645c'), MOSS = hex('#4f6b3a');
+    for (let k = -11; k <= 11; k++) {
+      const a0 = ang + k * 0.085, rr = POCO.R + 1.0 + r() * 1.4, x = lm.x + Math.cos(a0) * rr, z = lm.z + Math.sin(a0) * rr;
+      const hgt = (Math.abs(k) < 2 ? 9 : 9.8 - Math.abs(k) * 0.45) + r() * 1.6, w = 0.9 + r() * 0.8;
+      const T = frame(x, wy - 1, z, a0 + (r() - 0.5) * 0.5);
+      box(B, T, -w, w, 0, hgt, -w * 0.9, w * 0.9, r() < 0.3 ? MOSS : RK, RK2); maskRect(T, -w, w, -w * 0.9, w * 0.9);
+    }
+    // pedras baixas em volta do resto do poço
+    for (let k = 0; k < 22; k++) {
+      const a0 = ang + Math.PI * (0.35 + 1.3 * k / 21), rr = POCO.R + 0.4 + r() * 1.2, x = lm.x + Math.cos(a0) * rr, z = lm.z + Math.sin(a0) * rr, s = 0.5 + r() * 0.9;
+      box(B, frame(x, wy - 0.4, z, r() * 3), -s, s, 0, s * (0.6 + r() * 0.6), -s * 0.8, s * 0.8, r() < 0.25 ? MOSS : RK, RK2);
+    }
+    // a queda d'água: fitas claras descendo do topo do paredão até o poço, e espuma embaixo
+    const cx = lm.x + Math.cos(ang) * (POCO.R + 0.6), cz = lm.z + Math.sin(ang) * (POCO.R + 0.6), Tq = frame(cx, wy, cz, ang + Math.PI / 2);
+    for (let k = 0; k < 3; k++) { const w = 1.25 - k * 0.35, o = 0.25 + k * 0.12; box(B, Tq, -w, w, 0, 9.6 - k * 0.3, -o - 0.05, -o, k ? hex('#cfeef4') : hex('#f2fbfd'), hex('#e6f6fa'), F_GLOW); }
+    for (let k = 0; k < 9; k++) { const a0 = k / 9 * Math.PI * 2, s = 0.5 + r() * 0.4; box(B, frame(cx + Math.cos(a0) * 1.6 - Math.cos(ang) * 1.4, wy, cz + Math.sin(a0) * 1.6 - Math.sin(ang) * 1.4, a0), -s, s, 0, 0.12, -s, s, hex('#f4fbfc'), hex('#f4fbfc'), F_GLOW); }
+  }
+}
+
 // ---------------- mountains & clouds (far scenery) ----------------
 {
   const FOGC = [0.72, 0.82, 0.90];
   const r = rngFor(9, 9, 9), cx = (BX0 + BX1) / 2, cz = (BZ0 + BZ1) / 2;
   // anel de morros baixos e arredondados no horizonte (sem picos)
+  if (!SERR) {
   const n = 96, R0 = 1250;
   const raw = [];
   for (let i = 0; i < n; i++) raw.push(r());
@@ -2360,8 +2545,9 @@ function buildProp(B, k, x, z, a, o) {
     farB.quad(b0, b1, c1, c0, faceN(b0, b1, c1, true), col, F_FAR);
     farB.quad(c0, c1, k1, k0, faceN(c0, c1, k1, true), col2, F_FAR);
   }
+  }
   // ---- Serra da Mantiqueira ao norte: silhueta e cores tiradas da foto (malha única, sem luz nem sombra) ----
-  {
+  if (!SERR) {
     const S = {"h":[0.0,0.0,0.001,0.002,0.003,0.005,0.006,0.008,0.01,0.012,0.014,0.015,0.017,0.018,0.019,0.02,0.02,0.041,0.045,0.026,0.047,0.044,0.094,0.103,0.144,0.151,0.142,0.156,0.191,0.201,0.208,0.227,0.22,0.192,0.187,0.185,0.172,0.176,0.205,0.25,0.247,0.272,0.307,0.309,0.335,0.352,0.357,0.372,0.386,0.403,0.413,0.414,0.427,0.436,0.44,0.43,0.432,0.432,0.435,0.458,0.468,0.478,0.499,0.515,0.508,0.521,0.538,0.556,0.599,0.616,0.638,0.652,0.672,0.667,0.694,0.703,0.698,0.684,0.697,0.711,0.732,0.751,0.776,0.813,0.881,0.916,0.945,0.994,0.976,0.963,0.871,0.861,0.889,0.855,0.911,0.9,0.889,0.867,0.848,0.873,0.866,0.876,0.884,0.867,0.862,0.842,0.807,0.814,0.845,0.861,0.863,0.848,0.854,0.829,0.817,0.806,0.778,0.754,0.765,0.728,0.664,0.623,0.608,0.56,0.521,0.503,0.492,0.47,0.468,0.468,0.468,0.469,0.469,0.473,0.483,0.493,0.495,0.478,0.47,0.449,0.438,0.42,0.423,0.395,0.398,0.4,0.386,0.386,0.383,0.385,0.403,0.414,0.431,0.429,0.413,0.402,0.407,0.417,0.42,0.427,0.428,0.434,0.454,0.499,0.534,0.53,0.508,0.508,0.489,0.475,0.454,0.414,0.392,0.379,0.379,0.378,0.382,0.391,0.386,0.4,0.374,0.379,0.373,0.38,0.393,0.407,0.436,0.467,0.487,0.497,0.517,0.533,0.554,0.573,0.576,0.588,0.59,0.601,0.61,0.6,0.577],"c":["405b633357603a59602d535c044e591a505b33555e","405b633357603a59602d535c044e591a505b33555e","385a6134575f39585f3f5960495c614a5d62505f63","385a6134575f39585f3f5960495c614a5d62505f63","014e5d31575f044f5c24515c475c62606667656969","014f5e18505d024f5c044f5c445c61576266666b6b","014f5e18505d024f5c044f5c445c61576266666b6b","014e5e014e5d014f5d034f5d10515c566265606869","014e5e014e5d014f5d034f5d10515c566265606869","014f5e024e5e014f5d034f5c0d4f5c515e63495c63","024f5e054e5d014e5e024f5d094f5c25535e596668","024f5e054e5d014e5e024f5d094f5c25535e596668","014e5e024e5d014e5d024f5c084f5c24535e6b6c6a","014e5e024e5d014e5d024f5c084f5c24535e6b6c6a","014e5e014e5d014e5c034e5c094f5c23535e5d6568","014e5e014d5d024e5c024e5c0a4f5d1f535e3e5b63","014e5e014d5d024e5c024e5c0a4f5d1f535e3e5b63","024e5d0a4e5d024e5d014e5c0d4f5c21535e405b64","024e5d0a4e5d024e5d014e5c0d4f5c21535e405b64","054e5d27535e024e5c014e5d0c4f5c34576259666a","0a4f5d0d4f5d014d5d014e5d0f505d3c5b63465d64","0a4f5d0d4f5d014d5d014e5d0f505d3c5b63465d64","20535f054f5d014d5d014e5c485e642654604e6167","20535f054f5d014d5d014e5c485e642654604e6167","1e535f0e505d004d5c19505c20545f465e6459666b","044d5e104d5d014c5c22525d2e58604d6167566469","044d5e104d5d014c5c22525d2e58604d6167566469","1d535e024b5b1d4f5b26555f3a596154646a526268","1d535e024b5b1d4f5b26555f3a596154646a526268","19525e024b5a28545e24525e13505d4a5e66516069","2452601b525d25545d1b515c3e5b62506268526268","2452601b525d25545d1b515c3e5b62506268526268","024f6010505c20535d27555f4e61674f62685c676c","024f6010505c20535d27555f4e61674f62685c676c","0150610e505c20525c2e575f5163675f696c556569","014f6210515f34585f3a5a605564695a676b5d696c","014f6210515f34585f3a5a605564695a676b5d696c","0150620b506023545e30565e586769606a6c5f6a6d","0150620b506023545e30565e586769606a6c5f6a6d","01506103506116515c2f565e2c5761616a6c636a6e","01506202506112505c395a624761675e696d646c6e","01506202506112505c395a624761675e696d646c6e","0150610350610f4f5c1d545e446066606a6d636c6e","0150610350610f4f5c1d545e446066606a6d636c6e","024f61035061124e5c0c4f5d496167506369616c6e","014e60024f5f2d565f024e5b4c6167536569656d6f","014e60024f5f2d565f024e5b4c6167536569656d6f","365a65034f5f23545f335a625062685a686c5f6b6d","365a65034f5f23545f335a625062685a686c5f6b6d","2d5761024f6019525f435e654e636a54666a5b686b","2b5963024f5f08505f2c57614861684f63685d696d","2b5963024f5f08505f2c57614861684f63685d696d","2b5b64014e5f024f5f15525d47616752656a59696b","2b5b64014e5f024f5f15525d47616752656a59696b","2a5b66014f5f015060355b6344606854666b5e6b6d","205a6504506001506006515f3a5d654f656a53666a","205a6504506001506006515f3a5d654f656a53666a","0f556210526002505e03515e3a5c6351666b5f6b6e","0f556210526002505e03515e3a5c6351666b5f6b6e","235a64325b640d51600f535f0e536059686c4e6469","3e61692d5c66024f5e365c643b5d6557686c55676b","3e61692d5c66024f5e365c643b5d6557686c55676b","4160680953600b505f1f5560355d6551656b57676b","4160680953600b505f1f5560355d6551656b57676b","47636b1155611c5261085360345b644c6469626d6f","356169185761305e660d5460315c64355b63676f70","356169185761305e660d5460315c64355b63676f70","45636b0e53600a55614a646b2f5b64405f66656d70","45636b0e53600a55614a646b2f5b64405f66656d70","40626a0d535f0e55604362694161684462685f6b6f","1c57641d586316576123586347636a52676c4d656c","1c57641d586316576123586347636a52676c4d656c","0c55621f5863145861025461456268596b6e616e70","0c55621f5863145861025461456268596b6e616e70","1e5963275c641558620653614562694863685b6b6f","1b55620953600c54610353613a5d6650676c52686d","1b55620953600c54610353613a5d6650676c52686d","4a636c1958630d55601857623d5f674e656b626e71","4a636c1958630d55601857623d5f674e656b626e71","2f5f671d5863205863095662305b654b656b616e70","265a6402515f2e5b650254621859644c656b596b6e","265a6402515f2e5b650254621859644c656b596b6e","0954610252601054610b54611b59644f676b576b6e","0954610252601054610b54611b59644f676b576b6e","225764025160045361355f681858644a656a5b6c70","08506102505f0855621f586319596449636a54696d","08506102505f0855621f586319596449636a54696d","0f50600b535f15586128596318586448656b51676c","0f50600b535f15586128596318586448656b51676c","2d58651354602c5d652f5f671658643d626b50686d","3a5e6b1e57621157621d5864195763325f684b656c","3a5e6b1e57621157621d5864195763325f684b656c","55686f1f58620253610254611357633d616943636a","55686f1f58620253610254611357633d616943636a","44626a1c58620153600355621d5a6447666d4f686c","2757660a5360035461015462396069516a6f576b6e","2757660a5360035461015462396069516a6f576b6e","41616b1154600854610454623d636a4d696f44656b","41616b1154600854610454623d636a4d696f44656b","52676e0453600353600c576242656b4b686d406169","4b666e04515f04536136616947666c5d707247646a","4b666e04515f04536136616947666c5d707247646a","4c656d1155621e5a642d5e6647666c546c704f676c","4c656d1155621e5a642d5e6647666c546c704f676c","40636b0955612b5d650556613e636a5b6e71416369","3c60680b56620453602e5f6747676d586e71436369","3c60680b56620453602e5f6747676d586e71436369","065262025261095561305e663260695c6f73406167","065262025261095561305e663260695c6f73406167","0250610253620654611759633f646b5e6f723b6167","0e52620454611259642b5d663c626a596d6f3b5f66","0e52620454611259642b5d663c626a596d6f3b5f66","1557620c5661055462325f663b636a50696e4b6569","1557620c5661055462325f663b636a50696e4b6569","0b54611959630153611859623862684e686d54696c","17576203536102536135606643666c4e686c3d5e66","17576203536102536135606643666c4e686c3d5e66","01526001536101546247676a4d696d51696d375c64","01526001536101546247676a4d696d51696d375c64","025160005260015460375e65506a6d43656a385c63","03515f02515f366267165963536c6f4f696b395d64","03515f02515f366267165963536c6f4f696b395d64","3d6167435f663f636743656a536b6e4d6669375c63","3d6167435f663f636743656a536b6e4d6669375c63","355f63396165315e6449676c546d6f4d666b365a62","1c59601357600155601058624d686c4f686b3d5d62","1c59601357600155601058624d686c4f686b3d5d62","22585f08555f0155600e5762235d664d666a3a5a60","22585f08555f0155600e5762235d664d666a3a5a60","15586101535f015560095661235b644262673f5b60","0a545e01535f0254600656601d5a633159603b595e","0a545e01535f0254600656601d5a633159603b595e","02515e01535f0154600856601f5a632b555d37575d","02515e01535f0154600856601f5a632b555d37575d","02525e01535f02546008566120596327535b3c5b60","01525e01535f0254600755601d596235585e4a6062","01525e01535f0254600755601d596235585e4a6062","01525d01535f01535f09555f1d59612a545b3f595f","01525d01535f01535f09555f1d59612a545b3f595f","02515e00525e01535f07555f19586131595e3e595e","02515e02515e01535e08555e1b586033595f445c5f","02515e02515e01535e08555e1b586033595f445c5f","01505d02515e01525e06545e1d5861415e6134545b","01505d02515e01525e06545e1d5861415e6134545b","01505d02515e02525e06545e335c63405d632f525b","01505d01505d02525e08545d3e606448626532545b","01505d01505d02525e08545d3e606448626532545b","01505c02505d02515e2c575e365d63385d6436545b","01505c02505d02515e2c575e365d63385d6436545b","04515c11545c24585e355c62375e63325b6239565e","07515c14545c1a555c2a595f2c5a60325b623a585e","07515c14545c1a555c2a595f2c5a60325b623a585e","07515a0a525b24565e28585e2c595f305a613a5b60","07515a0a525b24565e28585e2c595f305a613a5b60","1c555c08515910545a3a5d633b5d612f5a603b5b61","16535b064f5a1d555d385c6221565e2e5960405b61","16535b064f5a1d555d385c6221565e2e5960405b61","2d5a5f0b515921565c21565d18555c2c59603e5c61","2d5a5f0b515921565c21565d18555c2c59603e5c61","17545a22555b1f555c28585d15545c2a585e3c5c61","155359125259325a5e22555c15545c2b575e3b5a61","155359125259325a5e22555c15545c2b575e3b5a61","07515909515a19565c27565d17535c28565e3a5a62","07515909515a19565c27565d17535c28565e3a5a62","045059054f5813525b1b545c18545c2a565d385960","024f59014f5a0c515906525a19535c2d565e3b5960","024f59014f5a0c515906525a19535c2d565e3b5960","034f5903505905505a03505a1b525b2d555d39585f","034f5903505905505a03505a1b525b2d555d39585f","18535911515a09515a08505a1d525c29555c37565d","26555a13525a034f590550591d515b29545c35545b","26555a13525a034f590550591d515b29545c35545b","0b5158085059024f59044f5919515a2b545c38555b","0b5158085059024f59044f5919515a2b545c38555b","024f59024f58014e58064f5918515a2d545b39565b","014e59014e58024e580b4e5923535b445c5f4e5f61","014e59014e58024e580b4e5923535b445c5f4e5f61","014e58014d58024d57084f5829545a36555d4a5c5f","014e58014d58024d57084f5829545a36555d4a5c5f","034e56014e58004d572050582f545a3f585e4f6061","034e57014d57024c572352582c555a30535b3a585c","034e57014d57024c572352582c555a30535b3a585c","034e57014d57184e5729535838585c3e595d3d595c","034e57014d57184e5729535838585c3e595d3d595c","034d56044d55194e552251572d545938555a475a5d","185357104d54134e551d4e562451582a515933535b","185357104d54134e551d4e562451582a515933535b","184e56064c55184d541c4f571d4f572a515931535b","184e56064c55184d541c4f571d4f572a515931535b","024b55064b56154e561c4f56194f572a51592e5259","024b55134d55114d550f4c56174e562a51592d5259","024b55134d55114d550f4c56174e562a51592d5259","064b540e4d55044b55084c55194e56285058305159","064b540e4d55044b55084c55194e56285058305159","024b54024a55024b55084c551a4e552850572e5158","014a55014a54024a55054b55124e56264f572d5158","014a55014a54024a55054b55124e56264f572d5158","024953024a54024a54044b54154d56244f562c5157","024953024a54024a54044b54154d56244f562c5157","0b4d54054a52034954034a54114c552a50562e5057"]};
     const N_ = S.c.length, ROWS = 7, R = 1850, SPAN = 1.5, HM = 300, BASE = -40;   // silhueta da foto do pôr do sol, pico com o formato da foto aproximada
     const hAt = i => { const e = Math.min(i / 14, (N_ - i) / 14), t = Math.max(0, Math.min(1, e)), f = t * t * (3 - 2 * t); return BASE + (0.06 + (Math.max(0.06, S.h[i]) - 0.06) * f) * (HM - BASE); };   // pontas descem suaves dos dois lados
@@ -2373,8 +2559,8 @@ function buildProp(B, k, x, z, a, o) {
       farB.quad(vtx(i, j), vtx(i + 1, j), vtx(i + 1, j + 1), vtx(i, j + 1), [0, 0, 1], c, F_SKY);
     }
   }
-  for (let i = 0; i < 46; i++) {
-    const x = cx + (r() - 0.5) * 2400, z = cz + (r() - 0.5) * 2400, y = 160 + r() * 80;
+  for (let i = 0; i < (SERR ? 110 : 46); i++) {
+    const x = cx + (r() - 0.5) * (SERR ? 11000 : 2400), z = cz + (r() - 0.5) * (SERR ? 7000 : 2400), y = SERR ? 1500 + r() * 300 : 160 + r() * 80;
     const T = frame(x, y, z, r() * 0.5), wc = hex('#ffffff'), sc = hex('#e8eef5');
     const k = 2 + Math.floor(r() * 4);
     for (let j = 0; j < k; j++) { const u = (r() - 0.5) * 40, v = (r() - 0.5) * 20, s = 10 + r() * 16; box(farB, T, u - s, u + s, 0, 5 + r() * 6, v - s * 0.6, v + s * 0.6, wc, sc, F_SKY, true); }   // nuvens acompanham a cor do céu
@@ -3359,7 +3545,7 @@ function boticoStep(n, tx, tz, sp, dt) {   // anda em direção ao alvo, desvian
   n.spd = 0; return false;
 }
 function boticoFrame(dt) {
-  const R = BOTICO; if (!R.n) return;
+  const R = BOTICO; if (!R.n || SERR) return;   // ele mora nas colinas do bairro
   const n = R.n, a = boticoAlt(player.x, player.z);
   if (!R.hills && a >= 428) R.hills = true; else if (R.hills && a < 424) R.hills = false;   // folga para não ficar entrando/saindo na borda
   R.inT = R.hills ? R.inT + dt : 0;
@@ -3604,7 +3790,7 @@ const VHS = { open: false, near: false, vis: false, cur: null, tapes: [
   { video: 'iRpbKtXmeks', pos: SOB9_TAPE },
   { video: 'adz-ePj0Oy8', pos: SOB9_TAPE_A },   // um pouco à esquerda da anterior, junto ao mesmo muro   // sobrado da esquina: dentro do terreno, junto ao muro da esquerda
   { video: '437DR4XdGjU', more: ['YVNCtyXO51Q', '4gY35lBxOII'], u: 9, v: 28.15 },   // lista: toca um depois do outro    // no muro do fundo, do lado de dentro, junto da hera
-].map(o => Object.assign(o, { pos: o.pos || null, sx: -1e4, sy: -1e4, vis: false, near: false })) };
+].filter(() => !SERR).map(o => Object.assign(o, { pos: o.pos || null, sx: -1e4, sy: -1e4, vis: false, near: false })) };   // fitas são do bairro
 function vhsPos(o = VHS.tapes[0]) {
   if (o.pos) return o.pos;
   const L = (W.landmarks || []).find(l => l.type === 'casa127'); if (!L) return null;
@@ -3710,7 +3896,7 @@ const PHOTOS = [
   { pos: (() => { const L = (W.landmarks || []).find(l => l.type === 'casa127'); if (!L) return null; const u = 0.6, v = 22.5; return [L.x + L.u[0] * u + L.v[0] * v, L.z + L.u[1] * u + L.v[1] * v]; })(), src: FOTO_116B, caption: '' },   // quintal da casa 116, atrás do sobrado
   { pos: (() => { const L = (W.landmarks || []).find(l => l.id === '389'); if (!L) return null; const u = 12, v = 8.6; return [L.x + L.u[0] * u + L.v[0] * v, L.z + L.u[1] * u + L.v[1] * v]; })(), src: FOTO_PANTUFA, caption: '' },   // quintal da frente da casa 389 (casa da Pantufa), logo depois do portão de madeira, longe do cantinho onde ela dorme
   { pos: (() => { const L = (W.landmarks || []).find(l => l.id === '389'); if (!L) return null; const u = 8.2, v = 8.6; return [L.x + L.u[0] * u + L.v[0] * v, L.z + L.u[1] * u + L.v[1] * v]; })(), src: FOTO_PANTUFA2, caption: '' },   // segunda foto no quintal da frente da casa 389, no meio, entre a porta e o portão
-].filter(o => o.pos).map(o => Object.assign(o, { near: false, px: null }));
+].filter(o => o.pos && !SERR).map(o => Object.assign(o, { near: false, px: null }));   // fotos são do bairro
 const PH = { open: false, cur: null };
 const thumb = (src, cb) => { const im = new Image(); im.onload = () => { const land = im.width > im.height, w = land ? 16 : 12, h = land ? 12 : 16, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(im, 0, 0, w, h);
   const d = g.getImageData(0, 0, w, h).data, px = { w, h, c: [] }; for (let i = 0; i < w * h; i++) px.c.push([d[i * 4], d[i * 4 + 1], d[i * 4 + 2]].map(v => Math.min(255, v * 1.6 + 20))); cb(px); }; im.src = src; };
@@ -4286,7 +4472,7 @@ let hudT = 0, lastStreet = '';
 function updateHUD() {
   let best = 1e9, name = '';
   for (const s of SEGS) { if (!s.n) continue; const d = segDist(player.x, player.z, s) - s.h; if (d < best) { best = d; name = s.n; } }
-  const txt = best < 18 ? name : (inPoly(player.x, player.z, (W.areas.find(a => a.t === 'wood') || { pts: [[0, 0]] }).pts) ? 'Mata' : 'Morada da Colina');
+  const txt = best < 18 ? name : (inPoly(player.x, player.z, (W.areas.find(a => a.t === 'wood') || { pts: [[0, 0]] }).pts) ? 'Mata' : (W.name || 'Morada da Colina'));
   if (txt !== lastStreet) { hudStreet.textContent = txt; lastStreet = txt; }
   const v = player.car ? Math.abs(player.cv) : player.speed;
   const gc = gameClock(), hh = Math.floor(gc.h), mm = Math.floor((gc.h - hh) * 60), isDay = gc.h >= 6 && gc.h < 18;
@@ -4900,6 +5086,7 @@ function step(dt) {
   if (keys.KeyD || keys.ArrowRight) ix += 1;
   if (joy.id !== null) { ix += joy.dx; iy -= joy.dy; }
   if (window.__hunt && window.__hunt.frozen()) { ix = 0; iy = 0; }
+  if (BUS.mode === 'ride' || BUS.mode === 'arrive') { ix = 0; iy = 0; }   // dentro do ônibus
   if (keys.KeyQ) cam.yaw += dt * 1.8;
   if (keys.KeyE) cam.yaw -= dt * 1.8;
   if (keys.KeyR) cam.pitch = Math.min(1.45, cam.pitch + dt);
@@ -5011,6 +5198,142 @@ function step(dt) {
     let guard = 0; while (c.s >= c.L && guard++ < 8) { const over = c.s - c.L; carNext(c); c.s = over; }
   }
 }
+// ================= ônibus Morada da Colina ⇄ Serrinha do Alambari =================
+const BUS = { mode: null, s: 0, v: 0, fast: false, x: 0, z: 0, a: 0, stop: null, near: null, t: 0, door: 0 };
+const BUS_ROUTE = (() => {   // rota do ônibus na Serrinha: um trecho da RJ‑163 antes do pórtico + a estrada até a praça
+  if (!SERR || !W.busRoute || W.busRoute.length < 2) return null;
+  const r = W.busRoute.map(p => [p[0], p[1]]), a = r[0], b = r[3] || r[1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  for (let k = 1; k <= 12; k++) r.unshift([a[0] - (b[0] - a[0]) / l * 5 * k, a[1] - (b[1] - a[1]) / l * 5 * k]);   // 60 m antes, já na rodovia
+  // suaviza as curvas para o ônibus não virar de lado
+  for (let it = 0; it < 3; it++) for (let i = 1; i < r.length - 1; i++) r[i] = [(r[i - 1][0] + 2 * r[i][0] + r[i + 1][0]) / 4, (r[i - 1][1] + 2 * r[i][1] + r[i + 1][1]) / 4];
+  const cum = [0]; for (let i = 1; i < r.length; i++) cum.push(cum[i - 1] + Math.hypot(r[i][0] - r[i - 1][0], r[i][1] - r[i - 1][1]));
+  return { pts: r, cum, L: cum[cum.length - 1] };
+})();
+function routeAt(R, s) {
+  s = Math.max(0, Math.min(R.L - 0.01, s)); let lo = 0, hi = R.cum.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (R.cum[m] <= s) lo = m; else hi = m; }
+  const a = R.pts[lo], b = R.pts[hi], t = (s - R.cum[lo]) / ((R.cum[hi] - R.cum[lo]) || 1);
+  const ah = R.pts[Math.min(R.pts.length - 1, hi + 2)], at = R.pts[Math.max(0, lo - 2)];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, Math.atan2(ah[1] - at[1], ah[0] - at[0])];
+}
+function drawBus(B, x, z, a, door) {   // ônibus intermunicipal: branco com faixas verde e amarela, letreiro laranja
+  const T = groundFrame(x, z, a, 0, 4.6), WH = hex('#f3f1ea'), WH2 = hex('#d9d6cc'), GR = hex('#1f8a4c'), YE = hex('#f2c230'), GLS = hex('#23384a'), BLK = hex('#1b1c1f'), TY = hex('#2a2a2d');
+  const L = 5.6, W2 = 1.27;
+  box(B, T, -L, L, 0.45, 3.15, -W2, W2, WH, WH2);                                   // carroceria
+  box(B, T, -L + 0.1, L - 0.1, 3.15, 3.3, -W2 + 0.12, W2 - 0.12, WH2, WH2);          // teto
+  box(B, T, -L - 0.01, L + 0.01, 0.85, 1.15, -W2 - 0.01, W2 + 0.01, GR, GR, F_PLAIN); // faixa verde
+  box(B, T, -L - 0.01, L + 0.01, 1.15, 1.27, -W2 - 0.01, W2 + 0.01, YE, YE, F_PLAIN); // faixa amarela
+  for (const sv of [-1, 1]) box(B, T, -L + 0.6, L - 1.6, 1.75, 2.75, sv * W2 - 0.02, sv * W2 + 0.02, GLS, GLS, F_PLAIN);   // janelas laterais
+  box(B, T, L - 0.02, L + 0.03, 1.55, 2.85, -W2 + 0.1, W2 - 0.1, GLS, GLS, F_PLAIN);   // para-brisa
+  box(B, T, L - 0.02, L + 0.04, 2.88, 3.1, -0.9, 0.9, hex('#120c08'), hex('#120c08'), F_PLAIN); box(B, T, L + 0.04, L + 0.05, 2.92, 3.06, -0.75, 0.6, hex('#ff9a2e'), hex('#ff9a2e'), F_GLOW);   // letreiro
+  box(B, T, -L - 0.03, -L + 0.02, 1.9, 2.8, -W2 + 0.15, W2 - 0.15, GLS, GLS, F_PLAIN);  // vidro de trás
+  for (const sv of [-1, 1]) { box(B, T, L - 0.02, L + 0.05, 0.6, 0.8, sv * 0.95 - 0.18, sv * 0.95 + 0.18, hex('#fff6d0'), hex('#fff6d0'), F_GLOW); box(B, T, -L - 0.05, -L + 0.02, 0.6, 0.8, sv * 0.95 - 0.18, sv * 0.95 + 0.18, hex('#d63b2f'), hex('#d63b2f'), F_GLOW); }
+  // porta da frente (lado direito, v negativo = direita do motorista): abre deslizando
+  box(B, T, L - 1.55 + door * 0.9, L - 0.65 + door * 0.9, 0.5, 2.7, -W2 - 0.03, -W2 + 0.01, door > 0.5 ? BLK : GLS, GLS, F_PLAIN);
+  for (const u of [-L + 1.6, L - 1.9]) for (const sv of [-1, 1]) box(B, T, u - 0.52, u + 0.52, 0.0, 1.04, sv * W2 - 0.3 * sv - 0.15, sv * W2 - 0.3 * sv + 0.15, TY, BLK);   // rodas
+}
+// ---- interface: botão do ponto, tela de transição e painel da viagem ----
+const busBtn = document.getElementById('btnBus'), busOv = document.getElementById('busOv'), busCv = document.getElementById('busCv'), busHud = document.getElementById('busHud');
+function busNearStop() {
+  if (BUS.mode) return null;
+  for (const st of BUS_STOPS) if (Math.hypot(player.x - st.sx, player.z - st.sz) < 4.5 || Math.hypot(player.x - st.x, player.z - st.z) < 7) return st;
+  return null;
+}
+// mapa em pixel art da viagem (Resende → Penedo → Serrinha), com o ônibus andando pela estrada
+const TRIP = [[-22.4874, -44.4770, 'Morada da Colina'], [-22.4800, -44.4790], [-22.4720, -44.4950], [-22.4640, -44.5170], [-22.4560, -44.5260], [-22.4430, -44.5270, 'Penedo'], [-22.4300, -44.5210], [-22.4180, -44.5110], [-22.4058, -44.5048, 'Pórtico'], [-22.3990, -44.5200], [-22.3925, -44.5350], [-22.3890, -44.5480], [-22.3875, -44.5583, 'Serrinha']];
+function tripAnim(dir, done) {
+  const cv = busCv, g = cv.getContext('2d'), Wc = 320, Hc = 180; cv.width = Wc; cv.height = Hc;
+  const lon0 = -44.575, lon1 = -44.455, lat0 = -22.380, lat1 = -22.497;
+  const X = lon => 14 + (lon - lon0) / (lon1 - lon0) * (Wc - 28), Y = lat => 26 + (lat - lat0) / (lat1 - lat0) * (Hc - 44);
+  const pts = TRIP.map(p => [X(p[1]), Y(p[0]), p[2]]); if (dir < 0) pts.reverse();
+  const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  const L = cum[cum.length - 1], DUR = 6500, t0 = performance.now(), rnd = k => { const s = Math.sin(k * 127.1) * 43758.5453; return s - Math.floor(s); };
+  busOv.style.display = 'flex'; document.getElementById('busCap').textContent = dir > 0 ? 'MORADA DA COLINA  →  SERRINHA DO ALAMBARI' : 'SERRINHA DO ALAMBARI  →  MORADA DA COLINA';
+  const at = s => { let i = 1; while (i < cum.length - 1 && cum[i] < s) i++; const t = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t, Math.atan2(pts[i][1] - pts[i - 1][1], pts[i][0] - pts[i - 1][0])]; };
+  const tick = () => {
+    const k = Math.min(1, (performance.now() - t0) / DUR), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2, now = performance.now() / 1000;
+    // chão: verde em blocos, serra ao norte (mais escura e alta), rio Paraíba embaixo
+    for (let y = 0; y < Hc; y += 4) for (let x = 0; x < Wc; x += 4) { const n = rnd(x * 0.37 + y * 1.91), hgt = 1 - y / Hc; g.fillStyle = hgt > 0.62 ? (n < 0.5 ? '#2f5a33' : '#36653a') : hgt > 0.4 ? (n < 0.5 ? '#4f8a45' : '#58934b') : (n < 0.5 ? '#6fa64a' : '#79ad50'); g.fillRect(x, y, 4, 4); }
+    for (let x = 0; x < Wc; x += 4) { const top = 6 + Math.round((Math.sin(x * 0.05) * 6 + Math.sin(x * 0.13 + 1) * 3 + 10) / 2) * 2; g.fillStyle = '#5c6f80'; g.fillRect(x, 0, 4, top); g.fillStyle = '#e8eef3'; if (x > 40 && x < 110) g.fillRect(x, 0, 4, Math.max(0, top - 10)); }   // Agulhas Negras no fundo
+    g.fillStyle = '#2f78b8'; for (let x = 0; x < Wc; x += 4) g.fillRect(x, Hc - 16 + Math.round(Math.sin(x * 0.04) * 3), 4, 6);   // rio Paraíba do Sul
+    g.fillStyle = '#5a5b62'; for (let x = 0; x < Wc; x += 2) g.fillRect(x, Hc - 26 + Math.round(Math.sin(x * 0.04 + 0.5) * 2), 2, 3);   // Via Dutra
+    // estrada da viagem
+    for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2); for (let j = 0; j <= n; j++) { const x = a[0] + (b[0] - a[0]) * j / n, y = a[1] + (b[1] - a[1]) * j / n; g.fillStyle = '#c79e72'; g.fillRect(Math.round(x) - 1, Math.round(y) - 1, 3, 3); } }
+    // rastro já percorrido
+    const sNow = e * L; for (let s = 0; s < sNow; s += 5) { const [x, y] = at(s); g.fillStyle = '#ffd84a'; g.fillRect(Math.round(x), Math.round(y), 2, 2); }
+    // lugares
+    for (const p of TRIP) if (p[2]) { const x = Math.round(X(p[1])), y = Math.round(Y(p[0])), big = p[2] === 'Morada da Colina' || p[2] === 'Serrinha';
+      g.fillStyle = '#b5532f'; g.fillRect(x - 4, y - 7, 8, 3); g.fillStyle = '#f1ece0'; g.fillRect(x - 3, y - 4, 6, 5); if (big) { g.fillStyle = '#b5532f'; g.fillRect(x + 3, y - 4, 6, 2); g.fillStyle = '#efe1b8'; g.fillRect(x + 4, y - 2, 4, 3); }
+      g.font = '8px monospace'; g.fillStyle = '#10140f'; g.fillText(p[2], x - g.measureText(p[2]).width / 2 + 1, y + 11); g.fillStyle = '#ffffff'; g.fillText(p[2], x - g.measureText(p[2]).width / 2, y + 10); }
+    // cachoeira perto da Serrinha
+    { const x = Math.round(X(-44.5744)), y = Math.round(Y(-22.3846)); g.fillStyle = '#e6f6fa'; g.fillRect(x, y - 8, 2, 8); g.fillStyle = '#2fa8a6'; g.fillRect(x - 3, y, 8, 3); }
+    // nuvens
+    for (let i = 0; i < 4; i++) { const x = ((i * 97 + now * 8) % (Wc + 60)) - 40, y = 30 + i * 21; g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(Math.round(x), y, 22, 5); g.fillRect(Math.round(x) + 5, y - 3, 12, 3); }
+    // ônibus (vista de cima, pixelado) + poeirinha
+    const [bx, by, ba] = at(sNow), c = Math.cos(ba), sn = Math.sin(ba), px = (u, v, col) => { g.fillStyle = col; g.fillRect(Math.round(bx + c * u - sn * v), Math.round(by + sn * u + c * v), 2, 2); };
+    for (let u = -6; u <= 6; u += 1.5) for (let v = -2; v <= 2; v += 1.5) px(u, v, Math.abs(v) > 1.4 ? '#1f8a4c' : '#f3f1ea');
+    px(6, 0, '#23384a'); px(-7, 0, '#d63b2f');
+    for (let k2 = 1; k2 < 5; k2++) { const [dx, dy] = at(Math.max(0, sNow - k2 * 4)); g.fillStyle = 'rgba(214,190,150,' + (0.6 - k2 * 0.12) + ')'; g.fillRect(Math.round(dx), Math.round(dy), 3, 3); }
+    if (k < 1) requestAnimationFrame(tick); else setTimeout(done, 350);
+  };
+  tick();
+}
+function busGo(st) {   // entra no ônibus: ele encosta no ponto, abre a porta, e a viagem começa
+  if (BUS.mode) return;
+  if (document.pointerLockElement) document.exitPointerLock();
+  for (const k in keys) keys[k] = false;
+  player.car = false; player.sit = null;
+  BUS.stop = st; BUS.mode = 'arrive'; BUS.t = 0; BUS.door = 0; BUS.a = st.a;
+  BUS.x0 = st.x - Math.cos(st.a) * 70; BUS.z0 = st.z - Math.sin(st.a) * 70;
+  if (st.to === 'serrinha') try { fetch('serrinha/', { cache: 'no-store' }).catch(() => {}); } catch (e) {}   // já vai baixando a outra página
+}
+function busFrame(B, dt) {
+  if (busBtn) { const st = busNearStop(); BUS.near = st; busBtn.style.display = st ? '' : 'none'; if (st) busBtn.firstChild.textContent = st.to === 'serrinha' ? '🚌 PEGAR O ÔNIBUS PARA A SERRINHA ' : '🚌 VOLTAR PARA O MORADA DA COLINA '; }
+  // ônibus parado no ponto da praça (Serrinha), esperando para voltar
+  if (SERR && !BUS.mode) for (const st of BUS_STOPS) if (st.to === 'morada' && Math.hypot(player.x - st.x, player.z - st.z) < 600) drawBus(B, st.x, st.z, st.a, 1);
+  if (BUS.mode === 'arrive' || BUS.mode === 'leave') {   // encostando / saindo do ponto
+    const st = BUS.stop; BUS.t += dt;
+    if (BUS.mode === 'arrive') { const k = Math.min(1, BUS.t / 3.2), e = 1 - Math.pow(1 - k, 3); BUS.x = BUS.x0 + (st.x - BUS.x0) * e; BUS.z = BUS.z0 + (st.z - BUS.z0) * e; BUS.door = Math.max(0, Math.min(1, (BUS.t - 3.3) / 0.6));
+      if (BUS.t > 4.3 && !BUS.faded) { BUS.faded = true; tripAnim(st.to === 'serrinha' ? 1 : -1, () => { location.href = st.to === 'serrinha' ? 'serrinha/?onibus=ida' : '../?onibus=volta'; }); } }
+    else { const k = Math.min(1, BUS.t / 4), e = k * k; BUS.door = Math.max(0, 1 - BUS.t / 0.6); BUS.x = st.x + Math.cos(st.a) * 80 * e; BUS.z = st.z + Math.sin(st.a) * 80 * e; if (k >= 1) BUS.mode = null; }
+    drawBus(B, BUS.x, BUS.z, st.a, BUS.door);
+  }
+  if (BUS.mode === 'ride' && BUS_ROUTE) {   // viagem do pórtico até a praça
+    const vmax = BUS.fast ? 70 : 19, left = BUS_ROUTE.L - BUS.s;
+    const tv = Math.min(vmax, Math.max(1.2, Math.sqrt(2 * 2.2 * Math.max(0, left - 1))));   // freia chegando na praça
+    BUS.v += (tv - BUS.v) * Math.min(1, dt * (tv < BUS.v ? 3 : 0.8)); BUS.s += BUS.v * dt;
+    const [x, z, a] = routeAt(BUS_ROUTE, BUS.s);
+    let da = a - BUS.a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; BUS.a += da * Math.min(1, dt * 5);
+    BUS.x = x; BUS.z = z; player.x = x; player.z = z; player.a = BUS.a;
+    const ty = Math.atan2(-Math.cos(BUS.a), -Math.sin(BUS.a)); let d = ty - cam.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; cam.yaw += d * Math.min(1, dt * 1.6);
+    drawBus(B, x, z, BUS.a, 0);
+    const km = Math.max(0, left) / 1000; document.getElementById('busLeft').textContent = km >= 1 ? km.toFixed(1).replace('.', ',') + ' km' : Math.round(km * 1000) + ' m';
+    if (left < 0.6) busArrive();
+  }
+}
+function busArrive() {   // chegou na praça: desce do ônibus, que fica parado no ponto esperando a volta
+  if (BUS.mode !== 'ride') return;
+  BUS.mode = null; busHud.style.display = 'none';
+  const st = BUS_STOPS.find(s => s.to === 'morada');
+  if (st) { BUS_STOPS.forEach(s => { if (s.to === 'morada') { s.x = BUS.x; s.z = BUS.z; s.a = BUS.a; } });
+    const dx = st.sx - BUS.x, dz = st.sz - BUS.z, l = Math.hypot(dx, dz) || 1; player.x = BUS.x + dx / l * 2.9; player.z = BUS.z + dz / l * 2.9; player.a = Math.atan2(dz, dx); }   // desce do lado do abrigo
+  cam.dist = 9; cam.pitch = 0.3;
+}
+if (busBtn) { busBtn.addEventListener('click', e => { e.stopPropagation(); if (BUS.near) busGo(BUS.near); }); busBtn.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); }
+document.getElementById('busFast').addEventListener('click', e => { e.stopPropagation(); BUS.fast = !BUS.fast; e.currentTarget.classList.toggle('on', BUS.fast); });
+document.getElementById('busSkip').addEventListener('click', e => { e.stopPropagation(); if (BUS.mode === 'ride' && BUS_ROUTE) { BUS.s = BUS_ROUTE.L - 0.5; BUS.v = 0; } });
+['busFast', 'busSkip'].forEach(id => document.getElementById(id).addEventListener('touchstart', e => e.stopPropagation(), { passive: true }));
+// chegada de ônibus: a página foi aberta pelo ponto (?onibus=ida na Serrinha, ?onibus=volta na Morada)
+const BUS_ARRIVAL = new URLSearchParams(location.search).get('onibus');
+function busStartArrival() {
+  if (SERR && BUS_ARRIVAL === 'ida' && BUS_ROUTE) { BUS.mode = 'ride'; BUS.s = 0; BUS.v = 12; BUS.a = routeAt(BUS_ROUTE, 0)[2]; cam.dist = 17; cam.pitch = 0.32; cam.yaw = Math.atan2(-Math.cos(BUS.a), -Math.sin(BUS.a)); busHud.style.display = 'flex'; const hp = document.getElementById('help'); if (hp) hp.style.display = 'none'; }
+  if (!SERR && BUS_ARRIVAL === 'volta') { const st = BUS_STOPS.find(s => s.to === 'serrinha'); if (st) {
+    const dx = st.sx - st.x, dz = st.sz - st.z, l = Math.hypot(dx, dz) || 1; player.x = st.x + dx / l * 2.9; player.z = st.z + dz / l * 2.9; player.a = Math.atan2(dz, dx);   // desce na calçada
+    const hp = document.getElementById('help'); if (hp) hp.style.display = 'none';
+    BUS.stop = st; BUS.mode = 'leave'; BUS.t = 0; BUS.door = 1; cam.dist = 11; cam.pitch = 0.3; cam.yaw = Math.atan2(-Math.cos(st.a + 2.2), -Math.sin(st.a + 2.2)); } }
+  if (BUS_ARRIVAL) try { history.replaceState(null, '', location.pathname); } catch (e) {}   // recarregar não repete a viagem
+}
+
 function frame_() {
   const now = performance.now();
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -5018,7 +5341,9 @@ function frame_() {
   const t = (nowMs() / 1000) % 3600;   // tempo das animações vem do relógio compartilhado
   // dynamic mesh
   dynB.reset();
-  if (!cam.fp && !(window.__net && window.__net.drawMe && window.__net.drawMe(dynB))) buildPlayer(dynB, player, MY_LOOK);
+  busFrame(dynB, dt);   // ônibus (e a posição do jogador quando está dentro dele)
+  const inBus = BUS.mode === 'ride' || (BUS.mode === 'arrive' && BUS.t > 3.9);
+  if (!inBus && !cam.fp && !(window.__net && window.__net.drawMe && window.__net.drawMe(dynB))) buildPlayer(dynB, player, MY_LOOK);
   if (cam.fp && player.car) { const K = frame(player.x, floorAt(player.x, player.z) + 0.02, player.z, player.a), c = hex('#e3e6ea');   // guidão em primeira pessoa
     const S = BIKES[bikeKind(player)]; beam(dynB, P(K, S.bar[0], S.bar[1], -S.bar[2]), P(K, S.bar[0], S.bar[1], S.bar[2]), 0.035, c); }
   if (window.__net) window.__net.frame(dynB, dt);
@@ -5172,5 +5497,7 @@ function frame_() {
 document.getElementById('load').style.display = 'none';
 updateHUD(); drawMini();
 requestAnimationFrame(frame_);
-window.__game = { botico: () => BOTICO, floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, gate9: () => GATE9, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, traffic, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+if (BUS_ARRIVAL) { document.getElementById('btnSolo').click(); busStartArrival(); }   // veio de ônibus: entra direto no jogo
+if (SERR) { for (const id of ['btnOnline', 'btnHunt']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; } }   // online só no bairro, por enquanto
+window.__game = { trip: d => tripAnim(d, () => { busOv.style.display = 'none'; }), bus: () => BUS, busStops: () => BUS_STOPS, busRoute: () => BUS_ROUTE && { L: BUS_ROUTE.L }, botico: () => BOTICO, floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, gate9: () => GATE9, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, traffic, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();

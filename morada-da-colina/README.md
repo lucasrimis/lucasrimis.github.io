@@ -22,6 +22,12 @@ Na tela inicial, **ESCONDE-ESCONDE** cria uma sala com código de 6 letras (ou e
 - Computador: Espaço = virar/atirar, T = travar, G = provocar.
 - As regras do Firebase estão em `fonte/firebase_rules.json`.
 
+## Serrinha do Alambari (segundo mapa, primeira versão)
+- No bairro, o ponto de ônibus fica na **Av. Professor Darcy Ribeiro**, na calçada do lado da igreja. Chegando perto aparece **🚌 PEGAR O ÔNIBUS PARA A SERRINHA**: o ônibus encosta, a tela mostra a viagem num mapa em pixel art e o jogo continua no **Pórtico da Serrinha**, dentro do ônibus, até a praça (7,3 km; dá para ⏩ acelerar ou ⏭ pular).
+- Da praça, o caminho até o **Poço do Céu** (2,2 km) segue a estrada e a trilha reais. Para voltar, o ônibus fica parado no ponto da praça.
+- Página: `serrinha/` (gerada por `fonte/prep_serrinha.py` + `fonte/build.py`). Por enquanto o modo online fica só no bairro.
+- Dados: estradas, trilhas, rios e nomes © colaboradores do OpenStreetMap (ODbL); relevo SRTM (Terrarium, AWS Open Data); cobertura do solo ESA WorldCover 2021 (© ESA WorldCover project / CC-BY 4.0). Casas e árvores são geradas a partir desses dados. Os dados brutos ficam no branch `dados-serrinha`, baixados pela tarefa `.github/workflows/serrinha-dados.yml`.
+
 ## Dados
 - Ruas, áreas verdes e lago: © colaboradores do OpenStreetMap (ODbL).
 - Relevo: SRTM 30 m.

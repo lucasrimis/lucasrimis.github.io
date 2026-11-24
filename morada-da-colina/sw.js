@@ -1,5 +1,5 @@
 // Morada da Colina: abre mesmo sem internet depois da primeira visita (modo sozinho).
-const CACHE = "morada-v20261124192735";
+const CACHE = "morada-v20261124205523";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -24,9 +24,11 @@ self.addEventListener("fetch", e => {
     e.respondWith(
       fetch(req, { cache: "no-store" }).then(res => {
         const copy = res.clone();
-        caches.open(CACHE).then(c => c.put("./index.html", copy));
+        // cada página guarda a sua cópia (a Morada e a Serrinha são páginas diferentes)
+        const key = url.pathname.endsWith("/serrinha/") || url.pathname.endsWith("/serrinha/index.html") ? "./serrinha/index.html" : "./index.html";
+        caches.open(CACHE).then(c => c.put(key, copy));
         return res;
-      }).catch(() => caches.match("./index.html"))
+      }).catch(() => caches.match(url.pathname.includes("/serrinha/") ? "./serrinha/index.html" : "./index.html"))
     );
     return;
   }
