@@ -558,7 +558,7 @@ const POCO = (() => { const lm = SERR && W.landmarks.find(l => l.type === 'pocoC
   let x = lm.x, z = lm.z, up;
   if (best && best.d < 45) { x = best.px; z = best.pz; const tx = best.b[0] - best.a[0], tz = best.b[1] - best.a[1], l = Math.hypot(tx, tz) || 1; up = [tx / l, tz / l]; if (demRaw(x + up[0] * 15, z + up[1] * 15) < demRaw(x - up[0] * 15, z - up[1] * 15)) up = [-up[0], -up[1]]; }
   else { const e = 8, gx = demRaw(x + e, z) - demRaw(x - e, z), gz = demRaw(x, z + e) - demRaw(x, z - e), l = Math.hypot(gx, gz) || 1; up = [gx / l, gz / l]; }
-  lm.x = x; lm.z = z; return { x, z, R: 8, y: demRaw(x, z) - 1.2, up }; })();
+  lm.x = x; lm.z = z; return { x, z, R: 4.6, y: demRaw(x, z) - 1.2, up }; })();
 const fineAt = (x, z) => { const i = Math.floor((x - EX0) / FG), j = Math.floor((z - EZ0) / FG); return i >= 0 && j >= 0 && i < FGW && j < FGH && FINE[j * FGW + i] === 1; };
 const TS = W.ts || 5; // terrain lattice spacing (m)
 const LW = Math.ceil((EX1 - EX0) / TS) + 1, LH = Math.ceil((EZ1 - EZ0) / TS) + 1;
@@ -568,7 +568,6 @@ for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
   let h = demRaw(x, z);
   if (SERR && !fineAt(x, z) && !fineAt(x + TS, z) && !fineAt(x, z + TS) && !fineAt(x - TS, z) && !fineAt(x, z - TS)) { LAT[j * LW + i] = h; continue; }
   if (STREAMS.length) { const sa = streamAt(x, z); if (sa && sa.e < 6) h -= (sa.w > 2 ? 1.6 : 1.0) * sstep(6, -sa.w * 0.4, sa.e); }   // leito dos rios
-  if (POCO) { const d = Math.hypot(x - POCO.x, z - POCO.z); if (d < POCO.R) h = Math.min(h, POCO.y - 0.4 - 1.8 * sstep(POCO.R, POCO.R - 4, d)); else if (d < POCO.R + 6) h = Math.min(h, POCO.y + 0.25 + (d - POCO.R) * 0.7); }
   // flatten road beds
   const rs = roadSurf(x, z);
   if (rs && !rs.foot && rs.e < LOT + 10) {   // lotes ao longo das ruas ficam na altura da calçada (casas e muros alinhados com ela)
@@ -590,6 +589,7 @@ for (let j = 0; j < LH; j++) for (let i = 0; i < LW; i++) {
   }
   if (CREEK2) { const d = creekD(x, z, CREEK2); if (d < 4.5) h -= 1.1 * sstep(4.5, 1.2, d); }   // valinha da continuação do riacho
   if (rs && rs.e < (rs.foot ? TS + 0.8 : 0.8)) h = Math.min(h, rs.h - (rs.foot ? 0.12 : 0.22));
+  if (POCO) { const d = Math.hypot(x - POCO.x, z - POCO.z); if (d < POCO.R + 3) h = Math.min(h, POCO.y - 0.7 - 1.5 * sstep(POCO.R + 3, POCO.R - 2, d)); else if (d < POCO.R + 12) h = Math.min(h, POCO.y - 0.7 + (d - POCO.R - 3) * 0.9); }   // bacia mais larga que a malha de 6 m; as pedras cobrem a borda
   LAT[j * LW + i] = h;
 }
 // cada casa fica na altura da calçada da sua rua; o terreno em volta é rebaixado para não atravessar paredes
@@ -863,7 +863,9 @@ for (const r of W.roads) {
 for (const sm of STREAMS) {
   const cp = sm.pts;
   for (let i = 0; i < cp.length - 1; i += 6) {
-    const piece = cp.slice(i, i + 7); if (piece.length < 2) continue;
+    let piece = cp.slice(i, i + 7);
+    if (POCO) { let best = [], cur = []; for (const p of piece) { if (Math.hypot(p[0] - POCO.x, p[1] - POCO.z) > POCO.R + 7) cur.push(p); else { if (cur.length > best.length) best = cur; cur = []; } } if (cur.length > best.length) best = cur; piece = best; }   // a água do rio não passa por cima do poço
+    if (piece.length < 2) continue;
     const [cx, cz] = centroid(piece); if (!fineAt(cx, cz)) continue;
     const B = chunkB(cx, cz), r = rngFor(cx, cz, 13);
     strip(B, piece, sm.w * 0.75, 0.35, hex('#3d84a8'), F_WATER, 2, groundAt);
@@ -2795,30 +2797,64 @@ if (SERR) for (const lm of W.landmarks) {
     BUS_STOPS.push({ x: lm.rx + nx * 1.6 + fx * 12, z: lm.rz + nz * 1.6 + fz * 12, a: Math.atan2(fz, fx), sx, sz, to: 'morada' });
     POIS.push({ n: 'Praça da Serrinha', x: lm.x, z: lm.z, y: 7 }); POIS.push({ n: '🚌 Ônibus p/ Morada', x: sx, z: sz, y: 4 });
   }
-  // ---- Poço do Céu: poço de água verde-azulada ao pé de uma queda d'água, cercado de pedra ----
+  // ---- Poço do Céu (pelas fotos): poço redondo verde‑esmeralda escavado na pedra lisa, queda estreita caindo na frente
+  //      de uma cavidade escura e redonda, paredão curvo com musgo, saída da água por lajes com uma cascatinha ----
   if (lm.type === 'pocoCeu') {
-    const B = chunkB(lm.x, lm.z), r = rngFor(lm.x, lm.z, 21), wy = POCO.y;
-    const up = POCO.up, ang = Math.atan2(up[1], up[0]);
-    // água
-    const ring = []; for (let k = 0; k < 20; k++) { const a0 = k / 20 * Math.PI * 2, rr = POCO.R * (0.92 + 0.1 * Math.sin(k * 2.3)); ring.push([lm.x + Math.cos(a0) * rr, lm.z + Math.sin(a0) * rr]); }
-    for (const [a, b, c] of triangulate(ring)) B.tri([ring[a][0], wy, ring[a][1]], [ring[b][0], wy, ring[b][1]], [ring[c][0], wy, ring[c][1]], UP, hex('#2fa8a6'), F_WATER);
-    // paredão de pedra do lado de cima, com a queda no meio
-    const RK = hex('#7d7a70'), RK2 = hex('#67645c'), MOSS = hex('#4f6b3a');
-    for (let k = -11; k <= 11; k++) {
-      const a0 = ang + k * 0.085, rr = POCO.R + 1.0 + r() * 1.4, x = lm.x + Math.cos(a0) * rr, z = lm.z + Math.sin(a0) * rr;
-      const hgt = (Math.abs(k) < 2 ? 9 : 9.8 - Math.abs(k) * 0.45) + r() * 1.6, w = 0.9 + r() * 0.8;
-      const T = frame(x, wy - 1, z, a0 + (r() - 0.5) * 0.5);
-      box(B, T, -w, w, 0, hgt, -w * 0.9, w * 0.9, r() < 0.3 ? MOSS : RK, RK2); maskRect(T, -w, w, -w * 0.9, w * 0.9);
+    const B = chunkB(lm.x, lm.z), r = rngFor(lm.x, lm.z, 21), wy = POCO.y, R0 = POCO.R, ang = Math.atan2(POCO.up[1], POCO.up[0]);
+    const T = frame(lm.x, wy, lm.z, ang);   // u = rio acima (para a queda), v = de lado
+    const RK = [hex('#6e6961'), hex('#605b54'), hex('#7a746a'), hex('#56524c')], MOSS = [hex('#5d7a35'), hex('#6f8f3c'), hex('#4c6a2e')];
+    const rk = () => RK[Math.floor(r() * RK.length)], ms = () => MOSS[Math.floor(r() * MOSS.length)];
+    const at = (u, v) => P(T, u, 0, v);
+    // água: borda mais clara e centro esmeralda
+    const disk = (rad, y, col) => { const ring = []; for (let k = 0; k < 28; k++) { const a0 = k / 28 * Math.PI * 2, rr = rad * (1 + 0.05 * Math.sin(k * 1.7)); ring.push([lm.x + Math.cos(a0) * rr, lm.z + Math.sin(a0) * rr]); }
+      for (const [a, b, c] of triangulate(ring)) B.tri([ring[a][0], y, ring[a][1]], [ring[b][0], y, ring[b][1]], [ring[c][0], y, ring[c][1]], UP, col, F_WATER); };
+    disk(R0 + 0.3, wy, hex('#1e8c80')); disk(R0 * 0.66, wy + 0.01, hex('#126f66')); disk(R0 * 0.3, wy + 0.02, hex('#0c5a55'));   // esmeralda, mais escuro no fundo
+    // bacia de pedra lisa: anéis subindo em degraus suaves (fica arredondado de longe); baixa na saída da água
+    for (let k = 0; k < 36; k++) {
+      const a0 = k / 36 * Math.PI * 2, rel = Math.abs(((a0 + Math.PI) % (2 * Math.PI)) - Math.PI);   // 0 = rio acima, π = saída
+      if (rel < 1.25) continue;                       // lado da queda é o paredão (abaixo)
+      const exit = rel > Math.PI - 0.32;              // bico de saída
+      for (let ring = 0; ring < 4; ring++) {
+        const rr = R0 + 0.35 + ring * 0.75, h = exit ? 0.15 + ring * 0.05 : 0.35 + ring * 0.55 + (ring === 3 ? r() * 0.5 : 0), w = 0.42 + ring * 0.06;
+        const u = Math.cos(a0) * rr, v = Math.sin(a0) * rr, Tb = frame(...(() => { const p = at(u, v); return [p[0], wy - 0.6, p[2]]; })(), ang + a0);
+        const top = ring === 3 && r() < 0.45 ? ms() : rk();
+        box(B, Tb, -w, w, 0, h + 0.6, -0.55, 0.55, top, rk());
+        if (ring >= 2 && !exit) maskRect(Tb, -w, w, -0.55, 0.55);
+      }
     }
-    // pedras baixas em volta do resto do poço
-    for (let k = 0; k < 22; k++) {
-      const a0 = ang + Math.PI * (0.35 + 1.3 * k / 21), rr = POCO.R + 0.4 + r() * 1.2, x = lm.x + Math.cos(a0) * rr, z = lm.z + Math.sin(a0) * rr, s = 0.5 + r() * 0.9;
-      box(B, frame(x, wy - 0.4, z, r() * 3), -s, s, 0, s * (0.6 + r() * 0.6), -s * 0.8, s * 0.8, r() < 0.25 ? MOSS : RK, RK2);
+    // paredão curvo atrás do poço (lado de cima), ~7 m, com musgo no alto e samambaias na beirada
+    const HW = 7.2;
+    for (let k = -10; k <= 10; k++) {
+      const a0 = k * 0.125, rr = R0 + 0.6 + Math.abs(k) * 0.05;
+      for (let layer = 0; layer < 3; layer++) {
+        const u = Math.cos(a0) * (rr + layer * 0.9), v = Math.sin(a0) * (rr + layer * 0.9), p = at(u, v);
+        const h = HW + layer * 0.8 - Math.abs(k) * 0.12 + r() * 0.5, Tc = frame(p[0], wy - 1, p[2], ang + a0);
+        box(B, Tc, -0.55, 0.55, 0, h, -0.42, 0.42, layer === 2 && r() < 0.6 ? ms() : rk(), rk());
+        if (layer === 0) maskRect(Tc, -0.55, 0.55, -0.42, 0.42);
+        if (layer === 2 && r() < 0.5) { const f = ms(); box(B, Tc, -0.5, 0.5, h, h + 0.35 + r() * 0.3, -0.5, 0.5, f, f); }   // samambaias / mato na beira
+      }
     }
-    // a queda d'água: fitas claras descendo do topo do paredão até o poço, e espuma embaixo
-    const cx = lm.x + Math.cos(ang) * (POCO.R + 0.6), cz = lm.z + Math.sin(ang) * (POCO.R + 0.6), Tq = frame(cx, wy, cz, ang + Math.PI / 2);
-    for (let k = 0; k < 3; k++) { const w = 1.25 - k * 0.35, o = 0.25 + k * 0.12; box(B, Tq, -w, w, 0, 9.6 - k * 0.3, -o - 0.05, -o, k ? hex('#cfeef4') : hex('#f2fbfd'), hex('#e6f6fa'), F_GLOW); }
-    for (let k = 0; k < 9; k++) { const a0 = k / 9 * Math.PI * 2, s = 0.5 + r() * 0.4; box(B, frame(cx + Math.cos(a0) * 1.6 - Math.cos(ang) * 1.4, wy, cz + Math.sin(a0) * 1.6 - Math.sin(ang) * 1.4, a0), -s, s, 0, 0.12, -s, s, hex('#f4fbfc'), hex('#f4fbfc'), F_GLOW); }
+    // cavidade escura e redonda atrás da queda
+    const D1 = hex('#1d1b18'), D2 = hex('#2a2722');
+    for (let k = 0; k < 9; k++) { const yy = 1.0 + k * 0.42, hw = Math.sqrt(Math.max(0, 1 - Math.pow((k - 4) / 4.6, 2))) * 1.7; box(B, T, R0 - 0.05, R0 + 0.2, yy, yy + 0.42, -hw, hw, k % 2 ? D1 : D2, D1, F_PLAIN); }   // na frente do paredão
+    // a queda: fita estreita, mais larga embaixo, saindo de um entalhe no alto do paredão
+    box(B, T, R0 + 0.55, R0 + 1.6, HW - 0.5, HW + 0.2, -0.75, 0.75, hex('#4d6f86'), hex('#4d6f86'), F_WATER);   // rio chegando no entalhe
+    for (let k = 0; k < 8; k++) {
+      const y0 = k * HW / 8, w = 0.5 + (8 - k) * 0.05, uu = R0 - 0.25 - (8 - k) * 0.03;
+      box(B, T, uu - 0.12, uu + 0.02, y0, y0 + HW / 8 + 0.05, -w, w, k % 2 ? hex('#f3fbfd') : hex('#dff2f7'), hex('#e9f7fa'), F_GLOW);
+    }
+    for (let k = 0; k < 10; k++) { const a0 = r() * Math.PI * 2, d = 0.4 + r() * 1.1, s = 0.25 + r() * 0.35, p = at(R0 - 0.7 + Math.cos(a0) * d, Math.sin(a0) * d * 1.3);   // espuma
+      box(B, frame(p[0], wy, p[2], r() * 3), -s, s, 0, 0.1, -s, s, hex('#f4fbfc'), hex('#f4fbfc'), F_GLOW); }
+    // saída: lajes de pedra descendo, com uma cascatinha branca
+    for (let k = 0; k < 7; k++) {
+      const u = -(R0 + 1.3 + k * 1.2), dy = -0.25 - k * 0.38, p = at(u, (r() - 0.5) * 0.6);
+      for (const sv of [-1, 1]) { const q = at(u, sv * (1.5 + r() * 0.6)); box(B, frame(q[0], wy + dy - 0.5, q[2], ang + (r() - 0.5) * 0.3), -0.7, 0.7, 0, 0.9 + r() * 0.6, -0.9, 0.9, r() < 0.3 ? ms() : rk(), rk()); }
+      box(B, frame(p[0], wy + dy - 0.5, p[2], ang), -0.7, 0.7, 0, 0.5, -1.0, 1.0, rk(), rk());
+      if (k === 3 || k === 4) box(B, frame(p[0], wy + dy, p[2], ang), -0.65, 0.65, 0.0, 0.08, -0.55, 0.55, hex('#f2fafc'), hex('#f2fafc'), F_GLOW);
+      else box(B, frame(p[0], wy + dy, p[2], ang), -0.65, 0.65, 0.0, 0.05, -0.5, 0.5, hex('#3f8f96'), hex('#3f8f96'), F_WATER);
+    }
+    // garganta fechada: mata densa dos dois lados do paredão
+    for (let k = 0; k < 26; k++) { const sv = k % 2 ? 1 : -1, u = -6 + r() * 16, v = sv * (R0 + 3.5 + r() * 6), p = at(u, v); if (Math.hypot(p[0] - lm.x, p[2] - lm.z) < R0 + 3) continue; tree(B, p[0], p[2], r() < 0.2 ? 5 : Math.floor(r() * 3), 0.9 + r() * 0.6, true); }
   }
 }
 
@@ -5804,7 +5840,7 @@ updateHUD(); drawMini();
 requestAnimationFrame(frame_);
 if (BUS_ARRIVAL) { document.getElementById('btnSolo').click(); busStartArrival(); }   // veio de ônibus: entra direto no jogo
 if (SERR) { for (const id of ['btnOnline', 'btnHunt']) { const el = document.getElementById(id); if (el) el.style.display = 'none'; } }   // online só no bairro, por enquanto
-window.__game = { trip: d => tripAnim(d, () => { busOv.style.display = 'none'; }), bus: () => BUS, busStops: () => BUS_STOPS, busRoute: () => BUS_ROUTE && { L: BUS_ROUTE.L }, botico: () => BOTICO, floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, gate9: () => GATE9, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, traffic, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
+window.__game = { poco: () => POCO, trip: d => tripAnim(d, () => { busOv.style.display = 'none'; }), bus: () => BUS, busStops: () => BUS_STOPS, busRoute: () => BUS_ROUTE && { L: BUS_ROUTE.L }, botico: () => BOTICO, floorAt: (x, z) => floorAt(x, z), player, cam, totalV, NPCS, DOGS, PROPS, gate: () => GATE116, beagle: () => BEAGLE, gate489: () => GATE489, gate9: () => GATE9, bench: () => BENCH, skymsg: () => SKYMSG, vhs: () => ({ pos: vhsPos(), near: VHS.near, vis: VHS.vis, sx: VHS.tapes[0].sx, sy: VHS.tapes[0].sy, open: VHS.open, tapes: VHS.tapes, cur: VHS.cur && VHS.cur.video }), PROPDEF, freeAt, groundAt, demRaw, SEGS, setPixel: p => { pixel = p; resize(); }, traffic, stats: () => ({ totalV, chunks: meshes.length, houses: W.houses.length, trees: W.trees.length, traffic: traffic.length, shadowOK }) };
 })();
 
 },30);
@@ -5812,7 +5848,7 @@ window.__game = { trip: d => tripAnim(d, () => { busOv.style.display = 'none'; }
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261124205523";
+  const BUILD = "v20261124235622";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;

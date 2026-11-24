@@ -178,7 +178,29 @@ nx, nz = -math.sin(qa) * side, math.cos(qa) * side
 pc = (qx + nx * 16, qz + nz * 16)
 landmarks.append({'type': 'pracaSerrinha', 'x': round(pc[0], 2), 'z': round(pc[1], 2), 'a': round(qa, 3), 'rx': round(qx, 2), 'rz': round(qz, 2), 'side': side})
 cx, cz = proj(*POCO)
+# encaixa o poço no rio mais perto (o ponto do OSM fica um pouco fora do traçado do rio)
+bs = None
+for sm in streams:
+    for a, b in zip(sm['pts'], sm['pts'][1:]):
+        dx, dz = b[0] - a[0], b[1] - a[1]; L = dx * dx + dz * dz or 1; t = max(0, min(1, ((cx - a[0]) * dx + (cz - a[1]) * dz) / L))
+        px, pz = a[0] + t * dx, a[1] + t * dz; d = math.hypot(cx - px, cz - pz)
+        if bs is None or d < bs[0]: bs = (d, px, pz)
+if bs and bs[0] < 45: cx, cz = bs[1], bs[2]
 landmarks.append({'type': 'pocoCeu', 'x': round(cx, 2), 'z': round(cz, 2)})
+# a trilha termina na beira do poço, não dentro da água
+for r in roads:
+    if r['t'] != 'footway' and r['hw'] != 'track': continue
+    keep = [p for p in r['pts'] if math.hypot(p[0] - cx, p[1] - cz) > 11]
+    if len(keep) != len(r['pts']):
+        runs, cur = [], []
+        for p in r['pts']:
+            if math.hypot(p[0] - cx, p[1] - cz) > 11: cur.append(p)
+            else:
+                if len(cur) > 1: runs.append(cur)
+                cur = []
+        if len(cur) > 1: runs.append(cur)
+        r['pts'] = max(runs, key=len) if runs else []
+roads[:] = [r for r in roads if len(r['pts']) > 1]
 dx_, dz_ = proj(-22.3848732, -44.5734527)
 landmarks.append({'type': 'pocoDino', 'x': round(dx_, 2), 'z': round(dz_, 2)})
 
