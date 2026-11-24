@@ -12,7 +12,7 @@ Jogo 3D em pixel art do bairro Morada da Colina (Resende, RJ), feito a partir de
 - O jogo instalado abre em tela cheia, funciona sozinho sem internet depois da primeira visita e se atualiza automaticamente.
 
 ## Controles
-- **Computador:** WASD / setas para andar, Shift corre, C entra e sai do carro, arrastar o mouse gira a câmera, roda do mouse dá zoom, M abre o mapa, V alterna entre primeira e terceira pessoa (clique na tela para travar o mouse).
+- **Computador:** WASD / setas para andar, Shift corre, C entra e sai do carro, arrastar o mouse gira a câmera, roda do mouse dá zoom, M abre o mapa, B abre o álbum de memórias (fotos e vídeos já encontrados), V alterna entre primeira e terceira pessoa (clique na tela para travar o mouse).
 - **Celular:** joystick no lado esquerdo da tela, arrastar no lado direito gira a câmera, dois dedos dão zoom, botão 👁 alterna primeira/terceira pessoa.
 
 ## Esconde-esconde

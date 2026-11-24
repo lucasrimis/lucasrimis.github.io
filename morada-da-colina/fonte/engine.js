@@ -2640,6 +2640,8 @@ addEventListener('keydown', e => {
   if (document.getElementById('lobby').style.display !== 'none') return;
   if (typeof VHS !== 'undefined' && VHS.open) return;
   if (typeof PH !== 'undefined' && PH.open) return;
+  if (e.code === 'KeyB' && typeof albumToggle !== 'undefined') { albumToggle(); return; }
+  if (typeof ALBUM !== 'undefined' && ALBUM.open) return;
   if (e.code === 'KeyF' && typeof VHS !== 'undefined' && VHS.near) { vhsOpen(VHS.cur); return; }
   if (e.code === 'KeyF' && typeof PH !== 'undefined' && PH.near) { photoOpen(); return; }
   if (e.code === 'KeyC' && typeof PET !== 'undefined' && PET.target) { petNow(); return; }
@@ -3658,6 +3660,7 @@ function tapeFound(o) {
   f.add(id); VHS.found = [...f]; try { localStorage.setItem(TAPE_KEY, JSON.stringify(VHS.found)); } catch (e) {}
   const ids = new Set(VHS.tapes.map(tapeId)), x = [...f].filter(k => ids.has(k)).length, y = ids.size;
   const el = document.getElementById('achv'); if (!el) return;
+  const ic = document.getElementById('achvIc'); if (ic) ic.textContent = '📼';
   el.querySelector('.t').textContent = x === y ? 'Todas as fitas encontradas!' : 'Fita encontrada!';
   el.querySelector('.n').textContent = x + '/' + y + ' fitas';
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
@@ -3747,6 +3750,7 @@ function photoFrame(B, t) {
 }
 function photoOpen(o) {
   o = o || PH.cur; if (!o || PH.open) return;
+  photoFound(o);
   if (document.pointerLockElement) document.exitPointerLock();
   PH.open = true; for (const k in keys) keys[k] = false;
   document.getElementById('fotoImg').src = o.src; document.getElementById('fotoImgB').src = o.back || ''; document.getElementById('fotoCard').classList.remove('flip');
@@ -3760,6 +3764,61 @@ document.getElementById('fotoOv').addEventListener('click', e => { if (e.target.
 document.getElementById('btnFoto').addEventListener('click', e => { e.stopPropagation(); photoOpen(); });
 document.getElementById('btnFoto').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
 addEventListener('keydown', e => { if (e.key === 'Escape' && PH.open) photoClose(); });
+// ---------------- álbum de memórias: fotos e fitas já encontradas (guardadas no navegador) ----------------
+const FOTO_KEY = 'mdc_fotos', photoId = o => 'f@' + Math.round(o.pos[0]) + ',' + Math.round(o.pos[1]);
+function photosFound() { try { return new Set(JSON.parse(localStorage.getItem(FOTO_KEY) || '[]')); } catch (e) { return new Set(PH.found || []); } }
+function photoFound(o) {
+  const f = photosFound(), id = photoId(o); if (f.has(id)) return;
+  f.add(id); PH.found = [...f]; try { localStorage.setItem(FOTO_KEY, JSON.stringify(PH.found)); } catch (e) {}
+  const ids = new Set(PHOTOS.map(photoId)), x = [...f].filter(k => ids.has(k)).length, y = ids.size;
+  const el = document.getElementById('achv'); if (!el) return;
+  const ic = document.getElementById('achvIc'); if (ic) ic.textContent = '🖼';
+  el.querySelector('.t').textContent = x === y ? 'Todas as fotos encontradas!' : 'Foto nova no álbum!';
+  el.querySelector('.n').textContent = x + '/' + y + ' fotos';
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  clearTimeout(VHS.achT); VHS.achT = setTimeout(() => el.classList.remove('on'), 5000);
+  if (ALBUM.open) albumRender();
+}
+const ALBUM = { open: false, tab: 'fotos' };
+function albumCounts() {
+  const fF = photosFound(), fT = tapesFound();
+  const ph = PHOTOS.filter(o => fF.has(photoId(o))).length, tp = VHS.tapes.filter(o => fT.has(tapeId(o))).length;
+  return { ph, tp, PH: PHOTOS.length, TP: VHS.tapes.length };
+}
+function albumRender() {
+  const c = albumCounts(), g = document.getElementById('albumGrid'), fF = photosFound(), fT = tapesFound();
+  document.getElementById('albumSub').textContent = (c.ph + c.tp) + ' de ' + (c.PH + c.TP) + ' memórias encontradas pelo bairro';
+  document.getElementById('albumTF').textContent = '🖼 FOTOS ' + c.ph + '/' + c.PH;
+  document.getElementById('albumTV').textContent = '📼 VÍDEOS ' + c.tp + '/' + c.TP;
+  document.querySelectorAll('#albumTabs .tbtn').forEach(b => b.classList.toggle('on', b.dataset.t === ALBUM.tab));
+  g.innerHTML = '';
+  if (ALBUM.tab === 'fotos') PHOTOS.forEach((o, i) => {
+    const ok = fF.has(photoId(o)), d = document.createElement('div'), rot = ((i * 37) % 9 - 4) * 0.8;
+    d.className = 'pola' + (ok ? '' : ' locked'); d.style.transform = 'rotate(' + rot + 'deg)';
+    d.innerHTML = '<span class="tp"></span>' + (ok ? '<img alt="Foto ' + (i + 1) + '">' : '<div class="lk">?</div>') + '<div class="nm">' + (ok ? '' : 'ainda não encontrada') + '</div>';
+    if (ok) { d.querySelector('img').src = o.src; d.addEventListener('click', () => photoOpen(o)); }
+    g.appendChild(d);
+  });
+  else VHS.tapes.forEach((o, i) => {
+    const ok = fT.has(tapeId(o)), d = document.createElement('div');
+    d.className = 'fita' + (ok ? '' : ' locked');
+    d.innerHTML = (ok ? '<img alt="Fita ' + (i + 1) + '">' : '<div class="lk">?</div>') + '<div class="lb">' + (ok ? 'FITA ' + String(i + 1).padStart(2, '0') : 'ainda não encontrada') + '</div><div class="rl"><i></i><i></i></div>';
+    if (ok) { const im = d.querySelector('img'); im.onerror = () => { im.style.visibility = 'hidden'; }; im.src = 'https://i.ytimg.com/vi/' + o.video + '/mqdefault.jpg'; d.addEventListener('click', () => vhsOpen(o)); }
+    g.appendChild(d);
+  });
+}
+function albumToggle(v) {
+  ALBUM.open = v === undefined ? !ALBUM.open : v;
+  if (ALBUM.open) { if (document.pointerLockElement) document.exitPointerLock(); for (const k in keys) keys[k] = false; albumRender(); }
+  document.getElementById('albumOv').style.display = ALBUM.open ? 'flex' : 'none';
+}
+document.getElementById('btnAlbum').addEventListener('click', e => { e.stopPropagation(); albumToggle(); });
+document.getElementById('btnAlbum').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+document.getElementById('albumClose').addEventListener('click', e => { e.stopPropagation(); albumToggle(false); });
+document.getElementById('albumOv').addEventListener('click', e => { if (e.target.id === 'albumOv') albumToggle(false); });
+document.getElementById('albumOv').addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+document.querySelectorAll('#albumTabs .tbtn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); ALBUM.tab = b.dataset.t; albumRender(); }));
+addEventListener('keydown', e => { if (e.key === 'Escape' && ALBUM.open && !PH.open && !VHS.open) albumToggle(false); }, true);   // captura: roda antes do Esc da foto/fita, então fechar a foto não fecha o álbum junto
 function vhsClose() { VHS.open = false; document.getElementById('vhsOv').style.display = 'none'; document.getElementById('vhsTv').innerHTML = ''; }
 document.getElementById('vhsClose').addEventListener('click', vhsClose);
 document.getElementById('btnVhs').addEventListener('click', e => { e.stopPropagation(); vhsOpen(VHS.cur); });
