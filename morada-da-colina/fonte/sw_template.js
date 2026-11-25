@@ -24,11 +24,9 @@ self.addEventListener("fetch", e => {
     e.respondWith(
       fetch(req, { cache: "no-store" }).then(res => {
         const copy = res.clone();
-        // cada página guarda a sua cópia (a Morada e a Serrinha são páginas diferentes)
-        const key = url.pathname.endsWith("/serrinha/") || url.pathname.endsWith("/serrinha/index.html") ? "./serrinha/index.html" : "./index.html";
-        caches.open(CACHE).then(c => c.put(key, copy));
+        caches.open(CACHE).then(c => c.put("./index.html", copy));
         return res;
-      }).catch(() => caches.match(url.pathname.includes("/serrinha/") ? "./serrinha/index.html" : "./index.html"))
+      }).catch(() => caches.match("./index.html"))
     );
     return;
   }
