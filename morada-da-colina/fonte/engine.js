@@ -1955,29 +1955,52 @@ for (const lm of (W.landmarks || [])) {
     for (let v = -4.8; v <= 4.8; v += 0.3) box(B, Nt, -0.01, 0.01, 1.62, 2.36, v, v + 0.02, dark, dark);
   }
   // ---- fences (posts + rails + wires): perimeter, divider, playground ----
-  function fence(u0, v0, u1, v1, h, postCol, gaps) {
-    const L = Math.hypot(u1 - u0, v1 - v0), du = (u1 - u0) / L, dv = (v1 - v0) / L;
-    const n = Math.max(1, Math.ceil(L / 2.8));
-    for (let k = 0; k < n; k++) {
-      const t0 = L * k / n, t1 = L * (k + 1) / n, tm = (t0 + t1) / 2;
-      if ((gaps || []).some(([g0, g1]) => tm > g0 && tm < g1)) continue;
-      const a = [u0 + du * t0, v0 + dv * t0], b = [u0 + du * t1, v0 + dv * t1];
-      const pa = WP(...a), pb = WP(...b), ya = gA(...a), yb = gA(...b);
-      beam(B, [pa[0], ya - 0.3, pa[2]], [pa[0], ya + h, pa[2]], 0.09, postCol);
-      if (k === n - 1 || (gaps || []).some(([g0]) => Math.abs(t1 - g0) < 0.01)) beam(B, [pb[0], yb - 0.3, pb[2]], [pb[0], yb + h, pb[2]], 0.09, postCol);
-      for (const hh of [0.12, h * 0.5, h - 0.04]) beam(B, [pa[0], ya + hh, pa[2]], [pb[0], yb + hh, pb[2]], hh === h - 0.04 ? 0.06 : 0.025, hh === h - 0.04 ? postCol : WIRE);
-      for (let y = 0.3; y < h - 0.1; y += 0.3) beam(B, [pa[0], ya + y, pa[2]], [pb[0], yb + y, pb[2]], 0.012, WIRE);
-      const c = frame(0, 0, 0, 0); // collision
-      mx.beginPath(); mx.lineWidth = 0.35; mx.strokeStyle = '#000'; mx.moveTo(pa[0], pa[2]); mx.lineTo(pb[0], pb[2]); mx.stroke();
+  // cerca: os trechos entre as aberturas são divididos em vãos de ~2,8 m, então sempre há mourão dos dois lados de cada abertura
+  const EARTH = hex('#a58c64'), EARTH2 = hex('#97805a');
+  function fence(u0, v0, u1, v1, h, postCol, gaps, gates) {
+    const L = Math.hypot(u1 - u0, v1 - v0), du = (u1 - u0) / L, dv = (v1 - v0) / L, G = (gaps || []).slice().sort((a, b) => a[0] - b[0]);
+    const runs = []; let t = 0; for (const [g0, g1] of G) { if (g0 > t) runs.push([t, g0]); t = g1; } if (t < L) runs.push([t, L]);
+    for (const [r0, r1] of runs) {
+      const n = Math.max(1, Math.round((r1 - r0) / 2.8));
+      for (let k = 0; k < n; k++) {
+        const t0 = r0 + (r1 - r0) * k / n, t1 = r0 + (r1 - r0) * (k + 1) / n;
+        const a = [u0 + du * t0, v0 + dv * t0], b = [u0 + du * t1, v0 + dv * t1], pa = WP(...a), pb = WP(...b), ya = gA(...a), yb = gA(...b);
+        beam(B, [pa[0], ya - 0.3, pa[2]], [pa[0], ya + h, pa[2]], 0.09, postCol);
+        if (k === n - 1) beam(B, [pb[0], yb - 0.3, pb[2]], [pb[0], yb + h, pb[2]], 0.09, postCol);
+        for (const hh of [0.12, h * 0.5, h - 0.04]) beam(B, [pa[0], ya + hh, pa[2]], [pb[0], yb + hh, pb[2]], hh === h - 0.04 ? 0.06 : 0.025, hh === h - 0.04 ? postCol : WIRE);
+        for (let y = 0.3; y < h - 0.1; y += 0.3) beam(B, [pa[0], ya + y, pa[2]], [pb[0], yb + y, pb[2]], 0.012, WIRE);
+        mx.beginPath(); mx.lineWidth = 0.35; mx.strokeStyle = '#000'; mx.moveTo(pa[0], pa[2]); mx.lineTo(pb[0], pb[2]); mx.stroke();
+      }
     }
+    // entradas: mourões reforçados com travessa no alto, portãozinho de tela aberto e trilha de terra batida atravessando
+    G.forEach(([g0, g1], gi) => {
+      const opt = (gates || [])[gi] || {}, a = [u0 + du * g0, v0 + dv * g0], b = [u0 + du * g1, v0 + dv * g1], pa = WP(...a), pb = WP(...b), ya = gA(...a), yb = gA(...b);
+      for (const [p, y] of [[pa, ya], [pb, yb]]) { beam(B, [p[0], y - 0.3, p[2]], [p[0], y + h + 0.15, p[2]], 0.13, postCol); box(B, frame(p[0], y + h + 0.15, p[2], 0), -0.11, 0.11, 0, 0.08, -0.11, 0.11, postCol, postCol); }
+      if (!opt.noTop) beam(B, [pa[0], ya + h + 0.1, pa[2]], [pb[0], yb + h + 0.1, pb[2]], 0.06, postCol);
+      if (opt.path !== false) {   // trilha gasta no chão, de um lado ao outro
+        const nu = -dv, nv = du, w = (g1 - g0) * 0.36, ext = opt.ext || 2.6, mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        for (let k = -4; k < 4; k++) { const c0 = [mid[0] + nu * ext * k / 4, mid[1] + nv * ext * k / 4], c1 = [mid[0] + nu * ext * (k + 1) / 4, mid[1] + nv * ext * (k + 1) / 4], ww = w * (1 - Math.abs(k + 0.5) / 5.5);
+          const q = [[c0[0] - du * ww, c0[1] - dv * ww], [c0[0] + du * ww, c0[1] + dv * ww], [c1[0] + du * ww, c1[1] + dv * ww], [c1[0] - du * ww, c1[1] - dv * ww]].map(([u, v]) => { const p = WP(u, v); return [p[0], groundAt(p[0], p[2]) + 0.075, p[2]]; });
+          B.quad(q[0], q[1], q[2], q[3], UP, k % 2 ? EARTH : EARTH2, F_TEX); }
+      }
+      if (opt.leaf !== false) {   // folha do portão aberta para dentro, encostada na cerca
+        const side = opt.side || 1, gw = Math.min(1.6, (g1 - g0) * 0.9), hinge = pa, hy = ya, open = opt.openAng || 1.75;
+        const lu = Math.cos(open) * du - Math.sin(open) * (-dv) * side, lv = Math.cos(open) * dv - Math.sin(open) * du * side;
+        const tip = WP(a[0] + lu * gw, a[1] + lv * gw), ty = gA(a[0] + lu * gw, a[1] + lv * gw);
+        for (const y of [0.12, h - 0.2]) beam(B, [hinge[0], hy + y, hinge[2]], [tip[0], ty + y, tip[2]], 0.04, postCol);
+        beam(B, [tip[0], ty + 0.1, tip[2]], [tip[0], ty + h - 0.2, tip[2]], 0.04, postCol); beam(B, [hinge[0], hy + 0.12, hinge[2]], [tip[0], ty + h - 0.2, tip[2]], 0.025, postCol);
+        for (let y = 0.35; y < h - 0.25; y += 0.3) beam(B, [hinge[0], hy + y, hinge[2]], [tip[0], ty + y, tip[2]], 0.012, WIRE);
+        mx.beginPath(); mx.lineWidth = 0.3; mx.strokeStyle = '#000'; mx.moveTo(hinge[0], hinge[2]); mx.lineTo(tip[0], tip[2]); mx.stroke();
+      }
+    });
   }
   const FU0 = 6.9, FU1 = 51, FV0 = 6.9, FV1 = FE;
-  fence(FU0, FV0, FU1, FV0, 2.4, POST, [[38.6, 42.6]]);          // Anália Franco side, with the main entrance
-  fence(FU0, FV0, FU0, FV1, 2.4, POST, [[FV1 - FV0 - 3.6, FV1 - FV0 - 0.2]]);          // Rua Quatro-A side, opening at the pitch corner
+  fence(FU0, FV0, FU1, FV0, 2.4, POST, [[38.4, 42.8]], [{ leaf: false, noTop: true, path: false }]);   // Anália Franco: entrada principal (arco PARQUE COLINA)
+  fence(FU0, FV0, FU0, FV1, 2.4, POST, [[FV1 - FV0 - 4.4, FV1 - FV0 - 1.0]], [{ side: -1, ext: 3.4 }]);   // Rua Quatro-A: entrada do campo pela esquina
   fence(FU0, FV1, FU1, FV1, 2.4, POST);                          // Agenor Lopes Siqueira side
   fence(FU1, FV0, FU1, FV1, 2.4, POST);                          // church side
-  fence(FU0, 26.6, FU1, 26.6, 3.0, RED, [[32.6, 35.2]]);         // divider pitch | playground + volley, with an opening to the playground
-  fence(30.7, FV0, 30.7, 26.6, 2.2, RED, [[8.2, 10.0]]);          // volley | playground, with a passage
+  fence(FU0, 26.6, FU1, 26.6, 3.0, RED, [[32.2, 35.8]], [{ side: 1, ext: 3.2 }]);   // divisa campo | parquinho: passagem larga com portão aberto
+  fence(30.7, FV0, 30.7, 26.6, 2.2, RED, [[7.4, 10.4]], [{ side: 1, ext: 2.4 }]);   // vôlei | parquinho
   // ---- entrance arch "PARQUE COLINA" ----
   {
     const uc = 47.5, vS = FV0;
