@@ -4701,14 +4701,15 @@ window.__net = (function () {
       const target = v.u === N.uid ? N.meBub : N.others.get(v.u);
       say(v.u === N.uid ? null : target, v.m, v.u);
     });
-    N.online = true; try { N.worldStart(); } catch (e) { console.error(e); } onl.style.display = 'flex'; $('btnLeave').textContent = 'SAIR'; $('btnLeave').classList.remove('join'); $('btnChat').style.display = '';
+    N.online = true; N.crJoinMs = Date.now(); N.crSince = null; setTimeout(() => crPoll(), 300);   // marca a entrada e já confere as mensagens
+    try { N.worldStart(); } catch (e) { console.error(e); } onl.style.display = 'flex'; $('btnLeave').textContent = 'SAIR'; $('btnLeave').classList.remove('join'); $('btnChat').style.display = '';
     if (!N.base) sys('Você está online. Aperte Enter (ou CHAT) para falar.');
   }
   // sair do online: volta ao modo sozinho no mesmo lugar
   N.leave = async () => {
     if (!N.online) return;
     N.tg({ t: 'leave', n: N.name, r: N.base ? N.base.split('/')[1] : '' });
-    N.online = false; N.worldStop();
+    N.online = false; N.crJoinMs = 0; N.crSince = null; N.worldStop();
     try { N.players.off(); N.chatQ.off(); N.connRef.off(); N.me.onDisconnect().cancel(); await N.me.update({ bye: 1 }).catch(() => {}); await N.me.remove(); } catch (e) { console.error(e); }
     for (const o of N.others.values()) { o.el.remove(); if (o.bub) o.bub.remove(); }
     N.others.clear();
@@ -4775,12 +4776,19 @@ window.__net = (function () {
     if (S.seen && !S.chat && now - S.seen > 4500) { S.chat = true; creatorChat(S.m); }
   };
   N.creatorMsg = creatorMsg;
-  const crSeen = new Set(); let crFirst = true;
+  // mensagens do criador: só as mandadas DEPOIS que a pessoa entrou no online (a cada entrada conta de novo).
+  // O momento da entrada é convertido para o relógio do servidor (j.now), então não depende do relógio do celular.
+  const crSeen = new Set();
   async function crPoll() {
     try {
-      const r = await fetch(TG + 'criador', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json();
-      for (const x of j.msgs || []) { if (crSeen.has(x.id)) continue; crSeen.add(x.id); if (crFirst && j.now - x.d > 90 || !N.online) continue; creatorMsg(Array.from(String(x.m)).slice(0, 200).join('')); }
-      crFirst = false;
+      const t0 = Date.now(), r = await fetch(TG + 'criador', { cache: 'no-store' }); if (!r.ok) return; const j = await r.json();
+      const rtt = (Date.now() - t0) / 2000;
+      if (N.online && N.crJoinMs && N.crSince == null) N.crSince = j.now - rtt - (Date.now() - N.crJoinMs) / 1000 - 1;   // hora do servidor em que entrou
+      for (const x of j.msgs || []) {
+        if (crSeen.has(x.id)) continue;
+        if (!N.online || N.crSince == null || x.d < N.crSince) { crSeen.add(x.id); continue; }   // mandada antes de entrar: ignora de vez
+        crSeen.add(x.id); creatorMsg(Array.from(String(x.m)).slice(0, 200).join(''));
+      }
     } catch (e) {}
   }
   N.crStart = () => { if (N.crOn) return; N.crOn = true; crPoll(); setInterval(() => { if (!document.hidden && N.online) crPoll(); }, 10000); };
@@ -5498,7 +5506,7 @@ window.__game = { botico: () => BOTICO, floorAt: (x, z) => floorAt(x, z), player
 <script>
 // ---------- App instalável (PWA), igual ao jogo dos gorilas ----------
 (() => {
-  const BUILD = "v20261126104358";
+  const BUILD = "v20261128172515";
   const host = location.hostname;
   const hosted = /github\.io$|pages\.dev$/i.test(host) || host === "localhost" || host === "127.0.0.1";
   let reg = null;
